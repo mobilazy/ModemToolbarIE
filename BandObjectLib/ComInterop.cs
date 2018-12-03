@@ -65,14 +65,14 @@ namespace BandObjectLib
     [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
 	public struct DESKBANDINFO
 	{
-		public UInt32		dwMask;
+		public DBIM		dwMask;
 		public Point	    ptMinSize;
 		public Point		ptMaxSize;
 		public Point		ptIntegral;
 		public Point		ptActual;
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst=255)]
 		public String		wszTitle;
-		public DBIM			dwModeFlags;
+		public DBIMF			dwModeFlags;
 		public Int32		crBkgnd;
 	};
 
@@ -81,7 +81,7 @@ namespace BandObjectLib
 	[Guid("FC4801A3-2BA9-11CF-A229-00AA003D7352")] 
 	public interface IObjectWithSite
 	{
-		void SetSite([In ,MarshalAs(UnmanagedType.IUnknown)] Object pUnkSite);
+		void SetSite([In ,MarshalAs(UnmanagedType.IUnknown)] object pUnkSite);
 		void GetSite(ref Guid riid, [MarshalAs(UnmanagedType.IUnknown)] out Object ppvSite); //
     }
 
