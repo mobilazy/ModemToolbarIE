@@ -36,7 +36,7 @@ namespace ModemToolbarIE
         {
             get
             {
-                if (engine == null || engine.Toolbar == null || engine.Toolbar.IsDisposed) return false;
+                if (engine == null || engine.ToolStrip == null || engine.ToolStrip.IsDisposed) return false;
                 foreach (ToolStripItem item in items)
                 {
                     if (item.Visible) return true;
@@ -46,7 +46,7 @@ namespace ModemToolbarIE
             }
             set
             {
-                if (engine == null || engine.Toolbar == null || engine.Toolbar.IsDisposed) return;
+                if (engine == null || engine.ToolStrip == null || engine.ToolStrip.IsDisposed) return;
                 foreach (ToolStripItem item in items)
                 {
                     item.Visible = value;
@@ -83,12 +83,12 @@ namespace ModemToolbarIE
         /// </summary>
         public virtual void Reset()
         {
-            if (!(engine == null || engine.Toolbar == null || engine.Toolbar.IsDisposed))
+            if (!(engine == null || engine.ToolStrip == null || engine.ToolStrip.IsDisposed))
             {
                 foreach (ToolStripItem item in items)
                 {
                     if (item.IsDisposed) continue;
-                    engine.Toolbar.Items.Remove(item);
+                    engine.ToolStrip.Items.Remove(item);
                     item.Dispose();
                 }
                 items.Clear();

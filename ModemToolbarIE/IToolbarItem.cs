@@ -14,9 +14,7 @@ namespace ModemToolbarIE
         Unknown = 0,
         Link,
         LinkList,
-        RssTicker,
         SearchBox,
-        Widget,
         MainMenu,
     };
 

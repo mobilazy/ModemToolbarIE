@@ -12,8 +12,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyKeyFile(@"..\..\..\BandObjects.snk")]
+//[assembly: AssemblyVersion("1.0.0.0")]
+//[assembly: AssemblyKeyFile(@"..\..\..\BandObjects.snk")]
 
 namespace BandObjectLib
 {
@@ -45,8 +45,18 @@ namespace BandObjectLib
         protected static BandObjectStyle style = BandObjectStyle.ExplorerToolbar;
         protected static string toolbarName = "ModemToolbar";
         protected static string toolbarHelpText = "ModemToolbar";
+        private string mNo = "";
+        private string currentUrl;
 
+        public HTMLDocument HtmlDoc
+        {
+            get { return htmlDocument; }
+        }
 
+        public string ModemNoEngine
+        {
+            get { return mNo; }
+        }
 
         public BandObject()
         {
@@ -66,10 +76,18 @@ namespace BandObjectLib
             this.ResumeLayout(false);
         }
 
+        public void RefreshPage()
+        {
+            if (currentUrl != "")
+            {
+                Navigate2(currentUrl);
+            }
+        }
 
         public void OnDocumentComplete(object pDisp, ref object URL)
         {
             htmlDocument = (HTMLDocument)Explorer.Document;
+            
 
 
             if (URL.ToString().Contains("www.google.com"))
@@ -95,10 +113,14 @@ namespace BandObjectLib
             }
 
             ModemEvents me = ModemEvents.None;
-            string mNo = "";
+            
+            
 
             if (URL.ToString().Contains(@"http://tanwebs.corp.halliburton.com/pls/log_web/"))
             {
+
+                currentUrl = URL.ToString();
+
                 if (URL.ToString().Contains(@"mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID"))
                 {
                     me = ModemEvents.View;
@@ -152,9 +174,30 @@ namespace BandObjectLib
                     me = ModemEvents.Gant;
                     mNo = "";
                 }
+                else if(URL.ToString().Contains(@"bha_mc.actionview"))
+                {
+                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_10");
+                    me = ModemEvents.BhaEdit;
+                    mNo = mp.ModemNo;
+
+                }
+                else if (URL.ToString().Contains(@"order_mc.actionview"))
+                {
+                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    me = ModemEvents.View;
+                    mNo = mp.ModemNo;
+                }
+                else if (URL.ToString().Contains(@"header_mc.actionview"))
+                {
+                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    me = ModemEvents.Edit;
+                    mNo = mp.ModemNo;
+                }
                 else
                 {
-                    
+                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    me = ModemEvents.View;
+                    mNo = mp.ModemNo;
                 }
             }
 

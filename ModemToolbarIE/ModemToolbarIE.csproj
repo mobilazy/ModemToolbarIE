@@ -21,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <WarningLevel>2</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -40,10 +40,6 @@
     <AssemblyOriginatorKeyFile>bin\Debug\KeyModemToolBarIE.SNK</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="BandObjectLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=4b827ebe229d539f, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\BandObjectLib\v4.0_1.0.0.0__4b827ebe229d539f\BandObjectLib.dll</HintPath>
-    </Reference>
     <Reference Include="ClearScript, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>bin\Debug\dll\ClearScript.dll</HintPath>
@@ -53,7 +49,7 @@
       <HintPath>..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\HtmlAgilityPack\v4.0_1.8.10.0__bd319b19eaf3b43a\HtmlAgilityPack.dll</HintPath>
     </Reference>
     <Reference Include="Interop.SHDocVw, Version=1.1.0.0, Culture=neutral, PublicKeyToken=4b827ebe229d539f">
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="Microsoft.mshtml, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <EmbedInteropTypes>True</EmbedInteropTypes>
@@ -61,6 +57,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Web.Services" />
     <Reference Include="System.Windows.Controls.Ribbon" />
     <Reference Include="System.Windows.Forms" />
@@ -71,8 +68,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BandObjectsLib\Attributes.cs" />
+    <Compile Include="BandObjectsLib\BandObject.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="BandObjectsLib\ComInterop.cs" />
+    <Compile Include="BandObjectsLib\MiscClasses.cs" />
     <Compile Include="BaseToolbarItem.cs" />
     <Compile Include="IToolbarItem.cs" />
+    <Compile Include="LinkItem.cs" />
+    <Compile Include="LinkListItem.cs" />
+    <Compile Include="MenuListItem.cs" />
+    <Compile Include="MenuStripItem.cs" />
     <Compile Include="PopupGo.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -90,15 +97,28 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="SearchBoxItem.cs" />
     <Compile Include="Toolbar.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Toolbar.Designer.cs">
       <DependentUpon>Toolbar.cs</DependentUpon>
     </Compile>
+    <Compile Include="Db\ToolDb.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ToolDb.xsd</DependentUpon>
+    </Compile>
+    <Compile Include="Utility\ModemConnection.cs" />
+    <Compile Include="Utility\ModemDataPost.cs" />
+    <Compile Include="Utility\ModemInsert.cs" />
     <Compile Include="Utility\ModemParameters.cs" />
+    <Compile Include="Utility\ModemPostObjects.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="BandObjectsLib\BandObject.resx">
+      <DependentUpon>BandObject.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="PopupGo.resx">
       <DependentUpon>PopupGo.cs</DependentUpon>
     </EmbeddedResource>
@@ -118,6 +138,17 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <None Include="Db\ToolDb.xsc">
+      <DependentUpon>ToolDb.xsd</DependentUpon>
+    </None>
+    <None Include="Db\ToolDb.xsd">
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>ToolDb.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Db\ToolDb.xss">
+      <DependentUpon>ToolDb.xsd</DependentUpon>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="MSHTML">
@@ -133,16 +164,20 @@
   <ItemGroup>
     <Content Include="Licenses\clearscript-license.txt" />
     <Content Include="Licenses\v8-license.txt" />
+    <EmbeddedResource Include="Resources\gear.png" />
+    <EmbeddedResource Include="Resources\magic-wand.png" />
+    <EmbeddedResource Include="Resources\smile.PNG" />
+    <EmbeddedResource Include="Resources\view.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Db\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
 "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
+
 "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
+
 "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 

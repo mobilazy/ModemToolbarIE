@@ -27,25 +27,52 @@ namespace ModemToolbarIE.Utility
 
         private HtmlAgilityPack.HtmlDocument hDoc = new HtmlDocument();
 
+        public ModemParameters(mshtml.HTMLDocument htmlDocument, bool isWithElementName, string ElementName)
+        {
+            hDoc.LoadHtml(LoadHtmlAgility(htmlDocument));
+            ModemNo = GetElementByName(ElementName);
+            ModemParametersInit();
+        }
+
+        public ModemParameters(HtmlAgilityPack.HtmlDocument htmlDocument, bool isWithElementName, string ElementName)
+        {
+            hDoc = htmlDocument;
+            ModemNo = GetElementByName(ElementName);
+            ModemParametersInit();
+        }
+
+        public ModemParameters(HtmlAgilityPack.HtmlDocument htmlDocument, string modemNo)
+        {
+            hDoc = htmlDocument;
+            ModemNo = modemNo; 
+            ModemParametersInit();
+        }
+
         public ModemParameters(mshtml.HTMLDocument htmlDocument,  string modemNo)
         {
 
             hDoc.LoadHtml(LoadHtmlAgility(htmlDocument));
             ModemNo = modemNo;
+            ModemParametersInit();
 
+        }
+
+        private void ModemParametersInit()
+        {
             Zchk = GetElementByName("Z_CHK") ?? GetElementByName("z_chk");
 
             MwdBhaCount = GetMwdBhaCount();
             DdBhaCount = GetDdBhaCount();
             GpBhaCount = GetGpBhaCount();
             LooseItemCount = GetLooseItemsCount();
+
         }
 
         private string LoadHtmlAgility(mshtml.HTMLDocument htmlDocument)
         {
             mshtml.IHTMLDocument3 idoc = (mshtml.IHTMLDocument3)htmlDocument;
             return idoc.documentElement.outerHTML;
-            
+        
 
         }
 
