@@ -8,9 +8,11 @@ using SHDocVw;
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using ModemWebUtility;
 
 //[assembly: AssemblyVersion("1.0.0.0")]
 //[assembly: AssemblyKeyFile(@"..\..\..\BandObjects.snk")]
@@ -60,9 +62,16 @@ namespace BandObjectLib
 
         public BandObject()
         {
+            //assembly resolve
+
+            //MessageBox.Show("Break Bandobject 1");
+            
+            FixConnectionString();
             InitializeComponent();
             BackColor = Color.Transparent;
         }
+
+        
 
         private void InitializeComponent()
         {
@@ -74,6 +83,12 @@ namespace BandObjectLib
             Name = "BandObject";
             this.Size = new System.Drawing.Size(1250, 25);
             this.ResumeLayout(false);
+        }
+
+        private void FixConnectionString()
+        {
+            AppDomain.CurrentDomain.SetData("DataDirectory", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            
         }
 
         public void RefreshPage()
@@ -176,26 +191,26 @@ namespace BandObjectLib
                 }
                 else if(URL.ToString().Contains(@"bha_mc.actionview"))
                 {
-                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_10");
+                    ModemParameters mp = new ModemParameters(htmlDocument, true, "P_10");
                     me = ModemEvents.BhaEdit;
                     mNo = mp.ModemNo;
 
                 }
                 else if (URL.ToString().Contains(@"order_mc.actionview"))
                 {
-                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    ModemParameters mp = new ModemParameters(htmlDocument, true, "P_SSORD_ID");
                     me = ModemEvents.View;
                     mNo = mp.ModemNo;
                 }
                 else if (URL.ToString().Contains(@"header_mc.actionview"))
                 {
-                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    ModemParameters mp = new ModemParameters(htmlDocument, true, "P_SSORD_ID");
                     me = ModemEvents.Edit;
                     mNo = mp.ModemNo;
                 }
                 else
                 {
-                    ModemToolbarIE.Utility.ModemParameters mp = new ModemToolbarIE.Utility.ModemParameters(htmlDocument, true, "P_SSORD_ID");
+                    ModemParameters mp = new ModemParameters(htmlDocument, true, "P_SSORD_ID");
                     me = ModemEvents.View;
                     mNo = mp.ModemNo;
                 }
@@ -217,10 +232,7 @@ namespace BandObjectLib
 
         protected virtual void OnHtmlDocComplete(ModemEvents ea, string modemNo)
         {
-            if (HtmlDocCompleted != null)
-            {
-                HtmlDocCompleted(this, new ModemEventArgs { ModemEvent = ea, ModemNo = modemNo });
-            }
+            HtmlDocCompleted?.Invoke(this, new ModemEventArgs { ModemEvent = ea, ModemNo = modemNo });
 
         }
 

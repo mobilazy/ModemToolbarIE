@@ -15,7 +15,7 @@ namespace ModemToolbarIE
     {
         static byte[] Key = { 0x31, 0x56, 0x26, 0x89, 0x1a, 0x86, 0xaa, 0xb5, 0x8e, 0x86, 0x30, 0x00, 0x10, 0x54, 0x23, 0x82 };
         static byte[] IV = { 0x38, 0x94, 0x24, 0x47, 0x15, 0x96, 0x81, 0x89, 0x34, 0x27, 0x92, 0x96, 0x42, 0x23, 0x43, 0x13 };
-
+        const string modemViewUrl = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
         /// <summary>
         /// Constructor
         /// </summary>
@@ -85,6 +85,8 @@ namespace ModemToolbarIE
             this.searchButton.ImageScaling = ToolStripItemImageScaling.None;
             this.searchButton.Text = buttonText;
             this.searchButton.Click += new System.EventHandler(this.searchButton_Click);
+            int marginPad = 10;
+            this.searchButton.Margin = new Padding(0,0,marginPad,0);
 
             originalColor = this.searchInputBox.ForeColor;
             this.searchInputBox.ForeColor = Color.Gray;
@@ -95,8 +97,14 @@ namespace ModemToolbarIE
             items.Add(searchButton);
 
             engine.LoadSearchHistory(this);
+
+            
             engine.ToolStrip.Items.AddRange(this.items.ToArray());
             this.searchInputBox.Text = greetingText;
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.searchInputBox.Size.Width + this.searchButton.Size.Width+ marginPad, this.engine.TsContainer.Height);
+            engine.TsContainer.Size = sz;
+
+            engine.TsContainer.Refresh();
         }
 
         /// <summary>
@@ -295,7 +303,17 @@ namespace ModemToolbarIE
             if (string.IsNullOrEmpty(query)) return;
             query = query.Trim();
             if (string.IsNullOrEmpty(query)) return;
-            string queryString = FormatSearchRequest(query);
+            int result;
+            string queryString;
+            if (query.Length == 7 && Int32.TryParse(query, out result))
+            {
+                queryString = modemViewUrl + query;
+            }
+            else
+            {
+                queryString = FormatSearchRequest(query);
+            }
+            
             engine.Navigate2(queryString);
         }
 

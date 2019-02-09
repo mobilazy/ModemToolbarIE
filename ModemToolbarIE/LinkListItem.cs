@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -39,6 +40,8 @@ namespace ModemToolbarIE
             this.linkListButton.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             this.linkListButton.Text = buttonText;
             this.linkListButton.ToolTipText = buttonTooltip;
+            int marginPad = 10;
+            this.linkListButton.Margin = new System.Windows.Forms.Padding(0, 0, marginPad, 0);
 
             this.linkListButton.ButtonClick += new EventHandler(linkListButton_Click);
 
@@ -58,7 +61,12 @@ namespace ModemToolbarIE
 
 
             items.Add(this.linkListButton);
+            
             engine.ToolStrip.Items.AddRange(this.items.ToArray());
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkListButton.Size.Width+ marginPad, this.engine.TsContainer.Height);
+            engine.TsContainer.Size = sz;
+
+            engine.TsContainer.Refresh();
         }
 
         void linkListButton_Click(object sender, EventArgs e)

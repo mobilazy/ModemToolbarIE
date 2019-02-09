@@ -22,26 +22,5 @@ namespace ModemToolbarIE.Properties {
                 return defaultInstance;
             }
         }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.SpecialSettingAttribute(global::System.Configuration.SpecialSetting.ConnectionString)]
-        [global::System.Configuration.DefaultSettingValueAttribute("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=\"O:\\Sperry Sun\\09 RTO-Insite\\RigAcc" +
-            "essFolder\\Common\\Standard MWD Config Database\\ModemBuilderDatabase.accdb\"")]
-        public string ToolDb {
-            get {
-                return ((string)(this["ToolDb"]));
-            }
-        }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.SpecialSettingAttribute(global::System.Configuration.SpecialSetting.ConnectionString)]
-        [global::System.Configuration.DefaultSettingValueAttribute("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=E:\\ModemBuilderDatabase.accdb")]
-        public string ModemBuilderDatabaseConnectionString {
-            get {
-                return ((string)(this["ModemBuilderDatabaseConnectionString"]));
-            }
-        }
     }
 }

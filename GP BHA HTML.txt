@@ -1,0 +1,872 @@
+<html>
+<head>
+<title> : BHA Geo Pilot</title>
+<meta name="GENERATOR" content="Oracle Designer Web PL/SQL Generator">
+<script>FormType = "Update";</script>
+<LINK REL=STYLESHEET HREF="/webhtml/css/css_hallib.css" TYPE="text/css">
+</head>
+<body onLoad="return GP_MC_OnLoad()">
+<SCRIPT>
+<!-- Hide from old browsers
+var index = 0;
+var DataChangeErrors = false;
+var DataChange = false;
+var P_L_MOBGP_ORDER_SSORD_ID = new Array();
+P_L_MOBGP_ORDER_SSORD_ID[0] = "1246544";
+var P_10 = new Array();
+P_10[0] = "1246544";
+var GP_MC_CHK_VALUE = new Array();
+GP_MC_CHK_VALUE[0] = 6871;
+var P_GP_ID = new Array();
+P_GP_ID[0] = "47750";
+var P_269 = new Array();
+P_269[0] = "47750";
+var GPITM_MC_CHK_VALUE = new Array();
+GPITM_MC_CHK_VALUE [0]= 31169;
+function JSLReplace(pstr1, pstr2, pstr3) {
+   if (pstr1 != "") {
+     var rtnstr = "";
+     var searchstr = pstr1;
+     var addlen = pstr2.length;
+     var index = pstr1.indexOf(pstr2);
+     while ((index != -1) && (searchstr != "")) {
+       rtnstr = rtnstr + searchstr.substring(0, index);
+       if (pstr3 != null) {
+         rtnstr = rtnstr + pstr3;
+       }
+       searchstr = searchstr.substring(index + addlen, searchstr.length);
+       if (searchstr != "") {
+          index = searchstr.indexOf(pstr2);
+       }
+       else { index = -1; }
+     }
+     return (rtnstr + searchstr);
+   }
+   else {
+     return "";
+   }
+}
+function JSLGetValue(pctl, ptype, pfalse) {
+   var i = 0;
+   if (ptype == null) { return pctl.value; }
+   if (ptype == "CHECK") {
+      if (pctl.checked) { return pctl.value; }
+      else { return pfalse; }
+   }
+   if (ptype == "RADIO") {
+      for (i=0;i<pctl.length;i++) {
+         if (pctl[i].checked) { return pctl[i].value; }
+      }
+      return "";
+   }
+   if (ptype == "LIST") {
+      if (pctl.selectedIndex >= 0) {
+         if (pctl.options[pctl.selectedIndex].value != "") {
+            return pctl.options[pctl.selectedIndex].value;
+         }
+         else { return pctl.options[pctl.selectedIndex].text; }
+      }
+      else { return ""; }
+   }
+}
+function JSLStripMask(p_val) {
+  if (p_val == "") { return ""; }
+  var str = p_val;
+  str = JSLReplace(str, " ");
+  str = JSLReplace(str, ",");
+  str = JSLReplace(str, "$");
+  str = JSLReplace(str, "USD");
+
+  if ((str.substring(0, 1) == "<") && (str.substring(str.length -1, str.length) == ">")) {
+      str = "-" + str.substring(1, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "-") {
+    str = "-" + str.substring(0, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "+") {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
+function JSLToNumber(p_val) {
+   var lval = JSLStripMask(p_val);
+   if (lval == "") { return ""; }
+   else { return parseFloat(lval); }
+}
+function JSLChkNumScale (pctl, pval, pscale, pmsg) {
+  if (pval != "") {
+    var PointPos = pval.indexOf(".");
+    if (PointPos != -1) {
+      var Scale = pval.length - PointPos - 1;
+      if (Scale > pscale) {
+        alert(pmsg);
+        pctl.focus();
+        return false;
+      }
+    }
+  }
+  return true;
+}
+function JSLChkNumPrecision(pctl, pval, pprecision, pmsg) {
+  if (pval != "") {
+    var Prec = 0;
+    var PointPos = pval.indexOf(".");
+    // If a decimal point was not found
+    // validate the number of digits in the whole string
+    if (PointPos == -1) {
+      Prec = pval.length;
+    }
+    else {  // Validate the number of digits before the decimal point
+      Prec = PointPos;
+    }
+    if (pval.indexOf("-") == 0) {
+       Prec = Prec - 1;
+    };
+    if (pval.indexOf("+") == 0) {
+       Prec = Prec - 1;
+    };
+
+    if (Prec > pprecision) { alert(pmsg); pctl.focus(); return false; }
+  }
+   return true;
+}
+function JSLChkMaxLength(pctl, plen, pmsg) {
+   if (pctl.value.length > plen) {
+     alert(pmsg);
+     pctl.focus();
+     return false;
+   }
+     return true;
+}
+function JSLCheckModified( p_form, p_action, p_submit ) {
+   var l_mod = false;
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         l_mod = true;
+         break;
+      };
+   };
+   if (l_mod) {
+      alert("Data on this page has been modified. Please submit changes or revert before continuing.");
+      return false;
+   } else {
+      p_form.Z_ACTION.value = p_action;
+      if (p_submit) {
+          p_form.submit();
+          return true;
+      }
+   }
+
+
+}
+function JSLRevertForm( p_form, rows ) {
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         p_form.z_modified[i].value = "N";
+      }
+   }
+   ResetRadios( p_form, rows );
+   return true;
+}
+function L_HOLESEC_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_holesec_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_OILTYPE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_oiltype_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_GPSIZE_OnChange(ctl, index) {
+
+// upd_threadsizes
+//
+//
+  var dropdown = document.mobssus_order$gp_mc$VForm.P_L_GPSIZE[0];
+  var selInd = dropdown.selectedIndex;
+  var selVal = dropdown.options[selInd].value;
+  var upconn = document.mobssus_order$gp_mc$VForm.P_L_THREAD_UP[0];
+  var lowconn = document.mobssus_order$gp_mc$VForm.P_L_THREAD_LOW[0];
+
+  if (selVal == "9600")
+  {
+    upconn.selectedIndex = 12;
+    lowconn.selectedIndex = 11;
+  }
+  else if (selVal == "7600")
+  {
+    upconn.selectedIndex = 8;
+    lowconn.selectedIndex = 7;
+  }
+  else if (selVal == "5200")
+  {
+    upconn.selectedIndex = 4;
+    lowconn.selectedIndex = 3;
+  }
+  else
+  {
+    upconn.selectedIndex = 0;
+    lowconn.selectedIndex = 0;
+  }
+   return true;
+}
+function L_GPSIZE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_gpsize_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_MRSC_SUB_CONF_DESCR2_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_mrsc_sub_conf_descr2_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_ABITYPE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_abitype_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_SOFTWARE_DM_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_software_dm_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_SOFTWARE_GP_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_software_gp_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_THREAD_UP_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_thread_up_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_THREAD_LOW_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_thread_low_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_LOWHOUSEDESC_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$gp_mc.l_lowhousedesc_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function GP_MC_Validate(ctl, index) {
+var index = 0;
+   if (!JSLChkNumPrecision(ctl.form.P_FLOW_RATE[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOW_RATE[index])), 7, "Flow Rate From: Value cannot have more than 7 digits before the decimal point")) {ctl.form.P_FLOW_RATE[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_FLOW_RATE[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOW_RATE[index])), 3, "Flow Rate From: Value cannot have more than 3 decimal places")) {ctl.form.P_FLOW_RATE[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_FLOW_RATE_TO[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOW_RATE_TO[index])), 7, "Flow Rate To: Value cannot have more than 7 digits before the decimal point")) {ctl.form.P_FLOW_RATE_TO[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_FLOW_RATE_TO[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOW_RATE_TO[index])), 3, "Flow Rate To: Value cannot have more than 3 decimal places")) {ctl.form.P_FLOW_RATE_TO[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MAX_HYD_PRES[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_HYD_PRES[index])), 7, "Max Hydrostatic Pressure: Value cannot have more than 7 digits before the decimal point")) {ctl.form.P_MAX_HYD_PRES[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_MAX_HYD_PRES[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_HYD_PRES[index])), 3, "Max Hydrostatic Pressure: Value cannot have more than 3 decimal places")) {ctl.form.P_MAX_HYD_PRES[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_PLAN_TEMP_START[index], JSLStripMask(JSLGetValue(ctl.form.P_PLAN_TEMP_START[index])), 3, "Plan Temp Start: Value cannot have more than 3 digits before the decimal point")) {ctl.form.P_PLAN_TEMP_START[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_PLAN_TEMP_START[index], JSLStripMask(JSLGetValue(ctl.form.P_PLAN_TEMP_START[index])), 2, "Plan Temp Start: Value cannot have more than 2 decimal places")) {ctl.form.P_PLAN_TEMP_START[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MAX_TEMP[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_TEMP[index])), 3, "Max Temprature: Value cannot have more than 3 digits before the decimal point")) {ctl.form.P_MAX_TEMP[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_MAX_TEMP[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_TEMP[index])), 2, "Max Temprature: Value cannot have more than 2 decimal places")) {ctl.form.P_MAX_TEMP[index].focus(); return false }
+   if (!JSLChkMaxLength(ctl.form.P_GP_COMMENT[index], 1000, "Geo-Pilot Comment: Value exceeds the maximum column length (1000)")) {ctl.form.P_GP_COMMENT[index].focus(); return false }
+   return true;
+}
+function GP_MC_OnLoad(ctl, index) {
+
+   if ( FormType != "PostDelete")
+   {
+      form_num=0;
+      do
+      {
+         elem_num=0;
+         len = document.forms[form_num].elements.length;
+         if (len > 0)
+         {
+            while (elem_num < len &&
+                   document.forms[form_num].elements[elem_num].type != "text" &&
+                   document.forms[form_num].elements[elem_num].type != "textarea")
+            {
+               elem_num++;
+            }
+            if (elem_num < len)
+            {
+               document.forms[form_num].elements[elem_num].focus();
+               break;
+            }
+         }
+         form_num++;
+      } while ( form_num < document.forms.length );
+   }
+
+   return true;
+}
+function btnVFU_OnClick(ctl, index) {
+   if (!GP_MC_Validate(ctl)) { return false; }
+   ctl.form.submit();
+   return true;
+}
+function btnVFD_OnClick(ctl, index) {
+   if (!confirm("Please confirm the Delete")) { return false }
+   ctl.form.Z_ACTION.value = "VerifiedDelete";
+   ctl.form.submit();
+   return true;
+}
+function btnVFR_OnClick(ctl, index) {
+   ctl.form.submit();
+   return true;
+}
+function COPY_GP_OnClick(ctl, index) {
+
+// COPY_GP_OnClick
+//
+//
+//window.open("mobgp_copy_crit?nOrderId=" + mobssus_order_new$gp_mc$VForm.O_ORDER_ID[0].value + "&nGpId=" + mobssus_order$gp_mc$VForm.P_GP_ID[0].value,"Copy","toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=470, height=325, left=400, top=200" );
+window.open("mobgp_copy_crit?nOrderId=" + mobssus_order_new$gp_mc$VForm.O_ORDER_ID[0].value + "&nGpId=" + mobssus_order_new$gp_mc$VForm.P_GP_ID[0].value,"Copy","toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=470, height=325, left=400, top=200" );
+
+                                                                                                                                                                                                                                                                                                                        
+   return true;
+}
+//-->
+</SCRIPT>
+<h1>BHA Geo Pilot</h1>
+<p>
+
+<h3>Remember to add in Jar and/or Accelerator for this job if required</h3>
+
+<form action="ActionItem" method="post" NAME="VF$AIFormTop">
+</form>
+<form action="mobssus_order_new$gp_mc.actionview" method="post" NAME="mobssus_order_new$gp_mc$VForm">
+<input type="hidden" name="P_10" value="1246544" />
+<p>
+<table >
+<input type="hidden" name="P_GP_ID" value="47750" />
+<input type="hidden" name="O_GP_ID" value="47750" />
+<input type="hidden" name="H_GP_COMPL_WARN" value="" />
+<input type="hidden" name="H_DIV0" value="" />
+<tr valign="TOP"><td align="LEFT"><b></b></td><td align="LEFT"></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV1" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Geo-Pilot #:</b></td><td align="LEFT"><select name="P_PILOT_NUM" size="1" CLASS = cgdvlist ID="P_PILOT_NUM"><option VALUE="0">0</option><option VALUE="1">1</option><option selected="selected" VALUE="2">2</option><option VALUE="3">3</option><option VALUE="4">4</option><option VALUE="5">5</option><option VALUE="6">6</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV30" value="" />
+<tr valign="TOP"><td align="LEFT"><b>GP Description:</b></td><td align="LEFT"><input type="text" name="P_GP_DESC" size="30" maxlength="50" value="gp2"  ID="P_GP_DESC" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_LBL_APPDET" value="&lt;br&gt;&lt;H3&gt;Application Details&lt;/H3&gt;" />
+<input type="hidden" name="H_DIV5" value="" />
+<tr valign="TOP"><td align="LEFT"><b></b></td><td align="LEFT"><br><H3>Application Details</H3></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV2" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Hole Section:</b></td><td align="LEFT"><select name="P_L_HOLESEC" size="1" CLASS = cglovlist ID="P_L_HOLESEC"><option selected="selected" VALUE=" "> </option><option VALUE="03 1/2&quot;">03 1/2&quot;</option><option VALUE="03 7/8&quot;">03 7/8&quot;</option><option VALUE="04 1/8&quot;">04 1/8&quot;</option><option VALUE="05 7/8&quot;">05 7/8&quot;</option><option VALUE="05&quot;">05&quot;</option><option VALUE="06 1/2&quot;">06 1/2&quot;</option><option VALUE="06 1/8&quot;">06 1/8&quot;</option><option VALUE="06&quot;">06&quot;</option><option VALUE="07&quot;">07&quot;</option><option VALUE="08 1/2&quot;">08 1/2&quot;</option><option VALUE="08 3/8&quot;">08 3/8&quot;</option><option VALUE="09 1/2&quot;">09 1/2&quot;</option><option VALUE="09 5/8&quot;">09 5/8&quot;</option><option VALUE="10 1/4&quot;">10 1/4&quot;</option><option VALUE="10 5/8&quot;">10 5/8&quot;</option><option VALUE="11 1/2&quot;">11 1/2&quot;</option><option VALUE="12 1/4&quot;">12 1/4&quot;</option><option VALUE="13 1/2&quot;">13 1/2&quot;</option><option VALUE="14 3/4&quot;">14 3/4&quot;</option><option VALUE="14&quot;">14&quot;</option><option VALUE="16&quot;">16&quot;</option><option VALUE="17 1/2&quot;">17 1/2&quot;</option><option VALUE="20&quot;">20&quot;</option><option VALUE="24&quot;">24&quot;</option><option VALUE="26&quot;">26&quot;</option><option VALUE="27&quot;">27&quot;</option><option VALUE="28&quot;">28&quot;</option><option VALUE="29&quot;">29&quot;</option><option VALUE="32&quot;">32&quot;</option><option VALUE="36&quot;">36&quot;</option><option VALUE="42&quot;">42&quot;</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV25" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Flow Rate From:</b></td><td align="LEFT"><input type="text" name="P_FLOW_RATE" size="10" maxlength="12"  ID="P_FLOW_RATE" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Flow Rate To:</b></td><td align="LEFT"><input type="text" name="P_FLOW_RATE_TO" size="10" maxlength="12"  ID="P_FLOW_RATE_TO" /></td><td align="LEFT"><b>Flow Rate Unit:</b></td><td align="LEFT"><select name="P_FLOW_RATE_UNIT" size="1" CLASS = cgdvlist ID="P_FLOW_RATE_UNIT"><option selected="selected"> </option><option VALUE="gpm">gpm</option><option VALUE="lpm">lpm</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Max Hydrostatic Pressure:</b></td><td align="LEFT"><input type="text" name="P_MAX_HYD_PRES" size="10" maxlength="12"  ID="P_MAX_HYD_PRES" /></td><td align="LEFT"><b>Max Hydrostatic Pressure Unit:</b></td><td align="LEFT"><select name="P_MAX_HYD_PRES_UNIT" size="1" CLASS = cgdvlist ID="P_MAX_HYD_PRES_UNIT"><option selected="selected"> </option><option VALUE="psi">psi</option><option VALUE="bar">bar</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Plan Temp Start:</b></td><td align="LEFT"><input type="text" name="P_PLAN_TEMP_START" size="5" maxlength="7"  ID="P_PLAN_TEMP_START" /></td><td align="LEFT"><b>Temprature Unit:</b></td><td align="LEFT"><select name="P_TEMP_UNIT" size="1" CLASS = cgdvlist ID="P_TEMP_UNIT"><option selected="selected"> </option><option VALUE="°C">°C</option><option VALUE="°F">°F</option></select></td></tr>
+<input type="hidden" name="H_DIV3" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Max Temprature:</b></td><td align="LEFT"><input type="text" name="P_MAX_TEMP" size="5" maxlength="7"  ID="P_MAX_TEMP" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV4" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Oil Type:</b></td><td align="LEFT"><select name="P_L_OILTYPE" size="1" CLASS = cglovlist ID="P_L_OILTYPE"><option selected="selected" VALUE=" "> </option><option VALUE="As rec from tmp prof">As rec from tmp prof</option><option VALUE="SHC 624">SHC 624</option><option VALUE="SHC 626">SHC 626</option><option VALUE="SHC 630">SHC 630</option><option VALUE="SHC 636">SHC 636</option><option VALUE="SHC 639">SHC 639</option><option VALUE="Unknown">Unknown</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_LBL_CONFDET" value="&lt;br&gt;&lt;H3&gt;Configuration Details&lt;/H3&gt;" />
+<input type="hidden" name="H_DIV6" value="" />
+<tr valign="TOP"><td align="LEFT"><b></b></td><td align="LEFT"><br><H3>Configuration Details</H3></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV12" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Geo-Pilot Size:</b></td><td align="LEFT"><select name="P_L_GPSIZE" size="1" CLASS = cglovlist onChange="return L_GPSIZE_OnChange(this, 0)" ID="P_L_GPSIZE"><option selected="selected" VALUE=" "> </option><option VALUE="5200">5200</option><option VALUE="7600">7600</option><option VALUE="7600 EDL">7600 EDL</option><option VALUE="9600">9600</option><option VALUE="9600 EDL">9600 EDL</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV11" value="" />
+<tr valign="TOP"><td align="LEFT"><b>9600 Repeater sub configuratio:</b></td><td align="LEFT"><select name="P_L_MRSC_SUB_CONF_DESCR2" size="1" CLASS = cglovlist ID="P_L_MRSC_SUB_CONF_DESCR2"><option selected="selected" VALUE="N/A">N/A</option><option VALUE="Slick">Slick</option><option VALUE="Slick NM">Slick NM</option><option VALUE="Stabilised">Stabilised</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV13" value="" />
+<tr valign="TOP"><td align="LEFT"><b>ABI Type:</b></td><td align="LEFT"><select name="P_L_ABITYPE" size="1" CLASS = cglovlist ID="P_L_ABITYPE"><option selected="selected" VALUE=" "> </option><option VALUE="ABI">ABI</option><option VALUE="GABI">GABI</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV19" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Flex Sub Required:</b></td><td align="LEFT"><select name="P_FLEXJOINT_REQ" size="1" CLASS = cgdvlist ID="P_FLEXJOINT_REQ"><option selected="selected"> </option><option VALUE="Yes">Yes</option><option VALUE="No">No</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV26" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Flex Sub torqued onto Geo-Pilot:</b></td><td align="LEFT"><select name="P_FLEX_TORQUED" size="1" CLASS = cgdvlist ID="P_FLEX_TORQUED"><option selected="selected"> </option><option VALUE="Y">Yes</option><option VALUE="N">No</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV14" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Clamp Required:</b></td><td align="LEFT"><select name="P_GP_CLAMP_REQ" size="1" CLASS = cgdvlist ID="P_GP_CLAMP_REQ"><option selected="selected"> </option><option VALUE="Yes">Yes</option><option VALUE="No">No</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV21" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Directional Probe:</b></td><td align="LEFT"><select name="P_DM_TYPE" size="1" CLASS = cgdvlist ID="P_DM_TYPE"><option selected="selected"> </option><option VALUE="Dummy DM">Dummy DM</option><option VALUE="Dummy PCD-C">Dummy PCD-C</option><option VALUE="Dummy DM/PCD-C">Dummy DM/PCD-C</option><option VALUE="Live DM">Live DM</option><option VALUE="Live PCD-C">Live PCD-C</option><option VALUE="Live Directional Probe (DM, PCDC or PM3)">Live Directional Probe (DM, PCDC or PM3)</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV15" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Software:</b></td><td align="LEFT"><select name="P_L_SOFTWARE_DM" size="1" CLASS = cglovlist ID="P_L_SOFTWARE_DM"><option selected="selected" VALUE=" "> </option><option VALUE="3.10">3.10</option><option VALUE="3.15">3.15</option><option VALUE="6.10">6.10</option><option VALUE="6.33">6.33</option><option VALUE="6.43">6.43</option><option VALUE="Refer to Other Req.">Refer to Other Req.</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV17" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Geo-Pilot Software:</b></td><td align="LEFT"><select name="P_L_SOFTWARE_GP" size="1" CLASS = cglovlist ID="P_L_SOFTWARE_GP"><option selected="selected" VALUE=" "> </option><option VALUE="3.10">3.10</option><option VALUE="3.16">3.16</option><option VALUE="3.18">3.18</option><option VALUE="GPC 5.54 &amp; AMC 5.66 (5200)">GPC 5.54 &amp; AMC 5.66 (5200)</option><option VALUE="GPC 7.11 &amp; AMC 7.09 (7600)">GPC 7.11 &amp; AMC 7.09 (7600)</option><option VALUE="GPC 9.11 &amp; AMC 9.09 (9600)">GPC 9.11 &amp; AMC 9.09 (9600)</option><option VALUE="Refer to Other Req.">Refer to Other Req.</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV24" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Uphole Connection:</b></td><td align="LEFT"><select name="P_L_THREAD_UP" size="1" CLASS = cglovlist ID="P_L_THREAD_UP"><option selected="selected" VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV23" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Lower Drive Shaft Connection:</b></td><td align="LEFT"><select name="P_L_THREAD_LOW" size="1" CLASS = cglovlist ID="P_L_THREAD_LOW"><option selected="selected" VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV18" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Bit Type:</b></td><td align="LEFT"><input type="text" name="P_BIT_TYPE" size="30" maxlength="100"  ID="P_BIT_TYPE" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV16" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Bit Torqued:</b></td><td align="LEFT"><select name="P_BIT_TORQUED" size="1" CLASS = cgdvlist ID="P_BIT_TORQUED"><option selected="selected"> </option><option VALUE="Yes">Yes</option><option VALUE="No">No</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV99" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Bit Makeup Torque:</b></td><td align="LEFT"><input type="text" name="P_BIT_MAKEUP_TORQUE" size="10" maxlength="10"  ID="P_BIT_MAKEUP_TORQUE" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV20" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Bit SN:</b></td><td align="LEFT"><input type="text" name="P_BIT_SN" size="10" maxlength="10"  ID="P_BIT_SN" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_DIV22" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Are lithium batteries used?:</b></td><td align="LEFT"><select name="P_LITHIUM_USED" size="1" CLASS = cgdvlist ID="P_LITHIUM_USED"><option> </option><option VALUE="N">No</option><option selected="selected" VALUE="Y">Yes</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Geo-Pilot Comment:</b></td><td align="LEFT"><textarea name="P_GP_COMMENT" rows="4" cols="50" wrap="VIRTUAL"  ID="P_GP_COMMENT"></textarea></td><td align="LEFT"><b>Lower Housing Configuration:</b></td><td align="LEFT"><select name="P_L_LOWHOUSEDESC" size="1" CLASS = cglovlist ID="P_L_LOWHOUSEDESC"><option selected="selected" VALUE="Slick">Slick</option><option VALUE="Slick Sleeve">Slick Sleeve</option><option VALUE="Stablized Ribs">Stablized Ribs</option><option VALUE="Stablized Sleeve">Stablized Sleeve</option></select></td></tr>
+<input type="hidden" name="H_DEL_BHA" value="&lt;input type=&quot;button&quot; value=&quot;Delete BHA&quot; onClick=&quot;location.href='mobss_delbha.startup?pBHAId=47750&amp;pBHAType=GP&amp;pOid=1246544'&quot;&gt;" />
+<tr valign="TOP"><td align="LEFT"><b>Delete GP:</b></td><td align="LEFT"><input type="button" value="Delete BHA" onClick="location.href='mobss_delbha.startup?pBHAId=47750&pBHAType=GP&pOid=1246544'"></td><td align="LEFT"><b></b></td><td align="LEFT"><input type="text" name="P_S2" size="1" maxlength="1" value="s"  ID="P_S2" /><b> (Do not touch)</b></td></tr>
+<input type="hidden" name="H_L_PRECON_STATUS" value="N/A" />
+<tr valign="TOP"><td align="LEFT"><b>Pre-Config:</b></td><td align="LEFT">N/A</td><td align="LEFT">&nbsp</td><td align="LEFT">&nbsp</td></tr>
+</tr>
+<SCRIPT>
+<!-- Hide from old browsers
+document.write('<INPUT TYPE="hidden" NAME="z_modified" VALUE="N">');
+//-->
+</SCRIPT>
+<input type="hidden" name="O_PILOT_NUM" value="2" />
+<input type="hidden" name="O_GP_DESC" value="gp2" />
+<input type="hidden" name="O_FLOW_RATE" value="" />
+<input type="hidden" name="O_FLOW_RATE_TO" value="" />
+<input type="hidden" name="O_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="O_MAX_HYD_PRES" value="" />
+<input type="hidden" name="O_MAX_HYD_PRES_UNIT" value="" />
+<input type="hidden" name="O_PLAN_TEMP_START" value="" />
+<input type="hidden" name="O_TEMP_UNIT" value="" />
+<input type="hidden" name="O_MAX_TEMP" value="" />
+<input type="hidden" name="O_ROLLER_STYLE" value="" />
+<input type="hidden" name="O_FLEXJOINT_REQ" value="" />
+<input type="hidden" name="O_FLEX_TORQUED" value="" />
+<input type="hidden" name="O_GP_CLAMP_REQ" value="" />
+<input type="hidden" name="O_DM_TYPE" value="" />
+<input type="hidden" name="O_BIT_TYPE" value="" />
+<input type="hidden" name="O_BIT_TORQUED" value="" />
+<input type="hidden" name="O_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="O_BIT_SN" value="" />
+<input type="hidden" name="O_LITHIUM_USED" value="Y" />
+<input type="hidden" name="O_ABITYPE_ID" value="1" />
+<input type="hidden" name="O_CONN_LOWER_ID" value="1" />
+<input type="hidden" name="O_CONN_UPHOLE_ID" value="1" />
+<input type="hidden" name="O_GPSIZE_ID" value="1" />
+<input type="hidden" name="O_HOLESEC_ID" value="1" />
+<input type="hidden" name="O_OILTYPE_ID" value="1" />
+<input type="hidden" name="O_ORDER_ID" value="23289" />
+<input type="hidden" name="O_SW_DM_ID" value="1" />
+<input type="hidden" name="O_SW_GP_ID" value="1" />
+<input type="hidden" name="O_GP_COMMENT" value="" />
+<input type="hidden" name="O_LWR_SLICK_HOUS" value="2" />
+<input type="hidden" name="O_STATUS" value="1" />
+<input type="hidden" name="O_SUB_CONF_ID" value="1" />
+<input type="hidden" name="O_LOWHOUSEID" value="1" />
+<input type="hidden" name="O_S2" value="s" />
+<input type="hidden" name="O_PRECON_ID" value="1" />
+</table>
+<p>
+<input type="hidden" name="P_GP_ID" value="" />
+<input type="hidden" name="P_PILOT_NUM" value="" />
+<input type="hidden" name="P_GP_DESC" value="" />
+<input type="hidden" name="P_L_HOLESEC" value="" />
+<input type="hidden" name="P_FLOW_RATE" value="" />
+<input type="hidden" name="P_FLOW_RATE_TO" value="" />
+<input type="hidden" name="P_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="P_MAX_HYD_PRES" value="" />
+<input type="hidden" name="P_MAX_HYD_PRES_UNIT" value="" />
+<input type="hidden" name="P_PLAN_TEMP_START" value="" />
+<input type="hidden" name="P_TEMP_UNIT" value="" />
+<input type="hidden" name="P_MAX_TEMP" value="" />
+<input type="hidden" name="P_L_OILTYPE" value="" />
+<input type="hidden" name="P_L_GPSIZE" value="" />
+<input type="hidden" name="P_L_MRSC_SUB_CONF_DESCR2" value="" />
+<input type="hidden" name="P_L_ABITYPE" value="" />
+<input type="hidden" name="P_FLEXJOINT_REQ" value="" />
+<input type="hidden" name="P_FLEX_TORQUED" value="" />
+<input type="hidden" name="P_GP_CLAMP_REQ" value="" />
+<input type="hidden" name="P_DM_TYPE" value="" />
+<input type="hidden" name="P_L_SOFTWARE_DM" value="" />
+<input type="hidden" name="P_L_SOFTWARE_GP" value="" />
+<input type="hidden" name="P_L_THREAD_UP" value="" />
+<input type="hidden" name="P_L_THREAD_LOW" value="" />
+<input type="hidden" name="P_BIT_TYPE" value="" />
+<input type="hidden" name="P_BIT_TORQUED" value="" />
+<input type="hidden" name="P_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="P_BIT_SN" value="" />
+<input type="hidden" name="P_LITHIUM_USED" value="" />
+<input type="hidden" name="P_GP_COMMENT" value="" />
+<input type="hidden" name="P_L_LOWHOUSEDESC" value="" />
+<input type="hidden" name="P_S2" value="" />
+<input type="hidden" name="O_PILOT_NUM" value="" />
+<input type="hidden" name="O_GP_DESC" value="" />
+<input type="hidden" name="O_FLOW_RATE" value="" />
+<input type="hidden" name="O_FLOW_RATE_TO" value="" />
+<input type="hidden" name="O_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="O_MAX_HYD_PRES" value="" />
+<input type="hidden" name="O_MAX_HYD_PRES_UNIT" value="" />
+<input type="hidden" name="O_PLAN_TEMP_START" value="" />
+<input type="hidden" name="O_TEMP_UNIT" value="" />
+<input type="hidden" name="O_MAX_TEMP" value="" />
+<input type="hidden" name="O_ROLLER_STYLE" value="" />
+<input type="hidden" name="O_FLEXJOINT_REQ" value="" />
+<input type="hidden" name="O_FLEX_TORQUED" value="" />
+<input type="hidden" name="O_GP_CLAMP_REQ" value="" />
+<input type="hidden" name="O_DM_TYPE" value="" />
+<input type="hidden" name="O_BIT_TYPE" value="" />
+<input type="hidden" name="O_BIT_TORQUED" value="" />
+<input type="hidden" name="O_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="O_BIT_SN" value="" />
+<input type="hidden" name="O_LITHIUM_USED" value="" />
+<input type="hidden" name="O_ABITYPE_ID" value="" />
+<input type="hidden" name="O_CONN_LOWER_ID" value="" />
+<input type="hidden" name="O_CONN_UPHOLE_ID" value="" />
+<input type="hidden" name="O_GPSIZE_ID" value="" />
+<input type="hidden" name="O_HOLESEC_ID" value="" />
+<input type="hidden" name="O_OILTYPE_ID" value="" />
+<input type="hidden" name="O_ORDER_ID" value="" />
+<input type="hidden" name="O_SW_DM_ID" value="" />
+<input type="hidden" name="O_SW_GP_ID" value="" />
+<input type="hidden" name="O_GP_COMMENT" value="" />
+<input type="hidden" name="O_LWR_SLICK_HOUS" value="" />
+<input type="hidden" name="O_STATUS" value="" />
+<input type="hidden" name="O_SUB_CONF_ID" value="" />
+<input type="hidden" name="O_LOWHOUSEID" value="" />
+<input type="hidden" name="O_S2" value="" />
+<input type="hidden" name="O_PRECON_ID" value="" />
+<input type="hidden" name="H_GP_COMPL_WARN" value="" />
+<input type="hidden" name="H_DIV0" value="" />
+<input type="hidden" name="H_DIV1" value="" />
+<input type="hidden" name="H_DIV30" value="" />
+<input type="hidden" name="H_LBL_APPDET" value="" />
+<input type="hidden" name="H_DIV5" value="" />
+<input type="hidden" name="H_DIV2" value="" />
+<input type="hidden" name="H_DIV25" value="" />
+<input type="hidden" name="H_DIV3" value="" />
+<input type="hidden" name="H_DIV4" value="" />
+<input type="hidden" name="H_LBL_CONFDET" value="" />
+<input type="hidden" name="H_DIV6" value="" />
+<input type="hidden" name="H_DIV12" value="" />
+<input type="hidden" name="H_DIV11" value="" />
+<input type="hidden" name="H_DIV13" value="" />
+<input type="hidden" name="H_DIV19" value="" />
+<input type="hidden" name="H_DIV26" value="" />
+<input type="hidden" name="H_DIV14" value="" />
+<input type="hidden" name="H_DIV21" value="" />
+<input type="hidden" name="H_DIV15" value="" />
+<input type="hidden" name="H_DIV17" value="" />
+<input type="hidden" name="H_DIV24" value="" />
+<input type="hidden" name="H_DIV23" value="" />
+<input type="hidden" name="H_DIV18" value="" />
+<input type="hidden" name="H_DIV16" value="" />
+<input type="hidden" name="H_DIV99" value="" />
+<input type="hidden" name="H_DIV20" value="" />
+<input type="hidden" name="H_DIV22" value="" />
+<input type="hidden" name="H_DEL_BHA" value="" />
+<input type="hidden" name="H_L_PRECON_STATUS" value="" />
+<input type="hidden" name="z_modified" value="dummy_row" />
+<SCRIPT><!--
+document.write('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+document.write('<input type=submit value="Update" onClick="this.form.Z_ACTION.value=\'UPDATE\'; return btnVFU_OnClick(this),false">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Update" ID="Update" />
+</NOSCRIPT>
+<SCRIPT><!--
+document.write('<input type=button value="Delete" onClick="this.form.Z_ACTION.value=\'DELETE\'; return btnVFD_OnClick(this)">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Delete" ID="Delete" />
+</NOSCRIPT>
+<input type="reset" VALUE="Revert" ID="Revert" />
+<input type="hidden" name="Z_CHK" value="46963" />
+<input type="hidden" name="Q_L_MOBGP_ORDER_SSORD_ID" value="" />
+<input type="hidden" name="Z_START" value="1" />
+</form>
+<LINK REL=STYLESHEET HREF="/webhtml/css/css_hallib.css" TYPE="text/css">
+<SCRIPT>
+<!-- Hide from old browsers
+var FormType = "List";
+var P_GP_ID = new Array();
+P_GP_ID[0] = "47750";
+var P_269 = new Array();
+P_269[0] = "47750";
+var P_10 = new Array();
+P_10[0] = "1246544";
+var P_L_MOBGP_ORDER_SSORD_ID = new Array();
+P_L_MOBGP_ORDER_SSORD_ID[0] = "1246544";
+var GPITM_MC_CHK_VALUE = new Array();
+GPITM_MC_CHK_VALUE[0] = 31169;
+var GP_MC_CHK_VALUE = new Array();
+GP_MC_CHK_VALUE[0] = 6871;
+var P_349 = new Array();
+//-->
+</SCRIPT>
+<h2>Geopilot Items</h2>
+<p>
+<p>
+<table  BORDER>
+<tr class = cgrlheaderrow><th align="RIGHT" ID="SEQ_NO">Sequence</th><th align="LEFT" ID="TORQUE">Torque (Ft-Lbs/1000)</th><th align="LEFT" ID="THREADSIZE">Threadsize Top</th><th align="LEFT" ID="THREADSIZE">Threadsize Bottom</th><th align="LEFT" ID="DESCRIPTION">Description</th></tr>
+<tr valign="TOP" class = cgrldatarow><td align="RIGHT" ID="SEQ_NO1"><a href="mobssus_order_new$gpitm_mc.QueryViewByKey?P_GPITM_ID=14275&P_269=47750&P_10=1246544&Z_CHK=29631" target="_self">1</a></td><td align="LEFT" ID="TORQUE1">06</td><td align="LEFT" ID="THREADSIZE1">4 1/2" 12.6ppf VT B</td><td align="LEFT" ID="THREADSIZE1">4 1/2" Reg Pin</td><td align="LEFT" ID="DESCRIPTION1">gppart1</td></tr>
+<tr valign="TOP" class = cgrldatarow><td align="RIGHT" ID="SEQ_NO2"><a href="mobssus_order_new$gpitm_mc.QueryViewByKey?P_GPITM_ID=14276&P_269=47750&P_10=1246544&Z_CHK=30143" target="_self">2</a></td><td align="LEFT" ID="TORQUE2">09.9</td><td align="LEFT" ID="THREADSIZE2">4 1/2" Reg Pin</td><td align="LEFT" ID="THREADSIZE2">4 1/2" Reg Pin</td><td align="LEFT" ID="DESCRIPTION2">gppart2</td></tr>
+</table>
+<p>
+Records 1 to 2 of 2
+<p>
+<form action="mobssus_order_new$gpitm_mc.querylist" method="post" target="_self" NAME="mobssus_order_new$gpitm_mc$LFormView">
+<input type="hidden" name="P_269" value="47750" />
+<input type="hidden" name="P_10" value="1246544" />
+<input type="hidden" name="P_GP_ID" value="47750" />
+<SCRIPT><!--
+document.write ('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+document.write ('<input type="submit" value="New" onClick="this.form.Z_ACTION.value=\'INSERT\'" />')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="New" ID="New" />
+</NOSCRIPT>
+<input type="hidden" name="Z_CHK" value="31169" />
+</form>
+<form action="ActionItem" method="post" NAME="VF$AIFormBottom">
+<SCRIPT><!--
+document.write('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+//--> <input type="submit" name="Z_ACTION" value="Copy Geo-Pilot Data" ID="COPY_GP" /> <!--
+document.write('<input type=submit value="Copy Geo-Pilot Data" onClick="return COPY_GP_OnClick(this,0,&quot;_self&quot;),false">')
+//-->
+</SCRIPT>
+</form>
+<p>
+
+<input type="button" value="New" onClick="window.location='mobssus_gp.InsertDefaultGP?p_ssord_id=' + P_SSORD_ID[0]" />
+
+<p>
+</body>
+</html>

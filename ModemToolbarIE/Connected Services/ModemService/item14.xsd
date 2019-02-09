@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:tns="http://schemas.datacontract.org/2004/07/WcfServiceModemToolbarSync" elementFormDefault="qualified" targetNamespace="http://schemas.datacontract.org/2004/07/WcfServiceModemToolbarSync" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:import schemaLocation="http://localhost:9123/?xsd=xsd3" namespace="http://schemas.datacontract.org/2004/07/System.Collections.Generic" />
+  <xs:import schemaLocation="http://localhost:9123/?xsd=xsd6" namespace="http://schemas.datacontract.org/2004/07/System.Windows.Forms" />
+  <xs:import schemaLocation="http://localhost:9123/?xsd=xsd7" namespace="http://schemas.datacontract.org/2004/07/System.Drawing" />
+  <xs:complexType name="MenuListClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="List" nillable="true" type="tns:ArrayOfMenuListItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="MenuListClass" nillable="true" type="tns:MenuListClass" />
+  <xs:complexType name="ArrayOfMenuListItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="MenuListItemClass" nillable="true" type="tns:MenuListItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="ArrayOfMenuListItemClass" nillable="true" type="tns:ArrayOfMenuListItemClass" />
+  <xs:complexType name="MenuListItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="Caption" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="Hint" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="Img" nillable="true" type="xs:base64Binary" />
+      <xs:element xmlns:q1="http://schemas.datacontract.org/2004/07/System.Collections.Generic" minOccurs="0" name="Links" nillable="true" type="q1:ArrayOfKeyValuePairOfstringArrayOfKeyValuePairOfstringModemMwdPostObjectsEIZd_S3ZYtwCi8m_S7" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="MenuListItemClass" nillable="true" type="tns:MenuListItemClass" />
+  <xs:complexType name="SearchListClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="List" nillable="true" type="tns:ArrayOfSearchBoxItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="SearchListClass" nillable="true" type="tns:SearchListClass" />
+  <xs:complexType name="ArrayOfSearchBoxItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="SearchBoxItemClass" nillable="true" type="tns:SearchBoxItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="ArrayOfSearchBoxItemClass" nillable="true" type="tns:ArrayOfSearchBoxItemClass" />
+  <xs:complexType name="SearchBoxItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="ButtonText" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="ButtonTooltip" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="ClearHistoryText" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="GreetingText" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="Img" nillable="true" type="xs:base64Binary" />
+      <xs:element xmlns:q2="http://schemas.datacontract.org/2004/07/System.Windows.Forms" minOccurs="0" name="InputBoxFlatStyle" type="q2:FlatStyle" />
+      <xs:element xmlns:q3="http://schemas.datacontract.org/2004/07/System.Drawing" minOccurs="0" name="InputBoxSize" type="q3:Size" />
+      <xs:element minOccurs="0" name="SearchBoxTooltip" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="SearchURL" nillable="true" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="SearchBoxItemClass" nillable="true" type="tns:SearchBoxItemClass" />
+  <xs:complexType name="LinkListClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="List" nillable="true" type="tns:ArrayOfLinkListItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="LinkListClass" nillable="true" type="tns:LinkListClass" />
+  <xs:complexType name="ArrayOfLinkListItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="LinkListItemClass" nillable="true" type="tns:LinkListItemClass" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="ArrayOfLinkListItemClass" nillable="true" type="tns:ArrayOfLinkListItemClass" />
+  <xs:complexType name="LinkListItemClass">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="Caption" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="Hint" nillable="true" type="xs:string" />
+      <xs:element minOccurs="0" name="Img" nillable="true" type="xs:base64Binary" />
+      <xs:element xmlns:q4="http://schemas.datacontract.org/2004/07/System.Collections.Generic" minOccurs="0" name="Links" nillable="true" type="q4:ArrayOfKeyValuePairOfstringstring" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="LinkListItemClass" nillable="true" type="tns:LinkListItemClass" />
+</xs:schema>

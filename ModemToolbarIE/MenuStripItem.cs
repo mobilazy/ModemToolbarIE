@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ModemWebUtility;
 
 namespace ModemToolbarIE
 {
@@ -13,7 +14,7 @@ namespace ModemToolbarIE
         private MenuStripItem stripItem;
         private Toolbar Engine;
 
-        private ModemPostObjects linkObject;
+        private ModemMwdPostObjects linkObject;
 
         /// <summary>
         /// Constructor
@@ -21,7 +22,7 @@ namespace ModemToolbarIE
         /// <param name="engine">Toolbar engine</param>
         internal MenuStripItem(Toolbar engine, MenuListItem _listItem,
             string caption,
-            KeyValuePair<string, ModemPostObjects>[] links)
+            KeyValuePair<string, ModemMwdPostObjects>[] links)
             : base(engine, null)
         {
             listItem = _listItem;
@@ -31,7 +32,7 @@ namespace ModemToolbarIE
 
         internal MenuStripItem(Toolbar engine, MenuStripItem _stripItem,
             string caption,
-            ModemPostObjects linkUrl)
+            ModemMwdPostObjects linkUrl)
           : base(engine, null)
         {
             stripItem = _stripItem;
@@ -42,14 +43,14 @@ namespace ModemToolbarIE
         public override ToolbarItemType TypeID => ToolbarItemType.MainMenu;
 
         public void Create(string menuText,
-            KeyValuePair<string, ModemPostObjects>[] links)
+            KeyValuePair<string, ModemMwdPostObjects>[] links)
         {
 
             menuStripItem = new System.Windows.Forms.ToolStripMenuItem();
             menuStripItem.Text = menuText;
 
 
-            foreach (KeyValuePair<string, ModemPostObjects> link in links)
+            foreach (KeyValuePair<string, ModemMwdPostObjects> link in links)
             {
                 MenuStripItem mnu = new MenuStripItem(base.engine, this, link.Key, link.Value);
                 menuStripItem.DropDownItems.Add(mnu.menuStripItem);
@@ -61,7 +62,7 @@ namespace ModemToolbarIE
 
 
         public void Create(string menuText,
-            ModemPostObjects linkUrl)
+            ModemMwdPostObjects linkUrl)
         {
 
             menuStripItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -81,23 +82,35 @@ namespace ModemToolbarIE
         {
             System.Windows.Forms.ToolStripMenuItem menuItem = sender as System.Windows.Forms.ToolStripMenuItem;
 
+            HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
+            doc.LoadHtml(HDocUtility.ConvertMshtmlToString(Engine.HtmlDoc));
+            string mwdId = HDocUtility.GetInputByName("P_104", doc);
           
             if (Engine.ModemStat == BandObjectLib.ModemEvents.BhaEdit)
             {
-                ModemToolbarIE.Utility.ModemParameters mp = new Utility.ModemParameters(Engine.HtmlDoc, true, "P_10");
-                ModemToolbarIE.Utility.ModemInsert mi = new Utility.ModemInsert(mp, linkObject, true);
+                ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_10");
+                ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, true);
+                
             }
             else if (Engine.ModemStat == BandObjectLib.ModemEvents.Edit)
             {
-                ModemToolbarIE.Utility.ModemParameters mp = new Utility.ModemParameters(Engine.HtmlDoc, true, "P_SSORD_ID");
-                ModemToolbarIE.Utility.ModemInsert mi = new Utility.ModemInsert(mp, linkObject, false);
+               ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_SSORD_ID");
+               ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, false);
             }
             else
             {
                 return;
             }
 
-            Engine.RefreshPage();
+            if (!String.IsNullOrEmpty(mwdId))
+            {
+                Engine.SmartNavigate(HDocUtility.BhaEditUrlwMwdId + mwdId);
+            }
+            else
+            {
+                Engine.RefreshPage();
+            }
+            
         }
 
 

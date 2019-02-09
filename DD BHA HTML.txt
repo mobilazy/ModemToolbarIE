@@ -1,0 +1,826 @@
+<html>
+<head>
+<title> : BHA DD</title>
+<meta name="GENERATOR" content="Oracle Designer Web PL/SQL Generator">
+<script>FormType = "Update";</script>
+<LINK REL=STYLESHEET HREF="/webhtml/css/css_hallib.css" TYPE="text/css">
+</head>
+<body onLoad="return MOTOR_MC_OnLoad()">
+<SCRIPT>
+<!-- Hide from old browsers
+var index = 0;
+var DataChange = false;
+var DataChangeErrors = false;
+var P_SSORD_ID = new Array();
+P_SSORD_ID[0] = "1246544";
+var P_10 = new Array();
+P_10[0] = "1246544";
+var MOTOR_MC_CHK_VALUE = new Array();
+MOTOR_MC_CHK_VALUE[0] = 6871;
+var P_MOTORS_ID = new Array();
+P_MOTORS_ID[0] = "9264";
+var P_183 = new Array();
+P_183[0] = "9264";
+var MOTORITM_MC_CHK_VALUE = new Array();
+MOTORITM_MC_CHK_VALUE [0]= 10059;
+function JSLReplace(pstr1, pstr2, pstr3) {
+   if (pstr1 != "") {
+     var rtnstr = "";
+     var searchstr = pstr1;
+     var addlen = pstr2.length;
+     var index = pstr1.indexOf(pstr2);
+     while ((index != -1) && (searchstr != "")) {
+       rtnstr = rtnstr + searchstr.substring(0, index);
+       if (pstr3 != null) {
+         rtnstr = rtnstr + pstr3;
+       }
+       searchstr = searchstr.substring(index + addlen, searchstr.length);
+       if (searchstr != "") {
+          index = searchstr.indexOf(pstr2);
+       }
+       else { index = -1; }
+     }
+     return (rtnstr + searchstr);
+   }
+   else {
+     return "";
+   }
+}
+function JSLGetValue(pctl, ptype, pfalse) {
+   var i = 0;
+   if (ptype == null) { return pctl.value; }
+   if (ptype == "CHECK") {
+      if (pctl.checked) { return pctl.value; }
+      else { return pfalse; }
+   }
+   if (ptype == "RADIO") {
+      for (i=0;i<pctl.length;i++) {
+         if (pctl[i].checked) { return pctl[i].value; }
+      }
+      return "";
+   }
+   if (ptype == "LIST") {
+      if (pctl.selectedIndex >= 0) {
+         if (pctl.options[pctl.selectedIndex].value != "") {
+            return pctl.options[pctl.selectedIndex].value;
+         }
+         else { return pctl.options[pctl.selectedIndex].text; }
+      }
+      else { return ""; }
+   }
+}
+function JSLStripMask(p_val) {
+  if (p_val == "") { return ""; }
+  var str = p_val;
+  str = JSLReplace(str, " ");
+  str = JSLReplace(str, ",");
+  str = JSLReplace(str, "$");
+  str = JSLReplace(str, "USD");
+
+  if ((str.substring(0, 1) == "<") && (str.substring(str.length -1, str.length) == ">")) {
+      str = "-" + str.substring(1, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "-") {
+    str = "-" + str.substring(0, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "+") {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
+function JSLToNumber(p_val) {
+   var lval = JSLStripMask(p_val);
+   if (lval == "") { return ""; }
+   else { return parseFloat(lval); }
+}
+function JSLChkNumScale (pctl, pval, pscale, pmsg) {
+  if (pval != "") {
+    var PointPos = pval.indexOf(".");
+    if (PointPos != -1) {
+      var Scale = pval.length - PointPos - 1;
+      if (Scale > pscale) {
+        alert(pmsg);
+        pctl.focus();
+        return false;
+      }
+    }
+  }
+  return true;
+}
+function JSLChkNumPrecision(pctl, pval, pprecision, pmsg) {
+  if (pval != "") {
+    var Prec = 0;
+    var PointPos = pval.indexOf(".");
+    // If a decimal point was not found
+    // validate the number of digits in the whole string
+    if (PointPos == -1) {
+      Prec = pval.length;
+    }
+    else {  // Validate the number of digits before the decimal point
+      Prec = PointPos;
+    }
+    if (pval.indexOf("-") == 0) {
+       Prec = Prec - 1;
+    };
+    if (pval.indexOf("+") == 0) {
+       Prec = Prec - 1;
+    };
+
+    if (Prec > pprecision) { alert(pmsg); pctl.focus(); return false; }
+  }
+   return true;
+}
+function JSLNotNull(pctl, pmsg){
+   if (pctl.value == "") { alert(pmsg); pctl.focus(); return false; }
+   return true;
+}
+function JSLChkMaxLength(pctl, plen, pmsg) {
+   if (pctl.value.length > plen) {
+     alert(pmsg);
+     pctl.focus();
+     return false;
+   }
+     return true;
+}
+function JSLCheckModified( p_form, p_action, p_submit ) {
+   var l_mod = false;
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         l_mod = true;
+         break;
+      };
+   };
+   if (l_mod) {
+      alert("Data on this page has been modified. Please submit changes or revert before continuing.");
+      return false;
+   } else {
+      p_form.Z_ACTION.value = p_action;
+      if (p_submit) {
+          p_form.submit();
+          return true;
+      }
+   }
+
+
+}
+function JSLRevertForm( p_form, rows ) {
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         p_form.z_modified[i].value = "N";
+      }
+   }
+   ResetRadios( p_form, rows );
+   return true;
+}
+function JSLFlagRow(p_form, p_row, p_set, p_path) {
+   var img = document.images[0];
+   var i = 0;
+   var search_name = p_form.name + (p_row);
+   var image_found = false;
+
+   while (i < document.images.length)
+   {
+     img = document.images[i];
+     if (img.name == search_name)
+     {
+       image_found = true;
+       break;
+     }
+     i++;
+   }
+
+   if (p_set == true)
+   {
+     if (image_found == true)
+     {
+       img.src = p_path + "cg_tick.gif";
+     }
+     p_form.z_modified[p_row].value = "Y";
+   }
+   else
+   {
+     if (image_found == true)
+     {
+       img.src = p_path + "cg_blnk.gif";
+     }
+     p_form.z_modified[p_row].value = "N";
+   }
+
+
+   return;
+}
+function L_MOBSS_HOLESEC_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_mobss_holesec_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_MOBSS_MOTORSIZE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_mobss_motorsize_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_MOBSS_LOBERATIO_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_mobss_loberatio_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_MOTORTYPE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_motortype_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_MOTOR_CATEGORY_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_motor_category_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_ROTOR_COATING_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_rotor_coating_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_BEND_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_bend_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_UPHOLE_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_uphole_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_DRIVESHAFT_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$motor_mc.l_driveshaft_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function MOTOR_MC_Validate(ctl, index) {
+var index = 0;
+   if (!JSLNotNull(ctl.form.P_MOTOR_NUM[index], "Motor #: A value must be entered")) {ctl.form.P_MOTOR_NUM[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MOTOR_NUM[index], JSLStripMask(JSLGetValue(ctl.form.P_MOTOR_NUM[index])), 2, "Motor #: Value cannot have more than 2 digits before the decimal point")) {ctl.form.P_MOTOR_NUM[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_FLOWRATE_MIN[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOWRATE_MIN[index])), 7, "Flow Rate Min: Value cannot have more than 7 digits before the decimal point")) {ctl.form.P_FLOWRATE_MIN[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_FLOWRATE_MIN[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOWRATE_MIN[index])), 3, "Flow Rate Min: Value cannot have more than 3 decimal places")) {ctl.form.P_FLOWRATE_MIN[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_FLOWRATE_MAX[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOWRATE_MAX[index])), 7, "Flow Rate Max: Value cannot have more than 7 digits before the decimal point")) {ctl.form.P_FLOWRATE_MAX[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_FLOWRATE_MAX[index], JSLStripMask(JSLGetValue(ctl.form.P_FLOWRATE_MAX[index])), 3, "Flow Rate Max: Value cannot have more than 3 decimal places")) {ctl.form.P_FLOWRATE_MAX[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_BIT_PRESSURE_DROP[index], JSLStripMask(JSLGetValue(ctl.form.P_BIT_PRESSURE_DROP[index])), 8, "Bit Pressure Drop: Value cannot have more than 8 digits before the decimal point")) {ctl.form.P_BIT_PRESSURE_DROP[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MOTOR_DIFFPRESS[index], JSLStripMask(JSLGetValue(ctl.form.P_MOTOR_DIFFPRESS[index])), 8, "Motor Diff/Pressure: Value cannot have more than 8 digits before the decimal point")) {ctl.form.P_MOTOR_DIFFPRESS[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MUD_TYPE[index], JSLStripMask(JSLGetValue(ctl.form.P_MUD_TYPE[index])), 3, "Mud Type/Weight: Value cannot have more than 3 digits before the decimal point")) {ctl.form.P_MUD_TYPE[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_MUD_TYPE[index], JSLStripMask(JSLGetValue(ctl.form.P_MUD_TYPE[index])), 2, "Mud Type/Weight: Value cannot have more than 2 decimal places")) {ctl.form.P_MUD_TYPE[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_PLAN_TEMP_START[index], JSLStripMask(JSLGetValue(ctl.form.P_PLAN_TEMP_START[index])), 3, "Plan Circ Temp at Start of App: Value cannot have more than 3 digits before the decimal point")) {ctl.form.P_PLAN_TEMP_START[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_PLAN_TEMP_START[index], JSLStripMask(JSLGetValue(ctl.form.P_PLAN_TEMP_START[index])), 2, "Plan Circ Temp at Start of App: Value cannot have more than 2 decimal places")) {ctl.form.P_PLAN_TEMP_START[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_MAX_TEMP[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_TEMP[index])), 3, "Max Circ Temp During Application: Value cannot have more than 3 digits before the decimal point")) {ctl.form.P_MAX_TEMP[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_MAX_TEMP[index], JSLStripMask(JSLGetValue(ctl.form.P_MAX_TEMP[index])), 2, "Max Circ Temp During Application: Value cannot have more than 2 decimal places")) {ctl.form.P_MAX_TEMP[index].focus(); return false }
+   if (!JSLChkMaxLength(ctl.form.P_COMMENTS[index], 512, "Motor Comments: Value exceeds the maximum column length (512)")) {ctl.form.P_COMMENTS[index].focus(); return false }
+   return true;
+}
+function MOTOR_MC_OnLoad(ctl, index) {
+
+   if ( FormType != "PostDelete")
+   {
+      form_num=0;
+      do
+      {
+         elem_num=0;
+         len = document.forms[form_num].elements.length;
+         if (len > 0)
+         {
+            while (elem_num < len &&
+                   document.forms[form_num].elements[elem_num].type != "text" &&
+                   document.forms[form_num].elements[elem_num].type != "textarea")
+            {
+               elem_num++;
+            }
+            if (elem_num < len)
+            {
+               document.forms[form_num].elements[elem_num].focus();
+               break;
+            }
+         }
+         form_num++;
+      } while ( form_num < document.forms.length );
+   }
+
+   return true;
+}
+function btnVFU_OnClick(ctl, index) {
+   if (!MOTOR_MC_Validate(ctl)) { return false; }
+   ctl.form.submit();
+   return true;
+}
+function btnVFD_OnClick(ctl, index) {
+   if (!confirm("Please confirm the Delete")) { return false }
+   ctl.form.Z_ACTION.value = "VerifiedDelete";
+   ctl.form.submit();
+   return true;
+}
+function btnVFR_OnClick(ctl, index) {
+   ctl.form.submit();
+   return true;
+}
+function btnVFI_OnClick(ctl, index) {
+   ctl.form.submit();
+   return true;
+}
+function COPY_MOTOR_DATA_OnClick(ctl, index) {
+
+// COPY_MOTOR_DATA_OnClick
+//
+//
+motor_id = mobssus_order_new$motor_mc$VForm.P_MOTORS_ID[index].value;
+window.open("mobss_motor_copy_crit?nOrderId=" + P_SSORD_ID[0] + "&nMotor_Id=" + motor_id,"Copy","toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=470, height=325, left=400, top=200" );
+   return true;
+}
+//-->
+</SCRIPT>
+<h1>BHA DD</h1>
+<form action="ActionItem" method="post" NAME="VF$AIFormTop">
+</form>
+<form action="mobssus_order_new$motor_mc.actionview" method="post" NAME="mobssus_order_new$motor_mc$VForm">
+<input type="hidden" name="P_10" value="1246544" />
+<p>
+<table >
+<input type="hidden" name="P_MOTORS_ID" value="9264" />
+<input type="hidden" name="O_MOTORS_ID" value="9264" />
+<input type="hidden" name="H_DD_MOTOR_WARN" value="" />
+<input type="hidden" name="H_DIV2" value="" />
+<tr valign="TOP"><td align="LEFT"><b></b></td><td align="LEFT"></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<input type="hidden" name="H_LABEL_APPDET" value="&lt;br&gt;&lt;H3&gt;Application Details&lt;/H3&gt;" />
+<tr valign="TOP"><td align="LEFT"><b>Motor #:</b></td><td align="LEFT"><input type="text" name="P_MOTOR_NUM" size="2" maxlength="3" value="2"  ID="P_MOTOR_NUM" /></td><td align="LEFT"><b></b></td><td align="LEFT"><br><H3>Application Details</H3></td></tr>
+<input type="hidden" name="H_DIV1" value="" />
+<tr valign="TOP"><td align="LEFT"><b>Motor Description:</b></td><td align="LEFT"><input type="text" name="P_MOTOR_DESC" size="50" maxlength="50" value="dd2"  ID="P_MOTOR_DESC" /></td><td align="LEFT"><b></b></td><td align="LEFT"></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Hole Section:</b></td><td align="LEFT"><select name="P_L_MOBSS_HOLESEC" size="1" CLASS = cglovlist ID="P_L_MOBSS_HOLESEC"><option selected="selected" VALUE=" "> </option><option VALUE="03 1/2&quot;">03 1/2&quot;</option><option VALUE="03 7/8&quot;">03 7/8&quot;</option><option VALUE="04 1/8&quot;">04 1/8&quot;</option><option VALUE="05 7/8&quot;">05 7/8&quot;</option><option VALUE="05&quot;">05&quot;</option><option VALUE="06 1/2&quot;">06 1/2&quot;</option><option VALUE="06 1/8&quot;">06 1/8&quot;</option><option VALUE="06&quot;">06&quot;</option><option VALUE="07&quot;">07&quot;</option><option VALUE="08 1/2&quot;">08 1/2&quot;</option><option VALUE="08 3/8&quot;">08 3/8&quot;</option><option VALUE="09 1/2&quot;">09 1/2&quot;</option><option VALUE="09 5/8&quot;">09 5/8&quot;</option><option VALUE="10 1/4&quot;">10 1/4&quot;</option><option VALUE="10 5/8&quot;">10 5/8&quot;</option><option VALUE="11 1/2&quot;">11 1/2&quot;</option><option VALUE="12 1/4&quot;">12 1/4&quot;</option><option VALUE="13 1/2&quot;">13 1/2&quot;</option><option VALUE="14 3/4&quot;">14 3/4&quot;</option><option VALUE="14&quot;">14&quot;</option><option VALUE="16&quot;">16&quot;</option><option VALUE="17 1/2&quot;">17 1/2&quot;</option><option VALUE="20&quot;">20&quot;</option><option VALUE="24&quot;">24&quot;</option><option VALUE="26&quot;">26&quot;</option><option VALUE="27&quot;">27&quot;</option><option VALUE="28&quot;">28&quot;</option><option VALUE="29&quot;">29&quot;</option><option VALUE="32&quot;">32&quot;</option><option VALUE="36&quot;">36&quot;</option><option VALUE="42&quot;">42&quot;</option></select></td><td align="LEFT"><b>Flow Rate Min:</b></td><td align="LEFT"><input type="text" name="P_FLOWRATE_MIN" size="10" maxlength="12"  ID="P_FLOWRATE_MIN" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Flow Rate Max:</b></td><td align="LEFT"><input type="text" name="P_FLOWRATE_MAX" size="10" maxlength="12"  ID="P_FLOWRATE_MAX" /></td><td align="LEFT"><b>Flow Rate Unit:</b></td><td align="LEFT"><select name="P_FLOW_RATE_UNIT" size="1" CLASS = cgdvlist ID="P_FLOW_RATE_UNIT"><option selected="selected"> </option><option VALUE="gpm">gpm</option><option VALUE="lpm">lpm</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>W O B:</b></td><td align="LEFT"><input type="text" name="P_WOB" size="20" maxlength="20"  ID="P_WOB" /><b> (Tons)</b></td><td align="LEFT"><b>Bit Pressure Drop:</b></td><td align="LEFT"><input type="text" name="P_BIT_PRESSURE_DROP" size="20" maxlength="9"  ID="P_BIT_PRESSURE_DROP" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Pressure Unit:</b></td><td align="LEFT"><select name="P_PRES_UNIT" size="1" CLASS = cgdvlist ID="P_PRES_UNIT"><option selected="selected"> </option><option VALUE="psi">psi</option><option VALUE="bar">bar</option></select></td><td align="LEFT"><b>Motor Diff/Pressure:</b></td><td align="LEFT"><input type="text" name="P_MOTOR_DIFFPRESS" size="20" maxlength="9"  ID="P_MOTOR_DIFFPRESS" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Mud Type/Weight:</b></td><td align="LEFT"><input type="text" name="P_MUD_TYPE" size="10" maxlength="7"  ID="P_MUD_TYPE" /><b> (SG)</b></td><td align="LEFT"><b>Stator Rubber:</b></td><td align="LEFT"><input type="text" name="P_STATOR_RUBBER" size="20" maxlength="20"  ID="P_STATOR_RUBBER" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Plan Circ Temp at Start of App:</b></td><td align="LEFT"><input type="text" name="P_PLAN_TEMP_START" size="10" maxlength="7"  ID="P_PLAN_TEMP_START" /></td><td align="LEFT"><b>Max Circ Temp During Application:</b></td><td align="LEFT"><input type="text" name="P_MAX_TEMP" size="10" maxlength="7"  ID="P_MAX_TEMP" /></td></tr>
+<input type="hidden" name="H_LABEL_CONFDET" value="&lt;br&gt;&lt;H3&gt;Configuration Details&lt;/H3&gt;" />
+<tr valign="TOP"><td align="LEFT"><b>Temp Unit:</b></td><td align="LEFT"><select name="P_TEMP_UNIT" size="1" CLASS = cgdvlist ID="P_TEMP_UNIT"><option selected="selected"> </option><option VALUE="°C">°C</option><option VALUE="°F">°F</option></select></td><td align="LEFT"><b></b></td><td align="LEFT"><br><H3>Configuration Details</H3></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Slick Bore:</b></td><td align="LEFT"><select name="P_SLICK_BORE" size="1" CLASS = cgdvlist ID="P_SLICK_BORE"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Motor Size:</b></td><td align="LEFT"><select name="P_L_MOBSS_MOTORSIZE" size="1" CLASS = cglovlist ID="P_L_MOBSS_MOTORSIZE"><option selected="selected" VALUE=" "> </option><option VALUE="02 3/8&quot;">02 3/8&quot;</option><option VALUE="02 7/8&quot;">02 7/8&quot;</option><option VALUE="03 1/8&quot;">03 1/8&quot;</option><option VALUE="03 3/8&quot;">03 3/8&quot;</option><option VALUE="03 5/8&quot;">03 5/8&quot;</option><option VALUE="04 3/4&quot;">04 3/4&quot;</option><option VALUE="05&quot;">05&quot;</option><option VALUE="06 1/2&quot;">06 1/2&quot;</option><option VALUE="06 1/4&quot;">06 1/4&quot;</option><option VALUE="06 3/4&quot;">06 3/4&quot;</option><option VALUE="07&quot;">07&quot;</option><option VALUE="08&quot; ">08&quot; </option><option VALUE="09 5/8&quot;">09 5/8&quot;</option><option VALUE="11 1/4&quot;">11 1/4&quot;</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Lobe Ratio:</b></td><td align="LEFT"><select name="P_L_MOBSS_LOBERATIO" size="1" CLASS = cglovlist ID="P_L_MOBSS_LOBERATIO"><option selected="selected" VALUE=" "> </option><option VALUE="Lobe 1:2">Lobe 1:2</option><option VALUE="Lobe 2:3">Lobe 2:3</option><option VALUE="Lobe 3:4">Lobe 3:4</option><option VALUE="Lobe 4:5">Lobe 4:5</option><option VALUE="Lobe 5:6">Lobe 5:6</option><option VALUE="Lobe 6:7">Lobe 6:7</option><option VALUE="Lobe 7:8">Lobe 7:8</option><option VALUE="Lobe 8:9">Lobe 8:9</option><option VALUE="Lobe 9:10">Lobe 9:10</option></select></td><td align="LEFT"><b>Type:</b></td><td align="LEFT"><select name="P_L_MOTORTYPE" size="1" CLASS = cglovlist ID="P_L_MOTORTYPE"><option selected="selected" VALUE=" "> </option><option VALUE="5” GeoForce Group 7 Rotor (160°C to 175°C) ">5” GeoForce Group 7 Rotor (160°C to 175°C) </option><option VALUE="7” GeoForce Group 7 Rotor (160°C to 175°C)">7” GeoForce Group 7 Rotor (160°C to 175°C)</option><option VALUE="9-5/8” GeoForce Group 7 Rotor (160°C to 175°C)">9-5/8” GeoForce Group 7 Rotor (160°C to 175°C)</option><option VALUE="AGM ">AGM </option><option VALUE="Dynadrill">Dynadrill</option><option VALUE="Geo-Force Rotor Size 0  (21 - 60 C)">Geo-Force Rotor Size 0  (21 - 60 C)</option><option VALUE="Geo-Force Rotor Size 2  (60 - 100 C)">Geo-Force Rotor Size 2  (60 - 100 C)</option><option VALUE="Geo-Force Rotor Size 4  (100 - 125 C)">Geo-Force Rotor Size 4  (100 - 125 C)</option><option VALUE="Geo-Force Rotor Size 6  (125 - 160 C)">Geo-Force Rotor Size 6  (125 - 160 C)</option><option VALUE="Slickbore">Slickbore</option><option VALUE="Sperry Drill">Sperry Drill</option><option VALUE="Turbine">Turbine</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Motor Category:</b></td><td align="LEFT"><select name="P_L_MOTOR_CATEGORY" size="1" CLASS = cglovlist ID="P_L_MOTOR_CATEGORY"><option selected="selected" VALUE=" "> </option><option VALUE="AGM">AGM</option><option VALUE="Geo-Force">Geo-Force</option><option VALUE="Performance">Performance</option><option VALUE="Regular">Regular</option><option VALUE="Tandem">Tandem</option></select></td><td align="LEFT"><b>Flexi Stator:</b></td><td align="LEFT"><select name="P_FLEXI_STATOR" size="1" CLASS = cgdvlist ID="P_FLEXI_STATOR"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Rotor Catchers:</b></td><td align="LEFT"><select name="P_ROTOR_CATCHERS" size="1" CLASS = cgdvlist ID="P_ROTOR_CATCHERS"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Rotor Coating:</b></td><td align="LEFT"><select name="P_L_ROTOR_COATING" size="1" CLASS = cglovlist ID="P_L_ROTOR_COATING"><option selected="selected" VALUE=" "> </option><option VALUE="Carbide">Carbide</option><option VALUE="Chrome">Chrome</option><option VALUE="Densified">Densified</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Bend:</b></td><td align="LEFT"><select name="P_L_BEND" size="1" CLASS = cglovlist ID="P_L_BEND"><option selected="selected" VALUE=" "> </option><option VALUE="Adj 0.0">Adj 0.0</option><option VALUE="Adj 0.26">Adj 0.26</option><option VALUE="Adj 0.31">Adj 0.31</option><option VALUE="Adj 0.39 ">Adj 0.39 </option><option VALUE="Adj 0.52">Adj 0.52</option><option VALUE="Adj 0.62">Adj 0.62</option><option VALUE="Adj 0.63">Adj 0.63</option><option VALUE="Adj 0.77">Adj 0.77</option><option VALUE="Adj 0.78 ">Adj 0.78 </option><option VALUE="Adj 0.93">Adj 0.93</option><option VALUE="Adj 1.00">Adj 1.00</option><option VALUE="Adj 1.15">Adj 1.15</option><option VALUE="Adj 1.22">Adj 1.22</option><option VALUE="Adj 1.41">Adj 1.41</option><option VALUE="Adj 1.50">Adj 1.50</option><option VALUE="Adj 1.59">Adj 1.59</option><option VALUE="Adj 1.73">Adj 1.73</option><option VALUE="Adj 1.76">Adj 1.76</option><option VALUE="Adj 1.83">Adj 1.83</option><option VALUE="Adj 1.85">Adj 1.85</option><option VALUE="Adj 1.93">Adj 1.93</option><option VALUE="Adj 1.98">Adj 1.98</option><option VALUE="Adj 2.00">Adj 2.00</option><option VALUE="Adj 2.12">Adj 2.12</option><option VALUE="Adj 2.23">Adj 2.23</option><option VALUE="Adj 2.28">Adj 2.28</option><option VALUE="Adj 2.43">Adj 2.43</option><option VALUE="Adj 2.60">Adj 2.60</option><option VALUE="Adj 2.74">Adj 2.74</option><option VALUE="Adj 2.77">Adj 2.77</option><option VALUE="Adj 2.85">Adj 2.85</option><option VALUE="Adj 2.89">Adj 2.89</option><option VALUE="Adj 2.93">Adj 2.93</option><option VALUE="Adj 2.97">Adj 2.97</option><option VALUE="Adj 2.98">Adj 2.98</option><option VALUE="Adj 3.00">Adj 3.00</option><option VALUE="Fix 0.25">Fix 0.25</option><option VALUE="Fix 0.50">Fix 0.50</option><option VALUE="Fix 0.75">Fix 0.75</option><option VALUE="Fix 1.00">Fix 1.00</option><option VALUE="Fix 1.25">Fix 1.25</option><option VALUE="Fix 1.50">Fix 1.50</option><option VALUE="Fix 1.75">Fix 1.75</option><option VALUE="Fix 2.00">Fix 2.00</option><option VALUE="Fix 2.25">Fix 2.25</option><option VALUE="Fix 2.50">Fix 2.50</option><option VALUE="Fix 2.75">Fix 2.75</option><option VALUE="Fix 3.00">Fix 3.00</option><option VALUE="Straight 0">Straight 0</option></select></td><td align="LEFT"><b>Rotor Nozzle:</b></td><td align="LEFT"><select name="P_ROTOR_NOZZLE" size="1" CLASS = cgdvlist ID="P_ROTOR_NOZZLE"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Dump Sub:</b></td><td align="LEFT"><select name="P_DUMP_SUB" size="1" CLASS = cgdvlist ID="P_DUMP_SUB"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Pin Down Shaft:</b></td><td align="LEFT"><select name="P_PIN_DOWN_SHAFT" size="1" CLASS = cgdvlist ID="P_PIN_DOWN_SHAFT"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Uphole Connection:</b></td><td align="LEFT"><select name="P_L_UPHOLE" size="1" CLASS = cglovlist ID="P_L_UPHOLE"><option selected="selected" VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td><td align="LEFT"><b>Drive Shaft Connection:</b></td><td align="LEFT"><select name="P_L_DRIVESHAFT" size="1" CLASS = cglovlist ID="P_L_DRIVESHAFT"><option selected="selected" VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Sleeve Fitted:</b></td><td align="LEFT"><select name="P_SLEEVE_FITTED" size="1" CLASS = cgdvlist ID="P_SLEEVE_FITTED"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Sleeve Gauge:</b></td><td align="LEFT"><input type="text" name="P_SLEEVE_GAUGE" size="20" maxlength="20"  ID="P_SLEEVE_GAUGE" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Pad:</b></td><td align="LEFT"><select name="P_PAD" size="1" CLASS = cgdvlist ID="P_PAD"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Pad Size:</b></td><td align="LEFT"><input type="text" name="P_PAD_SIZE" size="20" maxlength="20"  ID="P_PAD_SIZE" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>ABI Req:</b></td><td align="LEFT"><select name="P_ABI_REQ" size="1" CLASS = cgdvlist ID="P_ABI_REQ"><option selected="selected"> </option><option VALUE="No">No</option><option VALUE="Yes">Yes</option></select></td><td align="LEFT"><b>Bit Type:</b></td><td align="LEFT"><input type="text" name="P_BIT_TYPE" size="30" maxlength="100"  ID="P_BIT_TYPE" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Bit required torqued on:</b></td><td align="LEFT"><select name="P_BIT_TORQUED" size="1" CLASS = cgdvlist ID="P_BIT_TORQUED"><option selected="selected"> </option><option VALUE="Y">Yes</option><option VALUE="N">No</option></select></td><td align="LEFT"><b>Bit Makeup Torque:</b></td><td align="LEFT"><input type="text" name="P_BIT_MAKEUP_TORQUE" size="20" maxlength="20"  ID="P_BIT_MAKEUP_TORQUE" /></td></tr>
+<tr valign="TOP"><td align="LEFT"><b>Bit SN:</b></td><td align="LEFT"><input type="text" name="P_BIT_SN" size="20" maxlength="20"  ID="P_BIT_SN" /></td><td align="LEFT"><b>Motor Comments:</b></td><td align="LEFT"><textarea name="P_COMMENTS" rows="4" cols="50" wrap="VIRTUAL"  ID="P_COMMENTS"></textarea></td></tr>
+<input type="hidden" name="H_DEL_BHA" value="&lt;input type=&quot;button&quot; value=&quot;Delete BHA&quot; onClick=&quot;location.href='mobss_delbha.startup?pBHAId=9264&amp;pBHAType=DD&amp;pOid=1246544'&quot;&gt;" />
+<tr valign="TOP"><td align="LEFT"><b>Delete DD:</b></td><td align="LEFT"><input type="button" value="Delete BHA" onClick="location.href='mobss_delbha.startup?pBHAId=9264&pBHAType=DD&pOid=1246544'"></td><td align="LEFT"><b></b></td><td align="LEFT"><input type="text" name="P_S2" size="1" maxlength="1"  ID="P_S2" /><b> (Do not touch)</b></td></tr>
+<input type="hidden" name="H_L_PRECON_STATUS" value="N/A" />
+<tr valign="TOP"><td align="LEFT"><b>Pre-Config:</b></td><td align="LEFT">N/A</td><td align="LEFT">&nbsp</td><td align="LEFT">&nbsp</td></tr>
+</tr>
+<SCRIPT>
+<!-- Hide from old browsers
+document.write('<INPUT TYPE="hidden" NAME="z_modified" VALUE="N">');
+//-->
+</SCRIPT>
+<input type="hidden" name="O_SSORD_ID" value="1246544" />
+<input type="hidden" name="O_MOTOR_NUM" value="2" />
+<input type="hidden" name="O_MOTOR_DESC" value="dd2" />
+<input type="hidden" name="O_HOLESEC_ID" value="1" />
+<input type="hidden" name="O_FLOWRATE_MIN" value="" />
+<input type="hidden" name="O_FLOWRATE_MAX" value="" />
+<input type="hidden" name="O_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="O_WOB" value="" />
+<input type="hidden" name="O_BIT_PRESSURE_DROP" value="" />
+<input type="hidden" name="O_PRES_UNIT" value="" />
+<input type="hidden" name="O_MOTOR_DIFFPRESS" value="" />
+<input type="hidden" name="O_MOTORSIZE_ID" value="1" />
+<input type="hidden" name="O_LOBERATIO_ID" value="1" />
+<input type="hidden" name="O_MUD_TYPE" value="" />
+<input type="hidden" name="O_STATOR_RUBBER" value="" />
+<input type="hidden" name="O_PLAN_TEMP_START" value="" />
+<input type="hidden" name="O_MAX_TEMP" value="" />
+<input type="hidden" name="O_TEMP_UNIT" value="" />
+<input type="hidden" name="O_SLICK_BORE" value="" />
+<input type="hidden" name="O_FLEXI_STATOR" value="" />
+<input type="hidden" name="O_ROTOR_CATCHERS" value="" />
+<input type="hidden" name="O_ROTOR_NOZZLE" value="" />
+<input type="hidden" name="O_DUMP_SUB" value="" />
+<input type="hidden" name="O_PIN_DOWN_SHAFT" value="" />
+<input type="hidden" name="O_ROTCOAT_ID" value="1" />
+<input type="hidden" name="O_MOTCAT_ID" value="1" />
+<input type="hidden" name="O_MOTORTYPE_ID" value="1" />
+<input type="hidden" name="O_UPHOLE_CONN_ID" value="1" />
+<input type="hidden" name="O_DRIVESHAFT_CONN_ID" value="1" />
+<input type="hidden" name="O_MOTBEND_ID" value="1" />
+<input type="hidden" name="O_SLEEVE_FITTED" value="" />
+<input type="hidden" name="O_SLEEVE_GAUGE" value="" />
+<input type="hidden" name="O_PAD" value="" />
+<input type="hidden" name="O_PAD_SIZE" value="" />
+<input type="hidden" name="O_ABI_REQ" value="" />
+<input type="hidden" name="O_BIT_TYPE" value="" />
+<input type="hidden" name="O_BIT_TORQUED" value="" />
+<input type="hidden" name="O_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="O_BIT_SN" value="" />
+<input type="hidden" name="O_SCHED_STATUS" value="3" />
+<input type="hidden" name="O_STATUS" value="1" />
+<input type="hidden" name="O_COMMENTS" value="" />
+<input type="hidden" name="O_S2" value="" />
+<input type="hidden" name="O_PRECON_ID" value="1" />
+</table>
+<p>
+<input type="hidden" name="P_MOTORS_ID" value="" />
+<input type="hidden" name="P_MOTOR_NUM" value="" />
+<input type="hidden" name="P_MOTOR_DESC" value="" />
+<input type="hidden" name="P_L_MOBSS_HOLESEC" value="" />
+<input type="hidden" name="P_FLOWRATE_MIN" value="" />
+<input type="hidden" name="P_FLOWRATE_MAX" value="" />
+<input type="hidden" name="P_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="P_WOB" value="" />
+<input type="hidden" name="P_BIT_PRESSURE_DROP" value="" />
+<input type="hidden" name="P_PRES_UNIT" value="" />
+<input type="hidden" name="P_MOTOR_DIFFPRESS" value="" />
+<input type="hidden" name="P_MUD_TYPE" value="" />
+<input type="hidden" name="P_STATOR_RUBBER" value="" />
+<input type="hidden" name="P_PLAN_TEMP_START" value="" />
+<input type="hidden" name="P_MAX_TEMP" value="" />
+<input type="hidden" name="P_TEMP_UNIT" value="" />
+<input type="hidden" name="P_SLICK_BORE" value="" />
+<input type="hidden" name="P_L_MOBSS_MOTORSIZE" value="" />
+<input type="hidden" name="P_L_MOBSS_LOBERATIO" value="" />
+<input type="hidden" name="P_L_MOTORTYPE" value="" />
+<input type="hidden" name="P_L_MOTOR_CATEGORY" value="" />
+<input type="hidden" name="P_FLEXI_STATOR" value="" />
+<input type="hidden" name="P_ROTOR_CATCHERS" value="" />
+<input type="hidden" name="P_L_ROTOR_COATING" value="" />
+<input type="hidden" name="P_L_BEND" value="" />
+<input type="hidden" name="P_ROTOR_NOZZLE" value="" />
+<input type="hidden" name="P_DUMP_SUB" value="" />
+<input type="hidden" name="P_PIN_DOWN_SHAFT" value="" />
+<input type="hidden" name="P_L_UPHOLE" value="" />
+<input type="hidden" name="P_L_DRIVESHAFT" value="" />
+<input type="hidden" name="P_SLEEVE_FITTED" value="" />
+<input type="hidden" name="P_SLEEVE_GAUGE" value="" />
+<input type="hidden" name="P_PAD" value="" />
+<input type="hidden" name="P_PAD_SIZE" value="" />
+<input type="hidden" name="P_ABI_REQ" value="" />
+<input type="hidden" name="P_BIT_TYPE" value="" />
+<input type="hidden" name="P_BIT_TORQUED" value="" />
+<input type="hidden" name="P_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="P_BIT_SN" value="" />
+<input type="hidden" name="P_COMMENTS" value="" />
+<input type="hidden" name="P_S2" value="" />
+<input type="hidden" name="O_SSORD_ID" value="" />
+<input type="hidden" name="O_MOTOR_NUM" value="" />
+<input type="hidden" name="O_MOTOR_DESC" value="" />
+<input type="hidden" name="O_HOLESEC_ID" value="" />
+<input type="hidden" name="O_FLOWRATE_MIN" value="" />
+<input type="hidden" name="O_FLOWRATE_MAX" value="" />
+<input type="hidden" name="O_FLOW_RATE_UNIT" value="" />
+<input type="hidden" name="O_WOB" value="" />
+<input type="hidden" name="O_BIT_PRESSURE_DROP" value="" />
+<input type="hidden" name="O_PRES_UNIT" value="" />
+<input type="hidden" name="O_MOTOR_DIFFPRESS" value="" />
+<input type="hidden" name="O_MOTORSIZE_ID" value="" />
+<input type="hidden" name="O_LOBERATIO_ID" value="" />
+<input type="hidden" name="O_MUD_TYPE" value="" />
+<input type="hidden" name="O_STATOR_RUBBER" value="" />
+<input type="hidden" name="O_PLAN_TEMP_START" value="" />
+<input type="hidden" name="O_MAX_TEMP" value="" />
+<input type="hidden" name="O_TEMP_UNIT" value="" />
+<input type="hidden" name="O_SLICK_BORE" value="" />
+<input type="hidden" name="O_FLEXI_STATOR" value="" />
+<input type="hidden" name="O_ROTOR_CATCHERS" value="" />
+<input type="hidden" name="O_ROTOR_NOZZLE" value="" />
+<input type="hidden" name="O_DUMP_SUB" value="" />
+<input type="hidden" name="O_PIN_DOWN_SHAFT" value="" />
+<input type="hidden" name="O_ROTCOAT_ID" value="" />
+<input type="hidden" name="O_MOTCAT_ID" value="" />
+<input type="hidden" name="O_MOTORTYPE_ID" value="" />
+<input type="hidden" name="O_UPHOLE_CONN_ID" value="" />
+<input type="hidden" name="O_DRIVESHAFT_CONN_ID" value="" />
+<input type="hidden" name="O_MOTBEND_ID" value="" />
+<input type="hidden" name="O_SLEEVE_FITTED" value="" />
+<input type="hidden" name="O_SLEEVE_GAUGE" value="" />
+<input type="hidden" name="O_PAD" value="" />
+<input type="hidden" name="O_PAD_SIZE" value="" />
+<input type="hidden" name="O_ABI_REQ" value="" />
+<input type="hidden" name="O_BIT_TYPE" value="" />
+<input type="hidden" name="O_BIT_TORQUED" value="" />
+<input type="hidden" name="O_BIT_MAKEUP_TORQUE" value="" />
+<input type="hidden" name="O_BIT_SN" value="" />
+<input type="hidden" name="O_SCHED_STATUS" value="" />
+<input type="hidden" name="O_STATUS" value="" />
+<input type="hidden" name="O_COMMENTS" value="" />
+<input type="hidden" name="O_S2" value="" />
+<input type="hidden" name="O_PRECON_ID" value="" />
+<input type="hidden" name="H_DD_MOTOR_WARN" value="" />
+<input type="hidden" name="H_DIV2" value="" />
+<input type="hidden" name="H_LABEL_APPDET" value="" />
+<input type="hidden" name="H_DIV1" value="" />
+<input type="hidden" name="H_LABEL_CONFDET" value="" />
+<input type="hidden" name="H_DEL_BHA" value="" />
+<input type="hidden" name="H_L_PRECON_STATUS" value="" />
+<input type="hidden" name="z_modified" value="dummy_row" />
+<SCRIPT><!--
+document.write('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+document.write('<input type=submit value="Update" onClick="this.form.Z_ACTION.value=\'UPDATE\'; return btnVFU_OnClick(this),false">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Update" ID="Update" />
+</NOSCRIPT>
+<SCRIPT><!--
+document.write('<input type=button value="Delete" onClick="this.form.Z_ACTION.value=\'DELETE\'; return btnVFD_OnClick(this)">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Delete" ID="Delete" />
+</NOSCRIPT>
+<input type="reset" VALUE="Revert" ID="Revert" />
+<SCRIPT><!--
+document.write('<input type=button value="New" onClick="this.form.Z_ACTION.value=\'INSERT\'; return btnVFI_OnClick(this)">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="New" ID="New" />
+</NOSCRIPT>
+<input type="hidden" name="Z_CHK" value="18558" />
+<input type="hidden" name="Q_SSORD_ID" value="" />
+<input type="hidden" name="Z_START" value="1" />
+</form>
+<LINK REL=STYLESHEET HREF="/webhtml/css/css_hallib.css" TYPE="text/css">
+<SCRIPT>
+<!-- Hide from old browsers
+var FormType = "List";
+var P_DD_ID = new Array();
+P_DD_ID[0] = "9264";
+var P_183 = new Array();
+P_183[0] = "9264";
+var P_10 = new Array();
+P_10[0] = "1246544";
+var P_SSORD_ID = new Array();
+P_SSORD_ID[0] = "1246544";
+var MOTORITM_MC_CHK_VALUE = new Array();
+MOTORITM_MC_CHK_VALUE[0] = 10059;
+var MOTOR_MC_CHK_VALUE = new Array();
+MOTOR_MC_CHK_VALUE[0] = 6871;
+var P_255 = new Array();
+//-->
+</SCRIPT>
+<h2>Motor Items</h2>
+<p>
+<p>
+<table  BORDER>
+<tr class = cgrlheaderrow><th align="RIGHT" ID="SEQ_NO">Sequence</th><th align="LEFT" ID="TORQUE">Torque (Ft-Lbs/1000)</th><th align="LEFT" ID="THREADSIZE">Threadsize Top</th><th align="LEFT" ID="THREADSIZE">Threadsize Bottom</th><th align="LEFT" ID="DESCRIPTION">Description</th></tr>
+<tr valign="TOP" class = cgrldatarow><td align="RIGHT" ID="SEQ_NO1"><a href="mobssus_order_new$motoritm_mc.QueryViewByKey?P_DDITM_ID=23912&P_183=9264&P_10=1246544&Z_CHK=34627" target="_self">1</a></td><td align="LEFT" ID="TORQUE1">07</td><td align="LEFT" ID="THREADSIZE1">4 1/2" 12.6ppf VT B</td><td align="LEFT" ID="THREADSIZE1">4 1/2" IF Box</td><td align="LEFT" ID="DESCRIPTION1">ddpart1</td></tr>
+</table>
+<p>
+Record 1 of 1
+<p>
+<form action="mobssus_order_new$motoritm_mc.querylist" method="post" target="_self" NAME="mobssus_order_new$motoritm_mc$LFormView">
+<input type="hidden" name="P_183" value="9264" />
+<input type="hidden" name="P_10" value="1246544" />
+<input type="hidden" name="P_DD_ID" value="9264" />
+<SCRIPT><!--
+document.write ('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+document.write ('<input type="submit" value="New" onClick="this.form.Z_ACTION.value=\'INSERT\'" />')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="New" ID="New" />
+</NOSCRIPT>
+<input type="hidden" name="Z_CHK" value="10059" />
+</form>
+<form action="ActionItem" method="post" NAME="VF$AIFormBottom">
+<SCRIPT><!--
+document.write('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+//--> <input type="submit" name="Z_ACTION" value="Copy Motor Data" ID="COPY_MOTOR_DATA" /> <!--
+document.write('<input type=submit value="Copy Motor Data" onClick="return COPY_MOTOR_DATA_OnClick(this,0,&quot;_self&quot;),false">')
+//-->
+</SCRIPT>
+</form>
+</body>
+</html>

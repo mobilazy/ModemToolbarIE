@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{05F2F706-D0E1-45C1-A0FA-72A5E6CD5B71}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ModemWebUtility</RootNamespace>
+    <AssemblyName>ModemWebUtility</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>ModemWebUtilityKey.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ClearScript, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=MSIL">
+      <HintPath>..\packages\ClearScript.V8.5.5.2\lib\net45\ClearScript.dll</HintPath>
+    </Reference>
+    <Reference Include="HtmlAgilityPack, Version=1.8.11.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
+      <HintPath>..\packages\HtmlAgilityPack.1.8.11\lib\Net45\HtmlAgilityPack.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.mshtml, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DdBhaParameters.cs" />
+    <Compile Include="GpBhaParameters.cs" />
+    <Compile Include="HDocUtililty.cs" />
+    <Compile Include="LooseBhaParameters.cs" />
+    <Compile Include="ModemConnection.cs" />
+    <Compile Include="ModemDataPost.cs" />
+    <Compile Include="ModemDdInsert.cs" />
+    <Compile Include="ModemGpInsert.cs" />
+    <Compile Include="ModemLooseInsert.cs" />
+    <Compile Include="ModemMwdInsert.cs" />
+    <Compile Include="ModemParameters.cs" />
+    <Compile Include="ModemPostObjects.cs" />
+    <Compile Include="MwdBhaParameters.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="XpathUtility.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ModemWebUtilityKey.snk" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Licenses\clearscript-license.txt" />
+    <Content Include="Licenses\v8-license.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="SHDocVw">
+      <Guid>{EAB22AC0-30C1-11CF-A7EB-0000C05BAE0B}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>1</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>xcopy /s /y "$(TargetDir)$(TargetFileName)" "C:\Program Files (x86)\Internet Explorer\"
+
+if not exist "$(TargetDir)" md "$(TargetDir)"
+xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\x86\*.*" "$(TargetDir)"
+if not exist "$(TargetDir)" md "$(TargetDir)"
+xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\amd64\*.*" "$(TargetDir)"</PostBuildEvent>
+  </PropertyGroup>
+</Project>

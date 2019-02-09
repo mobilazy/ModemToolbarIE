@@ -1,0 +1,552 @@
+<html>
+<head>
+<title> : Loose Items</title>
+<meta name="GENERATOR" content="Oracle Designer Web PL/SQL Generator">
+<script>FormType = "Update";</script>
+<LINK REL=STYLESHEET HREF="/webhtml/css/css_hallib.css" TYPE="text/css">
+</head>
+<body onLoad="return ITEMS_MC_OnLoad()">
+<SCRIPT>
+<!-- Hide from old browsers
+var index = 0;
+var DataChange = false;
+var DataChangeErrors = false;
+var P_SSORD_ID = new Array();
+P_SSORD_ID[0] = "1246544";
+var P_10 = new Array();
+P_10[0] = "1246544";
+var ITEMS_MC_CHK_VALUE = new Array();
+ITEMS_MC_CHK_VALUE[0] = 6871;
+var P_369 = new Array();
+P_369[0] = "98574";
+function JSLOpenLOV(ctl, row, mode, lov_proc, depstr, lov_frame, winparams, filterprompt) {
+
+   var currpathname = location.pathname;
+   var i            = currpathname.indexOf ("/:");
+   var j            = currpathname.indexOf ("/", ++i);
+   var filter       = "";
+   var longlist     = "";
+
+   if (filterprompt != "")
+   {
+     filter = prompt(filterprompt, "%");
+     if (filter == null) { return; }
+     if (filter == "") { return; }
+     longlist = "Y";
+   };
+
+   if (i != -1)
+   {
+     //Correct URL syntax
+     currpathname = currpathname.substring (j, currpathname.length);
+   };
+
+   var url_string = (lov_proc +
+                     "?Z_FILTER=" + escape(filter) + "&Z_MODE=" + mode +
+                     "&Z_CALLER_URL=" + escape(location.protocol + "//" + location.host + currpathname + location.search) +
+                     depstr +
+                     "&Z_FORMROW=" + row + "&Z_LONG_LIST=" + longlist + "&Z_ISSUE_WAIT=Y");
+
+   // B1777722  and B1854252 for IE5
+   if ( navigator.appName == "Microsoft Internet Explorer" && typeof frmLOV == "object" )
+   {
+     frmLOV.close();
+   }
+
+   if (winparams == "")
+   {
+     frmLOV = open( url_string, lov_frame );
+   }
+   else
+   {
+     frmLOV = open( url_string, lov_frame, winparams);
+   }
+
+   if (frmLOV.opener == null) {
+      frmLOV.opener = self;
+   }
+   window.LOVForm = ctl.form;
+}
+function JSLReplace(pstr1, pstr2, pstr3) {
+   if (pstr1 != "") {
+     var rtnstr = "";
+     var searchstr = pstr1;
+     var addlen = pstr2.length;
+     var index = pstr1.indexOf(pstr2);
+     while ((index != -1) && (searchstr != "")) {
+       rtnstr = rtnstr + searchstr.substring(0, index);
+       if (pstr3 != null) {
+         rtnstr = rtnstr + pstr3;
+       }
+       searchstr = searchstr.substring(index + addlen, searchstr.length);
+       if (searchstr != "") {
+          index = searchstr.indexOf(pstr2);
+       }
+       else { index = -1; }
+     }
+     return (rtnstr + searchstr);
+   }
+   else {
+     return "";
+   }
+}
+function JSLGetValue(pctl, ptype, pfalse) {
+   var i = 0;
+   if (ptype == null) { return pctl.value; }
+   if (ptype == "CHECK") {
+      if (pctl.checked) { return pctl.value; }
+      else { return pfalse; }
+   }
+   if (ptype == "RADIO") {
+      for (i=0;i<pctl.length;i++) {
+         if (pctl[i].checked) { return pctl[i].value; }
+      }
+      return "";
+   }
+   if (ptype == "LIST") {
+      if (pctl.selectedIndex >= 0) {
+         if (pctl.options[pctl.selectedIndex].value != "") {
+            return pctl.options[pctl.selectedIndex].value;
+         }
+         else { return pctl.options[pctl.selectedIndex].text; }
+      }
+      else { return ""; }
+   }
+}
+function JSLStripMask(p_val) {
+  if (p_val == "") { return ""; }
+  var str = p_val;
+  str = JSLReplace(str, " ");
+  str = JSLReplace(str, ",");
+  str = JSLReplace(str, "$");
+  str = JSLReplace(str, "USD");
+
+  if ((str.substring(0, 1) == "<") && (str.substring(str.length -1, str.length) == ">")) {
+      str = "-" + str.substring(1, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "-") {
+    str = "-" + str.substring(0, str.length - 1);
+  }
+  if (str.substring(str.length -1, str.length) == "+") {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
+function JSLToNumber(p_val) {
+   var lval = JSLStripMask(p_val);
+   if (lval == "") { return ""; }
+   else { return parseFloat(lval); }
+}
+function JSLChkNumScale (pctl, pval, pscale, pmsg) {
+  if (pval != "") {
+    var PointPos = pval.indexOf(".");
+    if (PointPos != -1) {
+      var Scale = pval.length - PointPos - 1;
+      if (Scale > pscale) {
+        alert(pmsg);
+        pctl.focus();
+        return false;
+      }
+    }
+  }
+  return true;
+}
+function JSLChkNumPrecision(pctl, pval, pprecision, pmsg) {
+  if (pval != "") {
+    var Prec = 0;
+    var PointPos = pval.indexOf(".");
+    // If a decimal point was not found
+    // validate the number of digits in the whole string
+    if (PointPos == -1) {
+      Prec = pval.length;
+    }
+    else {  // Validate the number of digits before the decimal point
+      Prec = PointPos;
+    }
+    if (pval.indexOf("-") == 0) {
+       Prec = Prec - 1;
+    };
+    if (pval.indexOf("+") == 0) {
+       Prec = Prec - 1;
+    };
+
+    if (Prec > pprecision) { alert(pmsg); pctl.focus(); return false; }
+  }
+   return true;
+}
+function JSLNotNull(pctl, pmsg){
+   if (pctl.value == "") { alert(pmsg); pctl.focus(); return false; }
+   return true;
+}
+function JSLCheckModified( p_form, p_action, p_submit ) {
+   var l_mod = false;
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         l_mod = true;
+         break;
+      };
+   };
+   if (l_mod) {
+      alert("Data on this page has been modified. Please submit changes or revert before continuing.");
+      return false;
+   } else {
+      p_form.Z_ACTION.value = p_action;
+      if (p_submit) {
+          p_form.submit();
+          return true;
+      }
+   }
+
+
+}
+function JSLRevertForm( p_form, rows ) {
+   for (i = 0; i < p_form.z_modified.length; i++)
+   {
+      if (p_form.z_modified[i].value == "Y") {
+         p_form.z_modified[i].value = "N";
+      }
+   }
+   ResetRadios( p_form, rows );
+   return true;
+}
+function JSLFlagRow(p_form, p_row, p_set, p_path) {
+   var img = document.images[0];
+   var i = 0;
+   var search_name = p_form.name + (p_row);
+   var image_found = false;
+
+   while (i < document.images.length)
+   {
+     img = document.images[i];
+     if (img.name == search_name)
+     {
+       image_found = true;
+       break;
+     }
+     i++;
+   }
+
+   if (p_set == true)
+   {
+     if (image_found == true)
+     {
+       img.src = p_path + "cg_tick.gif";
+     }
+     p_form.z_modified[p_row].value = "Y";
+   }
+   else
+   {
+     if (image_found == true)
+     {
+       img.src = p_path + "cg_blnk.gif";
+     }
+     p_form.z_modified[p_row].value = "N";
+   }
+
+
+   return;
+}
+
+function CAL(the_fieldname, the_value, the_format, the_prompt) {
+   var filter = "";
+   var the_pathname = location.pathname;
+   var i            = the_pathname.indexOf ('/:');
+   var j            = the_pathname.indexOf ('/', ++i);
+   //var frmCAL;	//B1777722	Needs to be global to remember state between calls.
+
+   if (i != -1)
+   {
+
+     // Syntactically incorrect url so it needs to be corrected
+
+     the_pathname = the_pathname.substring (j, the_pathname.length);
+
+   }; // (i != -1)
+
+   // B1777722  and B1854252 for IE5
+   if ( navigator.appName == "Microsoft Internet Explorer" && typeof frmCAL == "object" )
+   {
+     frmCAL.close();
+   }
+
+   frmCAL = open ("mobssus_order_new$items_mc.calendar" +
+                 "?Z_FIELD_NAME=" + escape(the_fieldname) +
+                 "&Z_CALLER_URL=" + escape(location.protocol + '//' + location.host + the_pathname + location.search) +
+                 "&Z_FIELD_VALUE=" + escape(the_value) +
+                 "&Z_FIELD_FORMAT=" + escape(the_format) +
+                 "&Z_FIELD_PROMPT=" + escape(the_prompt),
+                 "winCAL", "scrollbars=no,resizable=no,width=320,height=350");
+
+   if (frmCAL.opener == null)
+   {
+      frmCAL.opener = self;
+   }
+} 
+function L_MOBSS_VEND_VEND_NAME2_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$items_mc.l_mobss_vend_vend_name2_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function DESCRIPTION_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$items_mc.lov_looseitems_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_THREADSIZE_TOP_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$items_mc.l_threadsize_top_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function L_THREADSIZE_BTM_LOV(ctl, index) {
+
+    var depStr = "";
+    var modeStr = ""
+    if (index == null)
+       index = 0;
+    if (ctl[index].form.name.search(/VForm$/) == -1)
+    {
+      modeStr = "INS";
+    }
+    else
+    {
+      modeStr = "UPD";
+    }
+   depStr = depStr + "&P_10=" + escape(ctl[index].form.P_10.value);
+
+    var lovFra = "winLOV";
+    var winpar = "scrollbars=yes,resizable=yes,width=400,height=400";
+    var filterprompt = "";
+
+
+    var lovTitle = "";
+    window.current_lov_title = lovTitle;
+
+    JSLOpenLOV( ctl[index], index, modeStr,  "mobssus_order_new$items_mc.l_threadsize_btm_lov", depStr, lovFra, winpar, filterprompt );
+
+
+   return true;
+}
+function ITEMS_MC_Validate(ctl, index) {
+var index = 0;
+   if (!JSLNotNull(ctl.form.P_QTY[index], "Qty: A value must be entered")) {ctl.form.P_QTY[index].focus(); return false }
+   if (!JSLChkNumPrecision(ctl.form.P_QTY[index], JSLStripMask(JSLGetValue(ctl.form.P_QTY[index])), 6, "Qty: Value cannot have more than 6 digits before the decimal point")) {ctl.form.P_QTY[index].focus(); return false }
+   if (!JSLChkNumScale(ctl.form.P_QTY[index], JSLStripMask(JSLGetValue(ctl.form.P_QTY[index])), 2, "Qty: Value cannot have more than 2 decimal places")) {ctl.form.P_QTY[index].focus(); return false }
+   return true;
+}
+function ITEMS_MC_OnLoad(ctl, index) {
+
+   if ( FormType != "PostDelete")
+   {
+      form_num=0;
+      do
+      {
+         elem_num=0;
+         len = document.forms[form_num].elements.length;
+         if (len > 0)
+         {
+            while (elem_num < len &&
+                   document.forms[form_num].elements[elem_num].type != "text" &&
+                   document.forms[form_num].elements[elem_num].type != "textarea")
+            {
+               elem_num++;
+            }
+            if (elem_num < len)
+            {
+               document.forms[form_num].elements[elem_num].focus();
+               break;
+            }
+         }
+         form_num++;
+      } while ( form_num < document.forms.length );
+   }
+
+   return true;
+}
+function btnVFU_OnClick(ctl, index) {
+   if (!ITEMS_MC_Validate(ctl)) { return false; }
+   ctl.form.submit();
+   return true;
+}
+function btnVFD_OnClick(ctl, index) {
+   if (!confirm("Please confirm the Delete")) { return false }
+   ctl.form.Z_ACTION.value = "VerifiedDelete";
+   ctl.form.submit();
+   return true;
+}
+function btnVFR_OnClick(ctl, index) {
+   ctl.form.submit();
+   return true;
+}
+function btnVFI_OnClick(ctl, index) {
+   ctl.form.submit();
+   return true;
+}
+//-->
+</SCRIPT>
+<h1>Loose Items</h1>
+<form action="ActionItem" method="post" NAME="VF$AIFormTop">
+</form>
+<form action="mobssus_order_new$items_mc.actionview" method="post" NAME="mobssus_order_new$items_mc$VForm">
+<input type="hidden" name="P_10" value="1246544" />
+<p>
+<table >
+<tr><th align="LEFT"><b>Qty</b></th><th align="LEFT"><b>Vendor</b></th><th align="LEFT"><b>Description</b></th><th align="LEFT"><b>Custom Status</b></th><th align="LEFT"><b>Comments</b></th><th align="LEFT"><b>Thread Size Top</b></th><th align="LEFT"><b>Thread Size Bottom</b></th><th align="LEFT"><b>Status</b></th></tr>
+<input type="hidden" name="P_LOOSE_ITEMS_ID" value="98574" />
+<input type="hidden" name="O_LOOSE_ITEMS_ID" value="98574" />
+<input type="hidden" name="H_STATUS" value="1" />
+<tr valign="TOP"><td align="LEFT"><input type="text" name="P_QTY" size="8" maxlength="10" value="1"  ID="P_QTY" /></td><td align="LEFT"><select name="P_L_MOBSS_VEND_VEND_NAME2" size="1" CLASS = cglovlist ID="P_L_MOBSS_VEND_VEND_NAME2"><option VALUE="GXT">GXT</option><option VALUE="Geo-Pilot">Geo-Pilot</option><option VALUE="IT Lab">IT Lab</option><option VALUE="Kits">Kits</option><option VALUE="MLT">MLT</option><option selected="selected" VALUE="MWD/DWD">MWD/DWD</option><option VALUE="Motors">Motors</option><option VALUE="Other">Other</option><option VALUE="SDBS">SDBS</option><option VALUE="SDL">SDL</option><option VALUE="Surface Lab">Surface Lab</option></select></td><td align="LEFT"><input type="text" name="P_DESCRIPTION" size="40" maxlength="100" value="Cim Battery"  ID="P_DESCRIPTION" /> <SCRIPT>
+<!-- Hide from old browsers
+document.write('<a href="javascript:void DESCRIPTION_LOV(document.mobssus_order_new$items_mc$VForm.P_DESCRIPTION)"><i>LoV</i></a>');
+//-->
+</SCRIPT></td><td align="LEFT"><select name="P_CUST_STAT" size="1" CLASS = cgdvlist ID="P_CUST_STAT"><option selected="selected" VALUE="FCG">FCG</option><option VALUE="IPR">IPR</option></select></td><td align="LEFT"><input type="text" name="P_COMMENTS" size="40" maxlength="256" value="test"  ID="P_COMMENTS" /></td><td align="LEFT"><select name="P_L_THREADSIZE_TOP" size="1" CLASS = cglovlist ID="P_L_THREADSIZE_TOP"><option VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option selected="selected" VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td><td align="LEFT"><select name="P_L_THREADSIZE_BTM" size="1" CLASS = cglovlist ID="P_L_THREADSIZE_BTM"><option VALUE=" "> </option><option VALUE="2 3/8&quot; Reg Box">2 3/8&quot; Reg Box</option><option VALUE="2 7/8&quot; Reg Box">2 7/8&quot; Reg Box</option><option VALUE="3 1/2&quot; IF Box">3 1/2&quot; IF Box</option><option VALUE="3 1/2&quot; IF Pin">3 1/2&quot; IF Pin</option><option VALUE="3 1/2&quot; Reg Box">3 1/2&quot; Reg Box</option><option VALUE="3 1/2&quot; Reg Pin">3 1/2&quot; Reg Pin</option><option VALUE="4 1/2&quot; 12.6ppf VT B">4 1/2&quot; 12.6ppf VT B</option><option VALUE="4 1/2&quot; 12.6ppf VT P">4 1/2&quot; 12.6ppf VT P</option><option VALUE="4 1/2&quot; IF Box">4 1/2&quot; IF Box</option><option VALUE="4 1/2&quot; IF Pin">4 1/2&quot; IF Pin</option><option VALUE="4 1/2&quot; Reg Box">4 1/2&quot; Reg Box</option><option VALUE="4 1/2&quot; Reg Pin">4 1/2&quot; Reg Pin</option><option selected="selected" VALUE="5 1/2 FH box">5 1/2 FH box</option><option VALUE="5 1/2 FH pin">5 1/2 FH pin</option><option VALUE="5 1/2&quot; 20ppf VTHC B">5 1/2&quot; 20ppf VTHC B</option><option VALUE="5 1/2&quot; 20ppf VTHC P">5 1/2&quot; 20ppf VTHC P</option><option VALUE="6 5/8&quot; 24ppf VT B">6 5/8&quot; 24ppf VT B</option><option VALUE="6 5/8&quot; 24ppf VT P">6 5/8&quot; 24ppf VT P</option><option VALUE="6 5/8&quot; FH Pin">6 5/8&quot; FH Pin</option><option VALUE="6 5/8&quot; FH box">6 5/8&quot; FH box</option><option VALUE="6 5/8&quot; Reg Box">6 5/8&quot; Reg Box</option><option VALUE="6 5/8&quot; Reg Pin">6 5/8&quot; Reg Pin</option><option VALUE="7 5/8&quot; 39ppf VT B">7 5/8&quot; 39ppf VT B</option><option VALUE="7 5/8&quot; Reg Box">7 5/8&quot; Reg Box</option><option VALUE="7 5/8&quot; Reg Pin">7 5/8&quot; Reg Pin</option><option VALUE="7&quot; 20ppf VT B">7&quot; 20ppf VT B</option><option VALUE="7&quot; 20ppf VT P">7&quot; 20ppf VT P</option><option VALUE="8 5/8&quot; Reb Box">8 5/8&quot; Reb Box</option><option VALUE="8 5/8&quot; Reg Pin">8 5/8&quot; Reg Pin</option><option VALUE="BW Rod Box">BW Rod Box</option><option VALUE="DC58 Box">DC58 Box</option><option VALUE="DC58 Pin">DC58 Pin</option><option VALUE="DC69 Box">DC69 Box</option><option VALUE="DC69 Pin">DC69 Pin</option><option VALUE="DS50 Box">DS50 Box</option><option VALUE="DS50 Pin">DS50 Pin</option><option VALUE="HT50 box">HT50 box</option><option VALUE="MT-57 Box">MT-57 Box</option><option VALUE="MT-57 Pin">MT-57 Pin</option><option VALUE="N/A">N/A</option><option VALUE="NC26 Box">NC26 Box</option><option VALUE="NC26 Pin">NC26 Pin</option><option VALUE="NC38 Box">NC38 Box</option><option VALUE="NC38 Pin">NC38 Pin</option><option VALUE="NC50 Box">NC50 Box</option><option VALUE="NC50 Pin">NC50 Pin</option><option VALUE="NW Rod Box">NW Rod Box</option><option VALUE="XT-40 Box">XT-40 Box</option><option VALUE="XT-40 Pin">XT-40 Pin</option><option VALUE="XT-57 Box">XT-57 Box</option><option VALUE="XT-57 Pin">XT-57 Pin</option></select></td><td align="LEFT">New</td></tr>
+</tr>
+<SCRIPT>
+<!-- Hide from old browsers
+document.write('<INPUT TYPE="hidden" NAME="z_modified" VALUE="N">');
+//-->
+</SCRIPT>
+<input type="hidden" name="O_QTY" value="1" />
+<input type="hidden" name="O_DESCRIPTION" value="Cim Battery" />
+<input type="hidden" name="O_CUST_STAT" value="FCG" />
+<input type="hidden" name="O_COMMENTS" value="test" />
+<input type="hidden" name="O_GRFSNO2" value="" />
+<input type="hidden" name="O_GRFSORDDATE2" value="" />
+<input type="hidden" name="O_GRFSEXPDATE2" value="" />
+<input type="hidden" name="O_THREAD_BTM_ID" value="46" />
+<input type="hidden" name="O_THREAD_TOP_ID" value="2" />
+<input type="hidden" name="O_UN_ID" value="" />
+<input type="hidden" name="O_SSORD_ID" value="1246544" />
+<input type="hidden" name="O_STATUS" value="1" />
+<input type="hidden" name="O_VEND_ID" value="100" />
+</table>
+<p>
+<input type="hidden" name="P_LOOSE_ITEMS_ID" value="" />
+<input type="hidden" name="P_QTY" value="" />
+<input type="hidden" name="P_L_MOBSS_VEND_VEND_NAME2" value="" />
+<input type="hidden" name="P_DESCRIPTION" value="" />
+<input type="hidden" name="P_CUST_STAT" value="" />
+<input type="hidden" name="P_COMMENTS" value="" />
+<input type="hidden" name="P_L_THREADSIZE_TOP" value="" />
+<input type="hidden" name="P_L_THREADSIZE_BTM" value="" />
+<input type="hidden" name="O_QTY" value="" />
+<input type="hidden" name="O_DESCRIPTION" value="" />
+<input type="hidden" name="O_CUST_STAT" value="" />
+<input type="hidden" name="O_COMMENTS" value="" />
+<input type="hidden" name="O_GRFSNO2" value="" />
+<input type="hidden" name="O_GRFSORDDATE2" value="" />
+<input type="hidden" name="O_GRFSEXPDATE2" value="" />
+<input type="hidden" name="O_THREAD_BTM_ID" value="" />
+<input type="hidden" name="O_THREAD_TOP_ID" value="" />
+<input type="hidden" name="O_UN_ID" value="" />
+<input type="hidden" name="O_SSORD_ID" value="" />
+<input type="hidden" name="O_STATUS" value="" />
+<input type="hidden" name="O_VEND_ID" value="" />
+<input type="hidden" name="H_STATUS" value="" />
+<input type="hidden" name="z_modified" value="dummy_row" />
+<SCRIPT><!--
+document.write('<input type=hidden name="Z_ACTION">')
+//-->
+</SCRIPT>
+<SCRIPT><!--
+document.write('<input type=submit value="Update" onClick="this.form.Z_ACTION.value=\'UPDATE\'; return btnVFU_OnClick(this),false">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Update" ID="Update" />
+</NOSCRIPT>
+<SCRIPT><!--
+document.write('<input type=button value="Delete" onClick="this.form.Z_ACTION.value=\'DELETE\'; return btnVFD_OnClick(this)">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="Delete" ID="Delete" />
+</NOSCRIPT>
+<input type="reset" VALUE="Revert" ID="Revert" />
+<SCRIPT><!--
+document.write('<input type=button value="New" onClick="this.form.Z_ACTION.value=\'INSERT\'; return btnVFI_OnClick(this)">')
+//-->
+</SCRIPT>
+<NOSCRIPT>
+<input type="submit" name="Z_ACTION" value="New" ID="New" />
+</NOSCRIPT>
+<input type="hidden" name="Z_CHK" value="49533" />
+<input type="hidden" name="Q_SSORD_ID" value="" />
+<input type="hidden" name="Z_START" value="1" />
+</form>
+<form action="ActionItem" method="post" NAME="VF$AIFormBottom">
+</form>
+</body>
+</html>

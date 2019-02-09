@@ -1,23 +1,20 @@
 ﻿using BandObjectLib;
 using Microsoft.Win32;
-using ModemToolbarIE.Db;
-using mshtml;
-using SHDocVw;
+using ModemWebUtility;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.ServiceModel;
 using System.Windows.Forms;
 using System.Xml;
+using WcfServiceModemToolbarSync;
 
 namespace ModemToolbarIE
 {
-    using Link = KeyValuePair<string, string>;
-    using MenuLink = KeyValuePair<string, KeyValuePair<string, ModemPostObjects>[]>;
-    using PostLink = KeyValuePair<string, ModemPostObjects>;
+    using System.Timers;
 
     [Guid("0823E052-F731-40A2-BE47-42527C602B0D")]
     [ComVisible(true), ClassInterface(ClassInterfaceType.None)] //this is added from ieengtbr
@@ -47,12 +44,17 @@ namespace ModemToolbarIE
 
         private bool bhaEditMode = false;
         public ModemEvents ModemStat { get; set; }
+        public List<MenuListItemClass> mlic = new List<MenuListItemClass>();
+        public List<SearchBoxItemClass> sbic = new List<SearchBoxItemClass>();
+        public List<LinkListItemClass> llic = new List<LinkListItemClass>();
+        public int syncStatus = 0;
 
-        MenuListItem menu;
+        MergeFormLink mergeButton;
         SearchBoxItem searchBox;
-        LinkListItem buttonItems;
 
-        List<BaseToolbarItem> items = new List<BaseToolbarItem>();
+        List<BaseToolbarItem> baseToolbarItems = new List<BaseToolbarItem>();
+
+        private System.Timers.Timer _timer;
 
         #region "Static Code"
 
@@ -185,11 +187,12 @@ namespace ModemToolbarIE
         {
             get
             {
-                string result = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string result = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); //C:\Users\<user>\AppData\Roaming\myProgram\ 
                 return Path.Combine(result, "ModemToolbar");
             }
         }
         #endregion
+
 
         private bool BhaEditMode
         {
@@ -204,6 +207,8 @@ namespace ModemToolbarIE
 
         public Toolbar()
         {
+            //MessageBox.Show("Break -2");
+
             Assembly asm = Assembly.GetExecutingAssembly();
             string fullName = asm.GetModules()[0].FullyQualifiedName;
             toolbarFolder = Path.GetDirectoryName(fullName);
@@ -212,10 +217,12 @@ namespace ModemToolbarIE
             {
                 cacheFolder = Path.Combine(dataFolder, "Cache");
                 Directory.CreateDirectory(cacheFolder);
+
             }
-            catch (Exception) { }
-
-
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
 
 
             //try
@@ -241,11 +248,11 @@ namespace ModemToolbarIE
             //}
             //catch (Exception) { }
 
+
             InitializeComponent();
             HtmlDocCompleted += Toolbar_HtmlDocComplete;
+
         }
-
-
 
 
         private void Toolbar_HtmlDocComplete(object sender, ModemEventArgs e)
@@ -305,48 +312,141 @@ namespace ModemToolbarIE
 
         private void EnableToolstrip(bool enable)
         {
-            //menuStrip.Enabled = enable;
+            menuStrip.Enabled = enable;
         }
 
         private bool CheckIfMwdEditEmpty(string _modemNo)
         {
-            
+            MwdBhaParameters mbp = new MwdBhaParameters(HtmlDoc);
 
-            try
+            if (mbp.BhaCount > 0)
             {
-                Utility.ModemParameters  modemParameters = new Utility.ModemParameters(htmlDocument, _modemNo);
-                if (modemParameters.MwdBhaCount == 0)
-                {
-                    return true;
-                }
 
                 return false;
-
             }
-            catch (Exception e)
+            else
             {
 
-                MessageBox.Show(e.ToString());
+                return true;
             }
 
-
-            //MessageBox.Show(modemParameters.MwdBhaCount.ToString());
-            return true;
-            
         }
 
         public System.Windows.Forms.ToolStrip ToolStrip => toolStrip;
 
         public System.Windows.Forms.ToolStrip MenuStrip => menuStrip;
 
+        public ToolStripContainer TsContainer => tsContainer;
+        public ToolStripContainer MsContainer => msContainer;
+
 
         private void Toolbar_Load(object sender, EventArgs e)
         {
+
             CreateToolbarItems();
+            StartWcfComms();
+            _timer = new System.Timers.Timer(150000) { AutoReset = true };
+            _timer.Elapsed += TimerElapsed;
+            _timer.Enabled = true;
+
+        }
+
+        private void TimerElapsed(object sender, ElapsedEventArgs e)
+        {
+            StartWcfComms();
+        }
+
+        internal void StartWcfComms()
+        {
+            NetTcpBinding myBinding = new NetTcpBinding()
+            {
+                //CloseTimeout = TimeSpan.FromMinutes(2),
+                ListenBacklog = 50,
+                MaxBufferPoolSize = 10485760,
+                MaxBufferSize = 10485760,
+                MaxConnections = 50,
+                MaxReceivedMessageSize = 10485760,
+                //OpenTimeout = TimeSpan.FromMinutes(5),
+                //PortSharingEnabled = false,
+                //ReceiveTimeout = TimeSpan.FromMinutes(5),
+                //SendTimeout = TimeSpan.FromMinutes(5),
+                //TransactionFlow = false,
+                //TransactionProtocol = TransactionProtocol.OleTransactions,
+                //TransferMode = TransferMode.Buffered,
+                //ReaderQuotas = new XmlDictionaryReaderQuotas()
+                //{
+                //    MaxArrayLength = 10240,
+                //    MaxBytesPerRead = 10485760,
+                //    MaxDepth = 100,
+                //    MaxNameTableCharCount = 10485760,
+                //    MaxStringContentLength = 10485760
+                //},
+
+                //ReliableSession = new OptionalReliableSession()
+                //{
+                //    Enabled = true,
+                //    InactivityTimeout = TimeSpan.FromMinutes(10),
+                //    Ordered = true
+                //}
+
+            };
+
+
+            EndpointAddress endpoint = new EndpointAddress("net.tcp://localhost:9124/");
+            var client = new ModemService.WCFModemServiceClient(myBinding, endpoint);
+
+            try
+            {
+                var proxy = client.ChannelFactory.CreateChannel();
+
+                if (syncStatus == proxy.GetSyncStatus())
+                {
+                    client.Close();
+                    return;
+                }
+
+                SearchListClass sc = new SearchListClass();
+                sc = proxy.GetSearchBoxItemClasses();
+                sbic = sc.List;
+
+                LinkListClass lc = new LinkListClass();
+                lc = proxy.GetLinkListItemClasses();
+                llic = lc.List;
+
+                MenuListClass mc = new MenuListClass();
+                mc = proxy.GetMenuListItemClasses();
+                mlic = mc.List;
+
+                CreateToolbarItems();
+                syncStatus = proxy.GetSyncStatus();
+                client.Close();
+
+
+            }
+            catch (CommunicationException e)
+            {
+                txtStatus.Text = "Error 1";
+                client.Abort();
+            }
+            catch (TimeoutException e)
+            {
+                txtStatus.Text = "Error 2";
+                client.Abort();
+            }
+            catch (Exception ex)
+            {
+                txtStatus.Text = "Error 3";
+                client.Abort();
+                //MessageBox.Show(ex.ToString());
+            }
+
+
         }
 
         internal void CreateToolbarItems()
         {
+
+
             try
             {
                 // Prevent redrowing of this toolbar control.
@@ -356,329 +456,77 @@ namespace ModemToolbarIE
                 Clear();
 
                 Assembly currentAssembly = Assembly.GetAssembly(GetType());
+                //MessageBox.Show("Break 2");
 
-                //
-                // Lwd Tools Menu
-                //
 
-                List<PostLink> RllLnk9 = new List<PostLink>();
-                List<PostLink> RllLnk8 = new List<PostLink>();
-                List<PostLink> RllLnk6 = new List<PostLink>();
-                List<PostLink> RllLnk4 = new List<PostLink>();
-
-                List<PostLink> PulPmLnk9 = new List<PostLink>();
-                List<PostLink> PulPmLnk8 = new List<PostLink>();
-                List<PostLink> PulPmLnk6 = new List<PostLink>();
-                List<PostLink> PulPmLnk4 = new List<PostLink>();
-
-                List<PostLink> LwdLnk9 = new List<PostLink>();
-                List<PostLink> LwdLnk8 = new List<PostLink>();
-                List<PostLink> LwdLnk6 = new List<PostLink>();
-                List<PostLink> LwdLnk4 = new List<PostLink>();
-
-                List<PostLink> OtherLnk9 = new List<PostLink>();
-                List<PostLink> OtherLnk8 = new List<PostLink>();
-                List<PostLink> OtherLnk6 = new List<PostLink>();
-                List<PostLink> OtherLnk4 = new List<PostLink>();
-
-                PostLink lnk;
-
-                using (var db = new ToolDb())
+                if (mlic.Count != 0)
                 {
-                    ModemToolbarIE.Db.ToolDbTableAdapters.ToolsTableAdapter toolAdapter = new Db.ToolDbTableAdapters.ToolsTableAdapter();
-                    ToolDb.ToolsDataTable dsTools = new ToolDb.ToolsDataTable();
-                    toolAdapter.Fill(dsTools);
-
-
-
-                    foreach (ToolDb.ToolsRow item in dsTools.Rows)
+                    foreach (var item in mlic)
                     {
-                        Db.ToolDbTableAdapters.SubToolsTableAdapter compAdapter = new Db.ToolDbTableAdapters.SubToolsTableAdapter();
-                        Db.ToolDbTableAdapters.SoftwareTableAdapter softAdapter = new Db.ToolDbTableAdapters.SoftwareTableAdapter();
 
-                        ToolDb.SubToolsDataTable subTools = new ToolDb.SubToolsDataTable();
-                        ToolDb.SoftwareDataTable softTools = new ToolDb.SoftwareDataTable();
-
-                        compAdapter.Fill(subTools);
-                        softAdapter.Fill(softTools);
-
-                        var varTools = from tool in subTools
-                                       where tool.ToolID == item.ID 
-                                       select tool;
-
-                        var varSofts = from soft in softTools
-                                       where soft.ToolID == item.ID
-                                       select soft;
-
-                        ModemPostObjects mpo = new ModemPostObjects(ModemNoEngine, htmlDocument);
-                        mpo.MwdBhaPost = GetBhaObj(item.ToolName, "Please check components accordingly", true);
-                        mpo.MwdCompPostDict = GetRowsToModemComp(varTools);
-                        mpo.MwdSoftPostDict = GetRowsToModemSoft(varSofts);
-
-                        lnk = new PostLink(item.ToolName, mpo);
-
-                        if (item.ToolSize == 9)
+                        Image image;
+                        using (var ms = new MemoryStream(item.Img))
                         {
-                            switch (item.Category)
-                            {
-                                case "RLL":
-                                    RllLnk9.Add(lnk);
-                                    break;
-                                case "Pulser-PM":
-                                    PulPmLnk9.Add(lnk);
-                                    break;
-                                case "LWD":
-                                    LwdLnk9.Add(lnk);
-                                    break;
-                                case "Other":
-                                    OtherLnk9.Add(lnk);
-                                    break;
-                                default:
-                                    break;
-                            }
+                            image = Image.FromStream(ms);
+                        }
 
-                        }
-                        else if (item.ToolSize == 8)
-                        {
-                            switch (item.Category)
-                            {
-                                case "RLL":
-                                    RllLnk8.Add(lnk);
-                                    break;
-                                case "Pulser-PM":
-                                    PulPmLnk8.Add(lnk);
-                                    break;
-                                case "LWD":
-                                    LwdLnk8.Add(lnk);
-                                    break;
-                                case "Other":
-                                    OtherLnk8.Add(lnk);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (item.ToolSize == 6)
-                        {
-                            switch (item.Category)
-                            {
-                                case "RLL":
-                                    RllLnk6.Add(lnk);
-                                    break;
-                                case "Pulser-PM":
-                                    PulPmLnk6.Add(lnk);
-                                    break;
-                                case "LWD":
-                                    LwdLnk6.Add(lnk);
-                                    break;
-                                case "Other":
-                                    OtherLnk6.Add(lnk);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (item.ToolSize == 4)
-                        {
-                            switch (item.Category)
-                            {
-                                case "RLL":
-                                    RllLnk4.Add(lnk);
-                                    break;
-                                case "Pulser-PM":
-                                    PulPmLnk4.Add(lnk);
-                                    break;
-                                case "LWD":
-                                    LwdLnk4.Add(lnk);
-                                    break;
-                                case "Other":
-                                    OtherLnk4.Add(lnk);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
+                        MenuListItem mtemp = new MenuListItem(this, item.Caption, item.Hint, item.Links, image);
+                        baseToolbarItems.Add(mtemp);
                     }
-
-
                 }
 
-                MenuLink mRll950 = new MenuLink("950", RllLnk9.ToArray());
-                MenuLink mRll800 = new MenuLink("800", RllLnk8.ToArray());
-                MenuLink mRll675 = new MenuLink("675", RllLnk6.ToArray());
-                MenuLink mRll475 = new MenuLink("475", RllLnk4.ToArray());
 
-                MenuLink mPulPm950 = new MenuLink("950", PulPmLnk9.ToArray());
-                MenuLink mPulPm800 = new MenuLink("800", PulPmLnk8.ToArray());
-                MenuLink mPulPm675 = new MenuLink("675", PulPmLnk6.ToArray());
-                MenuLink mPulPm475 = new MenuLink("475", RllLnk4.ToArray());
+                if (sbic.Count != 0)
+                {
+                    foreach (var item in sbic)
+                    {
+                        Image image;
+                        using (var ms = new MemoryStream(item.Img))
+                        {
+                            image = Image.FromStream(ms);
+                        }
 
-                MenuLink mLwd950 = new MenuLink("950", LwdLnk9.ToArray());
-                MenuLink mLwd800 = new MenuLink("800", LwdLnk8.ToArray());
-                MenuLink mLwd675 = new MenuLink("675", LwdLnk6.ToArray());
-                MenuLink mLwd475 = new MenuLink("475", LwdLnk4.ToArray());
+                        SearchBoxItem sbtemp = new SearchBoxItem(this, item.ClearHistoryText, item.GreetingText, item.SearchURL, item.SearchBoxTooltip, item.ButtonText,
+                            item.ButtonTooltip, item.InputBoxSize, item.InputBoxFlatStyle, image);
+                        baseToolbarItems.Add(sbtemp);
+                        searchBox = sbtemp;
+                    }
+                }
 
-                MenuLink mOther950 = new MenuLink("950", OtherLnk9.ToArray());
-                MenuLink mOther800 = new MenuLink("800", OtherLnk8.ToArray());
-                MenuLink mOther675 = new MenuLink("675", OtherLnk6.ToArray());
-                MenuLink mOther475 = new MenuLink("475", OtherLnk4.ToArray());
-
-                Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
-
-                MenuListItem mRll = new MenuListItem(this, "RLL", "Add RLL", new MenuLink[] { mRll950, mRll800, mRll675, mRll475 }, img);
-                MenuListItem mPulPm = new MenuListItem(this, "Pulser-PM", "Add Pulser or PM", new MenuLink[] { mPulPm950, mPulPm800, mPulPm675, mPulPm475 }, img);
-                MenuListItem mLwd = new MenuListItem(this, "LWD", "Add LWD", new MenuLink[] { mLwd950, mLwd800, mLwd675, mLwd475 }, img);
-                MenuListItem mOther = new MenuListItem(this, "Other", "Add Other Tools", new MenuLink[] { mOther950, mOther800, mOther675, mOther475 }, img);
-
-                items.Add(mRll);
-                items.Add(mPulPm);
-                items.Add(mLwd);
-                items.Add(mOther);
-
-                //
-                // Loose Items Menu
-                //
+                if (llic.Count != 0)
+                {
+                    foreach (var item in llic)
+                    {
+                        Image image;
+                        using (var ms = new MemoryStream(item.Img))
+                        {
+                            image = Image.FromStream(ms);
+                        }
+                        LinkListItem lltemp = new LinkListItem(this, item.Caption, item.Hint, item.Links, image);
+                        baseToolbarItems.Add(lltemp);
+                    }
+                }
 
 
 
-                //
-                // Search box
-                //
-
-                img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
-
-                searchBox = new SearchBoxItem(this, "<clear>", "terms to serach!",
-                    "http://www.google.ru/search?q={0}",
-                    "Search here", "Search", "Click to search", new Size(160, 16),
-                    FlatStyle.System, img);
-
-                items.Add(searchBox);
-
-                Link link1 = new Link("Quality", "http://www.yahoo.com/");
-                Link link2 = new Link("Imagination", "http://www.youtube.com");
-                Link link3 = new Link("Expertise", "http://www.uis.no/");
-                Link link4 = new Link("Reliability", "http://www.halliburton.com/");
-
-                //
-                //List of links
-                //
-
-                img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
-
-                buttonItems = new LinkListItem(this, "Advantages", "Advantages",
-                    new Link[] { link1, link2, link3, link4 }, img);
-
-                items.Add(buttonItems);
-
-                //
-                // RSS links
-                //
+                //merge button
+                Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
+                mergeButton = new MergeFormLink(this, "Merge", "Merge From a modem", img);
+                baseToolbarItems.Add(mergeButton);
 
 
 
             }
             finally
             {
+
                 ResumeLayout();
+                PerformLayout();
+
             }
         }
 
-        private Dictionary<int, MwdCompPosts> GetRowsToModemComp(IEnumerable<ToolDb.SubToolsRow> comps)
-        {
-            Dictionary<int, MwdCompPosts> mcpDic = new Dictionary<int, MwdCompPosts>();
-            int i = 0;
-            foreach (ToolDb.SubToolsRow row in comps)
-            {
-                MwdCompPosts mcp = new MwdCompPosts();
-                mcp.P_SEQ_NO = IntDbNull(row, "Sequence");
-                mcp.P_L_TORQUE = IntDbNull(row, "Torque");
-                mcp.P_L_THREAD_TOP = StringDbNull(row, "ThreadTop");
-                mcp.P_L_THREAD_BTM = StringDbNull(row, "ThreadBottom");
-                mcp.P_DESCRIPTION = StringDbNull(row, "Description");
-                mcp.P_COMMENTS = StringDbNull(row, "Comments");
-                mcpDic.Add(i, mcp);
-                i++;
-            } 
 
-            return mcpDic;
-        }
-
-        private Dictionary<int, MwdSoftPosts> GetRowsToModemSoft(IEnumerable <ToolDb.SoftwareRow> comps)
-        {
-            Dictionary<int, MwdSoftPosts> mcpDic = new Dictionary<int, MwdSoftPosts>();
-            int i = 0;
-            foreach (ToolDb.SoftwareRow row in comps)
-            {
-                MwdSoftPosts mcp = new MwdSoftPosts();
-                mcp.P_L_MSR_SENSOR = StringDbNull(row, "SoftwareSensor");
-                mcp.P_OPS_VERSION = StringDbNull(row, "SoftwareVersion");
-                mcp.P_WS_VERSION = "";
-
-                mcpDic.Add(i, mcp);
-                i++;
-            }
-
-            return mcpDic;
-        }
-
-        private MwdBhaPosts GetBhaObj(string bhaDesc, string bhaComments, bool bhaHC)
-        {
-            MwdBhaPosts mbp = new MwdBhaPosts();
-            mbp.P_BHA_DESC = bhaDesc;
-            mbp.P_BHA_NUM = "";
-            mbp.P_EXP_MAX_TEMP = "";
-            mbp.P_HC_TOOL = bhaHC ? "Yes" : "";
-            mbp.P_L_IMPELLERSIZE = " ";
-            mbp.P_L_ORIFFICESIZE = "";
-            mbp.P_L_STATORSIZE = " ";
-            mbp.P_MWDDWD_ADD_INFO = bhaComments;
-            mbp.P_POPPET_STANDOFF = "";
-            mbp.P_PULSER_OILTYPE = "";
-            mbp.P_RASOURCE_ID = "";
-
-            return mbp;
-
-        }
-
-
-        private string StringDbNull(ToolDb.SubToolsRow row, string fieldName)
-        {
-            if (!DBNull.Value.Equals(row[fieldName]))
-            {
-                return (string)row[fieldName];
-            }
-            else
-            {
-                return ""; // returns the default value for the type
-            }
-
-        }
-
-        private string StringDbNull(ToolDb.SoftwareRow row, string fieldName)
-        {
-            if (!DBNull.Value.Equals(row[fieldName]))
-            {
-                return (string)row[fieldName];
-            }
-            else
-            {
-                return ""; // returns the default value for the type
-            }
-
-        }
-
-        private string IntDbNull(ToolDb.SubToolsRow row, string fieldName)
-        {
-            if (!DBNull.Value.Equals(row[fieldName]))
-            {
-                return ((int)row[fieldName]).ToString(); 
-            }
-            else
-            {
-                return ""; // returns the default value for the type
-            }
-
-        }
 
         internal void SmartNavigate(string url)
         {
@@ -697,11 +545,11 @@ namespace ModemToolbarIE
 
         internal void Clear()
         {
-            foreach (BaseToolbarItem item in items)
+            foreach (BaseToolbarItem item in baseToolbarItems)
             {
                 item.Reset();
             }
-            items.Clear();
+            baseToolbarItems.Clear();
         }
 
         internal void SaveSearchHistory(SearchBoxItem item)
@@ -765,6 +613,54 @@ namespace ModemToolbarIE
 
         }
     }
+
+    //[CallbackBehavior(ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
+    //public class CallbackHandler : ModemToolbarIE.ModemService.IWCFModemServiceCallback
+    //{
+    //    private Toolbar toolbar;
+
+    //    public CallbackHandler(Toolbar _toolbar)
+    //    {
+    //        toolbar = _toolbar;
+    //    }
+
+    //    public void Alive()
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+
+    //    public void DataLinkListItemClassEquals(LinkListClass linkList)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+
+    //    public void DataMenuListItemClassEquals(MenuListClass menuList)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+
+    //    public void DataSearchBoxItemClassEquals(SearchListClass searchBox)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+
+    //    public void SyncStatusEquals(int status)
+    //    {
+    //        MessageBox.Show("Sync status is: " + status.ToString());
+    //        toolbar.syncStatus = status;
+
+    //    }
+    //}
+
+    //public class ModemServiceClient : DuplexChannelFactory<ModemService.IWCFModemService>
+    //{
+    //    public ModemServiceClient(object callbackInstance, System.ServiceModel.Channels.Binding binding, EndpointAddress remoteAddress)
+    //    : base(callbackInstance, binding, remoteAddress)
+    //    {
+
+    //    }
+    //}
+
 
 
 }

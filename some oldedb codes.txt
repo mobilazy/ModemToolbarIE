@@ -1,0 +1,136 @@
+private bool SyncDatabases()
+        {
+            try
+            {
+                DbHelper dbHelperLocal = new DbHelper();
+                DbHelper dbHelperRemote = new DbHelper();
+
+
+                string connStringLocal = dbHelperLocal.localConnectionString;
+                string connStringRemote = dbHelperRemote.remoteConnectionString;
+                string localFile = dbHelperLocal.localFile;
+                string remoteFile = dbHelperRemote.remoteFile;
+
+                dbHelperRemote.OpenConnection(connStringRemote);
+                var rmtAuditTrail = dbHelperRemote.GetTblAuditAsList();
+
+                dbHelperLocal.OpenConnection(connStringLocal);
+                var lclAuditTrail = dbHelperLocal.GetTblAuditAsList();
+
+                int lclRows, rmtRows;
+                lclRows = rmtAuditTrail.Count;
+                rmtRows = lclAuditTrail.Count;
+
+                dbHelperLocal.CloseConnection();
+                dbHelperRemote.CloseConnection();
+
+                if (lclRows == rmtRows)
+                {
+                    return true;
+                }
+                else
+                {
+
+                    return SyncRemoteToLocal();
+
+                }
+
+
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception();
+            }
+
+
+            return false;
+
+        }
+		
+
+	
+
+
+        private bool SyncRemoteToLocal()
+        {
+            DbHelper dbHelperLocal = new DbHelper();
+            DbHelper dbHelperRemote = new DbHelper();
+
+            string connStringLocal = dbHelperLocal.localConnectionString;
+            string connStringRemote = dbHelperRemote.remoteConnectionString;
+
+            dbHelperRemote.OpenConnection(connStringRemote);
+            var rmtAuditTrail = dbHelperRemote.GetTblAuditAsList();
+
+
+            dbHelperLocal.OpenConnection(connStringLocal);
+            var lclAuditTrail = dbHelperLocal.GetTblAuditAsList();
+
+
+            foreach (var kvPair in rmtAuditTrail)
+            {
+                
+
+                if (lclAuditTrail.ContainsKey(kvPair.Key))  //kvPair.Value.tblId == lclAuditTrail[kvPair.Key].tblId)
+                {
+                    continue;
+                }
+                else
+                {
+                    ReadAndUpdate(kvPair.Value);
+                }
+            }
+
+            dbHelperRemote.CloseConnection();
+            dbHelperLocal.CloseConnection();
+            return true;
+
+        }
+
+        private bool ReadAndUpdate(TblAuditClass auditTrail)
+        {
+            bool returnValue = false;
+
+            try
+            {
+                DbHelper dbHelperLocal = new DbHelper();
+                DbHelper dbHelperRemote = new DbHelper();
+
+                string lclConnectionString = dbHelperLocal.localConnectionString;
+                string rmtConnectionString = dbHelperRemote.remoteConnectionString;
+
+                dbHelperLocal.OpenConnection(lclConnectionString);
+                dbHelperRemote.OpenConnection(rmtConnectionString);
+
+
+                switch (auditTrail.action)
+                {
+                    case "NEW":
+                        var tmp = dbHelperRemote.GetRecordObject(Int32.Parse(auditTrail.recordId), auditTrail.tableName);
+                        dbHelperLocal.InsertRecordObject(tmp, auditTrail.tableName);
+                        dbHelperLocal.InsertTblAuditRecord(auditTrail, "NEW");
+                        break;
+                    case "EDIT":
+                        dbHelperLocal.UpdateRecord(auditTrail.tableName, Int32.Parse(auditTrail.recordId), auditTrail.fieldName, auditTrail.newValue);
+                        dbHelperLocal.InsertTblAuditRecord(auditTrail, "EDIT");
+                        break;
+                    case "DELETE":
+                        dbHelperLocal.DeleteRecord(auditTrail.tableName, Int32.Parse(auditTrail.recordId));
+                        dbHelperLocal.InsertTblAuditRecord(auditTrail, "DELETE");
+                        break;
+                    default:
+                        break;
+                }
+
+
+                returnValue = true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception();
+            }
+
+
+            return returnValue;
+        }

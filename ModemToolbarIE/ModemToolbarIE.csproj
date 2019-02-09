@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ModemToolbarIE</RootNamespace>
     <AssemblyName>ModemToolbarIE</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -23,6 +23,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>2</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -32,6 +33,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
@@ -39,24 +41,49 @@
   <PropertyGroup>
     <AssemblyOriginatorKeyFile>bin\Debug\KeyModemToolBarIE.SNK</AssemblyOriginatorKeyFile>
   </PropertyGroup>
+  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>2</WarningLevel>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <RegisterForComInterop>false</RegisterForComInterop>
+  </PropertyGroup>
+  <PropertyGroup />
   <ItemGroup>
     <Reference Include="ClearScript, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>bin\Debug\dll\ClearScript.dll</HintPath>
+      <HintPath>..\packages\ClearScript.V8.5.5.2\lib\net45\ClearScript.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="HtmlAgilityPack, Version=1.8.10.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\HtmlAgilityPack\v4.0_1.8.10.0__bd319b19eaf3b43a\HtmlAgilityPack.dll</HintPath>
-    </Reference>
-    <Reference Include="Interop.SHDocVw, Version=1.1.0.0, Culture=neutral, PublicKeyToken=4b827ebe229d539f">
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+    <Reference Include="HtmlAgilityPack, Version=1.8.11.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
+      <HintPath>..\packages\HtmlAgilityPack.1.8.11\lib\Net45\HtmlAgilityPack.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.mshtml, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Services" />
     <Reference Include="System.Windows.Controls.Ribbon" />
@@ -75,11 +102,28 @@
     <Compile Include="BandObjectsLib\ComInterop.cs" />
     <Compile Include="BandObjectsLib\MiscClasses.cs" />
     <Compile Include="BaseToolbarItem.cs" />
+    <Compile Include="Connected Services\ModemService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
     <Compile Include="IToolbarItem.cs" />
     <Compile Include="LinkItem.cs" />
     <Compile Include="LinkListItem.cs" />
     <Compile Include="MenuListItem.cs" />
     <Compile Include="MenuStripItem.cs" />
+    <Compile Include="MergeForm\MergeForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MergeForm\MergeForm.Designer.cs">
+      <DependentUpon>MergeForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ModemToolbarInstaller.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="ModemToolbarInstaller.Designer.cs">
+      <DependentUpon>ModemToolbarInstaller.cs</DependentUpon>
+    </Compile>
     <Compile Include="PopupGo.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -104,20 +148,13 @@
     <Compile Include="Toolbar.Designer.cs">
       <DependentUpon>Toolbar.cs</DependentUpon>
     </Compile>
-    <Compile Include="Db\ToolDb.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>ToolDb.xsd</DependentUpon>
-    </Compile>
-    <Compile Include="Utility\ModemConnection.cs" />
-    <Compile Include="Utility\ModemDataPost.cs" />
-    <Compile Include="Utility\ModemInsert.cs" />
-    <Compile Include="Utility\ModemParameters.cs" />
-    <Compile Include="Utility\ModemPostObjects.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BandObjectsLib\BandObject.resx">
       <DependentUpon>BandObject.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MergeForm\MergeForm.resx">
+      <DependentUpon>MergeForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="PopupGo.resx">
       <DependentUpon>PopupGo.cs</DependentUpon>
@@ -131,61 +168,97 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <None Include="app.config">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="bin\Debug\KeyModemToolBarIE.SNK" />
+    <None Include="Connected Services\ModemService\item.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item11.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item12.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item13.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item14.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item15.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\item16.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Connected Services\ModemService\WCFModemService.wsdl" />
     <None Include="packages.config" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.LinkListClass.datasource" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.LinkListItemClass.datasource" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.MenuListClass.datasource" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.MenuListItemClass.datasource" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.SearchBoxItemClass.datasource" />
+    <None Include="Properties\DataSources\WcfServiceModemToolbarSync.SearchListClass.datasource" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-    <None Include="Db\ToolDb.xsc">
-      <DependentUpon>ToolDb.xsd</DependentUpon>
-    </None>
-    <None Include="Db\ToolDb.xsd">
-      <Generator>MSDataSetGenerator</Generator>
-      <LastGenOutput>ToolDb.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Db\ToolDb.xss">
-      <DependentUpon>ToolDb.xsd</DependentUpon>
-    </None>
   </ItemGroup>
   <ItemGroup>
-    <COMReference Include="MSHTML">
-      <Guid>{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}</Guid>
-      <VersionMajor>4</VersionMajor>
-      <VersionMinor>0</VersionMinor>
+    <None Include="Connected Services\ModemService\item.disco" />
+    <None Include="Connected Services\ModemService\configuration91.svcinfo" />
+    <None Include="Connected Services\ModemService\configuration.svcinfo" />
+    <None Include="Connected Services\ModemService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+    <Content Include="Licenses\clearscript-license.txt" />
+    <Content Include="Licenses\v8-license.txt" />
+    <EmbeddedResource Include="Resources\view.png" />
+    <EmbeddedResource Include="Resources\smile.PNG" />
+    <EmbeddedResource Include="Resources\magic-wand.png" />
+    <EmbeddedResource Include="Resources\gear.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="SHDocVw">
+      <Guid>{EAB22AC0-30C1-11CF-A7EB-0000C05BAE0B}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>1</VersionMinor>
       <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
+      <WrapperTool>tlbimp</WrapperTool>
       <Isolated>False</Isolated>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>True</Private>
     </COMReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Licenses\clearscript-license.txt" />
-    <Content Include="Licenses\v8-license.txt" />
-    <EmbeddedResource Include="Resources\gear.png" />
-    <EmbeddedResource Include="Resources\magic-wand.png" />
-    <EmbeddedResource Include="Resources\smile.PNG" />
-    <EmbeddedResource Include="Resources\view.png" />
+    <ProjectReference Include="..\ModemWebUtility\ModemWebUtility.csproj">
+      <Project>{05f2f706-d0e1-45c1-a0fa-72a5e6cd5b71}</Project>
+      <Name>ModemWebUtility</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\WcfServiceModemToolbarSync\WcfServiceModemToolbarSync.csproj">
+      <Project>{b8da02bf-cbb8-4ab4-ab90-f196d246bb9d}</Project>
+      <Name>WcfServiceModemToolbarSync</Name>
+    </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadataStorage Include="Connected Services\ModemService\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
-"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
-
-"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
+    <PostBuildEvent>"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
-
-"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 
-"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64\gacutil.exe" /i "$(TargetDir)dll\HtmlAgilityPack.dll"
-"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /i "$(TargetDir)dll\HtmlAgilityPack.dll"
-
-"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\x64\gacutil.exe" /i "$(TargetDir)dll\ClearScript.dll"
-"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /i "$(TargetDir)dll\ClearScript.dll"
 
 if not exist "$(TargetDir)" md "$(TargetDir)"
 xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\x86\*.*" "$(TargetDir)"

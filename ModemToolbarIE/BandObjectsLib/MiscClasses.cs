@@ -1,12 +1,5 @@
-﻿using Microsoft.Win32;
-using mshtml;
-using SHDocVw;
-using System;
-using System.ComponentModel;
-using System.Drawing;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
+﻿using System;
+
 
 namespace BandObjectLib
 {
@@ -22,6 +15,7 @@ namespace BandObjectLib
         public string ModemNo { get; set; }
     }
 
+    
     
     public enum ModemEvents
     {

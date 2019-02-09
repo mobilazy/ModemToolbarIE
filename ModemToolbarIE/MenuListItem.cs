@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ModemWebUtility;
 
 namespace ModemToolbarIE
 {
@@ -16,7 +18,7 @@ namespace ModemToolbarIE
         internal MenuListItem(Toolbar engine,
             string caption,
             string hint,
-            KeyValuePair<string, KeyValuePair<string, ModemPostObjects>[]>[] links, System.Drawing.Image img)
+            KeyValuePair<string, KeyValuePair<string, ModemMwdPostObjects>[]>[] links, System.Drawing.Image img)
             : base(engine, img)
         {
             this.Create(caption, hint, links);
@@ -29,23 +31,28 @@ namespace ModemToolbarIE
 
         public void Create(string menuText,
             string menuTooltip,
-            KeyValuePair<string, KeyValuePair<string, ModemPostObjects>[]>[] links)
+            KeyValuePair<string, KeyValuePair<string, ModemMwdPostObjects>[]>[] links)
         {
 
             this.menuListItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuListItem.Text = menuText;
             
 
-            foreach (KeyValuePair<string, KeyValuePair<string, ModemPostObjects>[]> link in links)
+            foreach (KeyValuePair<string, KeyValuePair<string, ModemMwdPostObjects>[]> link in links)
             {
                 MenuStripItem mnu = new MenuStripItem(base.engine, this, link.Key, link.Value);
                 menuListItem.DropDownItems.Add(mnu.menuStripItem);
             }
 
-            
-            
+            Size sz = new Size(this.engine.MsContainer.Size.Width + this.menuListItem.Size.Width, this.engine.MsContainer.Height);
+            engine.MsContainer.Size = sz; 
+            engine.MsContainer.Left += engine.TsContainer.Size.Width;
+
             engine.MenuStrip.Items.Add(this.menuListItem);
-            
+     
+            engine.MsContainer.Refresh();
+            //engine.Refresh();
+
         }
 
         
