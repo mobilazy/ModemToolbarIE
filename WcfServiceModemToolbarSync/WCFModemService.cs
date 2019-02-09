@@ -43,7 +43,15 @@ namespace WcfServiceModemToolbarSync
         public WCFModemService()
         {
             currentAssembly = Assembly.GetAssembly(GetType());
-            DbHelper.remoteFile = RemoteFilepathFromFile();
+            try
+            {
+                DbHelper.remoteFile = RemoteFilepathFromFile();
+            }
+            catch (Exception)
+            {
+  
+            }
+            
 
             if (SetDbConnectionString())
             {

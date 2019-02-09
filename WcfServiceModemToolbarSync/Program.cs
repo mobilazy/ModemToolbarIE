@@ -12,12 +12,12 @@ namespace WcfServiceModemToolbarSync
         static void Main()
         {
 
-//#if DEBUG
-            //ModemWindowsService service = new ModemWindowsService();
-            //service.OnDebug();
-            //System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
+#if DEBUG
+            ModemWindowsService service = new ModemWindowsService();
+            service.OnDebug();
+            System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
 
-//#else
+#else
             ServiceBase[] servicesToRun;
             servicesToRun = new ServiceBase[]
             {
@@ -26,7 +26,7 @@ namespace WcfServiceModemToolbarSync
 
             ServiceBase.Run(servicesToRun);
 
-//#endif
+#endif
         }
     }
 }
