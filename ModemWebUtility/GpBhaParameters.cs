@@ -162,8 +162,14 @@ namespace ModemWebUtility
             gpBhaPost.P_GP_COMMENT = Tuple.Create(gpBhaPost.P_GP_COMMENT.Item1, HDocUtility.GetTextAreaById(gpBhaPost.P_GP_COMMENT.Item1, hDoc));
             gpBhaPost.P_L_LOWHOUSEDESC = Tuple.Create(gpBhaPost.P_L_LOWHOUSEDESC.Item1, HDocUtility.GetSelectedElementById(gpBhaPost.P_L_LOWHOUSEDESC.Item1, hDoc));
             gpBhaPost.H_DEL_BHA = Tuple.Create(gpBhaPost.H_DEL_BHA.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.H_DEL_BHA.Item1, hDoc));
-            gpBhaPost.P_S2 = Tuple.Create(gpBhaPost.P_S2.Item1, HDocUtility.GetInputById(gpBhaPost.P_S2.Item1, hDoc));
-            gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.H_L_PRECON_STATUS.Item1, hDoc));
+
+
+            ////gpBhaPost.P_S2 = Tuple.Create(gpBhaPost.P_S2.Item1, HDocUtility.GetInputById(gpBhaPost.P_S2.Item1, hDoc));
+            gpBhaPost.P_S2 = Tuple.Create(gpBhaPost.P_S2.Item1, "s");
+
+
+            //gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.H_L_PRECON_STATUS.Item1, hDoc));
+            gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, "N/A");
 
             gpBhaPost.O_PILOT_NUM = Tuple.Create(gpBhaPost.O_PILOT_NUM.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_PILOT_NUM.Item1, hDoc));
             //gpBhaPost.O_GP_DESC = Tuple.Create(gpBhaPost.O_GP_DESC.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_GP_DESC.Item1, hDoc));
@@ -185,22 +191,27 @@ namespace ModemWebUtility
             //gpBhaPost.O_BIT_MAKEUP_TORQUE = Tuple.Create(gpBhaPost.O_BIT_MAKEUP_TORQUE.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_BIT_MAKEUP_TORQUE.Item1, hDoc));
             //gpBhaPost.O_BIT_SN = Tuple.Create(gpBhaPost.O_BIT_SN.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_BIT_SN.Item1, hDoc));
             gpBhaPost.O_LITHIUM_USED = Tuple.Create(gpBhaPost.O_LITHIUM_USED.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_LITHIUM_USED.Item1, hDoc));
-            gpBhaPost.O_ABITYPE_ID = Tuple.Create(gpBhaPost.O_ABITYPE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_ABITYPE_ID.Item1, hDoc));
-            gpBhaPost.O_CONN_LOWER_ID = Tuple.Create(gpBhaPost.O_CONN_LOWER_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_CONN_LOWER_ID.Item1, hDoc));
-            gpBhaPost.O_CONN_UPHOLE_ID = Tuple.Create(gpBhaPost.O_CONN_UPHOLE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_CONN_UPHOLE_ID.Item1, hDoc));
-            gpBhaPost.O_GPSIZE_ID = Tuple.Create(gpBhaPost.O_GPSIZE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_GPSIZE_ID.Item1, hDoc));
-            gpBhaPost.O_HOLESEC_ID = Tuple.Create(gpBhaPost.O_HOLESEC_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_HOLESEC_ID.Item1, hDoc));
-            gpBhaPost.O_OILTYPE_ID = Tuple.Create(gpBhaPost.O_OILTYPE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_OILTYPE_ID.Item1, hDoc));
-            gpBhaPost.O_ORDER_ID = Tuple.Create(gpBhaPost.O_ORDER_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_ORDER_ID.Item1, hDoc));
-            gpBhaPost.O_SW_DM_ID = Tuple.Create(gpBhaPost.O_SW_DM_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_SW_DM_ID.Item1, hDoc));
-            gpBhaPost.O_SW_GP_ID = Tuple.Create(gpBhaPost.O_SW_GP_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_SW_GP_ID.Item1, hDoc));
+            ////gpBhaPost.O_ABITYPE_ID = Tuple.Create(gpBhaPost.O_ABITYPE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_ABITYPE_ID.Item1, hDoc));
+            ////gpBhaPost.O_CONN_LOWER_ID = Tuple.Create(gpBhaPost.O_CONN_LOWER_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_CONN_LOWER_ID.Item1, hDoc));
+            ////gpBhaPost.O_CONN_UPHOLE_ID = Tuple.Create(gpBhaPost.O_CONN_UPHOLE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_CONN_UPHOLE_ID.Item1, hDoc));
+            ////gpBhaPost.O_GPSIZE_ID = Tuple.Create(gpBhaPost.O_GPSIZE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_GPSIZE_ID.Item1, hDoc));
+            ////gpBhaPost.O_HOLESEC_ID = Tuple.Create(gpBhaPost.O_HOLESEC_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_HOLESEC_ID.Item1, hDoc));
+            ////gpBhaPost.O_OILTYPE_ID = Tuple.Create(gpBhaPost.O_OILTYPE_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_OILTYPE_ID.Item1, hDoc));
+            ////gpBhaPost.O_ORDER_ID = Tuple.Create(gpBhaPost.O_ORDER_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_ORDER_ID.Item1, hDoc));
+            ////gpBhaPost.O_SW_DM_ID = Tuple.Create(gpBhaPost.O_SW_DM_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_SW_DM_ID.Item1, hDoc));
+            ////gpBhaPost.O_SW_GP_ID = Tuple.Create(gpBhaPost.O_SW_GP_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_SW_GP_ID.Item1, hDoc));
             //gpBhaPost.O_GP_COMMENT = Tuple.Create(gpBhaPost.O_GP_COMMENT.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_GP_COMMENT.Item1, hDoc));
             gpBhaPost.O_LWR_SLICK_HOUS = Tuple.Create(gpBhaPost.O_LWR_SLICK_HOUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_LWR_SLICK_HOUS.Item1, hDoc));
-            gpBhaPost.O_STATUS = Tuple.Create(gpBhaPost.O_STATUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_STATUS.Item1, hDoc));
+            ////gpBhaPost.O_STATUS = Tuple.Create(gpBhaPost.O_STATUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_STATUS.Item1, hDoc));
             //gpBhaPost.O_SUB_CONF_ID = Tuple.Create(gpBhaPost.O_SUB_CONF_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_SUB_CONF_ID.Item1, hDoc));
             //gpBhaPost.O_LOWHOUSEID = Tuple.Create(gpBhaPost.O_LOWHOUSEID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_LOWHOUSEID.Item1, hDoc));
             //gpBhaPost.O_S2 = Tuple.Create(gpBhaPost.O_S2.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_S2.Item1, hDoc));
-            gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_PRECON_ID.Item1, hDoc));
+
+
+            ////gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_PRECON_ID.Item1, hDoc));
+            gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, "2");
+
+
             //gpBhaPost.P_GP_ID_o = Tuple.Create(gpBhaPost.P_GP_ID_o.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.P_GP_ID_o.Item1, hDoc));
             //gpBhaPost.P_PILOT_NUM_o = Tuple.Create(gpBhaPost.P_PILOT_NUM_o.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.P_PILOT_NUM_o.Item1, hDoc));
             //gpBhaPost.P_GP_DESC_o = Tuple.Create(gpBhaPost.P_GP_DESC_o.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.P_GP_DESC_o.Item1, hDoc));

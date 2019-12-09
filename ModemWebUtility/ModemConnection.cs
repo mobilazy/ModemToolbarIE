@@ -76,8 +76,9 @@ namespace ModemWebUtility
                 request.Method = "GET";
 
                 response = request.GetResponse();
-                
-                reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8);
+
+                //reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8);
+                reader = new StreamReader(response.GetResponseStream(), HDocUtility.CurrentEncoding);
                 result = reader.ReadToEnd();
 
             }

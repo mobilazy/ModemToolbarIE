@@ -24,8 +24,8 @@ namespace ModemWebUtility
                 AddMwdBha();
             }
             
-            UpdateMwdComponent(mp.MwdId.Last());
-            UpdateMwdSoftware(mp.MwdId.Last());
+            UpdateMwdComponent(mp.MwdId.LastOrDefault());
+            UpdateMwdSoftware(mp.MwdId.LastOrDefault());
         }
 
         private void AddMwdBha()
@@ -73,7 +73,7 @@ namespace ModemWebUtility
                     {
                         mdp.AddPostKeys("z_modified", "Y");
                         mdp.AddPostKeys("P_BHA_NUM", (lastItem+1).ToString());
-                        mdp.AddPostKeys("P_L_ORIFFICESIZE", String.IsNullOrEmpty(mObj.MwdBhaPost.P_L_ORIFFICESIZE)? "  " : mObj.MwdBhaPost.P_L_ORIFFICESIZE);
+                        mdp.AddPostKeys("P_L_ORIFFICESIZE", String.IsNullOrEmpty(mObj.MwdBhaPost.P_L_ORIFFICESIZE)? " " : mObj.MwdBhaPost.P_L_ORIFFICESIZE);
                         mdp.AddPostKeys("P_POPPET_STANDOFF", String.IsNullOrEmpty(mObj.MwdBhaPost.P_POPPET_STANDOFF) ? "": mObj.MwdBhaPost.P_POPPET_STANDOFF);
                         mdp.AddPostKeys("P_L_IMPELLERSIZE", String.IsNullOrEmpty(mObj.MwdBhaPost.P_L_IMPELLERSIZE) ? "  " : mObj.MwdBhaPost.P_L_IMPELLERSIZE);
                         mdp.AddPostKeys("P_EXP_MAX_TEMP", String.IsNullOrEmpty (mObj.MwdBhaPost.P_EXP_MAX_TEMP)?"": mObj.MwdBhaPost.P_EXP_MAX_TEMP);

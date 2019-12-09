@@ -38,12 +38,13 @@ namespace ModemToolbarIE
             this.linkButton.Text = buttonText;
             this.linkButton.ToolTipText = buttonTooltip;
             this.linkButton.Click += new EventHandler(linkButton_Click);
-
+            int marginPad = 15;
+            this.linkButton.Margin = new System.Windows.Forms.Padding(0, 0, marginPad, 0);
 
             items.Add(this.linkButton);
             
             engine.ToolStrip.Items.AddRange(this.items.ToArray());
-            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkButton.Size.Width, this.engine.TsContainer.Height);
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkButton.Size.Width+  marginPad, this.engine.TsContainer.Height);
             engine.TsContainer.Size = sz;
             engine.TsContainer.Refresh();
         }
@@ -111,12 +112,12 @@ namespace ModemToolbarIE
             this.linkButton.Enabled = false;
             this.linkButton.Click += new EventHandler(linkButton_Click);
             engine.HtmlDocCompleted += Engine_HtmlDocCompleted;
-
-
+            int marginPad = 15;
+            this.linkButton.Margin = new System.Windows.Forms.Padding(0,0,marginPad,0);
             items.Add(this.linkButton);
             
             engine.ToolStrip.Items.AddRange(this.items.ToArray());
-            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkButton.Size.Width, this.engine.TsContainer.Height);
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkButton.Size.Width+marginPad + 30, this.engine.TsContainer.Height);
             engine.TsContainer.Size = sz;
             engine.TsContainer.Refresh();
         }

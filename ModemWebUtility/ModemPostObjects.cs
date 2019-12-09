@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 namespace ModemWebUtility
 {
-    public class ModemMwdPostObjects
+    public class ModemMwdPostObjects 
     {
 
         //public string ModemNo { get; set; }
@@ -23,6 +23,7 @@ namespace ModemWebUtility
             //Doc = doc;
         }
 
+        
     }
 
     public class ModemDdPostObjects
@@ -60,7 +61,7 @@ namespace ModemWebUtility
         }
     }
 
-    public class MwdBhaPosts
+    public class MwdBhaPosts 
     {
         public string P_BHA_NUM { get; set; } = "";
         public string P_L_ORIFFICESIZE { get; set; } = " ";
@@ -74,6 +75,7 @@ namespace ModemWebUtility
         public string P_HC_TOOL { get; set; } = "Yes";
         public string P_RASOURCE_ID { get; set; } = "";
 
+        
     }
 
     public class MwdCompPosts

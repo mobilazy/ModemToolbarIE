@@ -85,7 +85,7 @@ namespace ModemToolbarIE
             this.searchButton.ImageScaling = ToolStripItemImageScaling.None;
             this.searchButton.Text = buttonText;
             this.searchButton.Click += new System.EventHandler(this.searchButton_Click);
-            int marginPad = 10;
+            int marginPad = 15;
             this.searchButton.Margin = new Padding(0,0,marginPad,0);
 
             originalColor = this.searchInputBox.ForeColor;
@@ -101,7 +101,7 @@ namespace ModemToolbarIE
             
             engine.ToolStrip.Items.AddRange(this.items.ToArray());
             this.searchInputBox.Text = greetingText;
-            Size sz = new Size(this.engine.TsContainer.Size.Width + this.searchInputBox.Size.Width + this.searchButton.Size.Width+ marginPad, this.engine.TsContainer.Height);
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.searchInputBox.Size.Width + this.searchButton.Size.Width+  marginPad, this.engine.TsContainer.Height);
             engine.TsContainer.Size = sz;
 
             engine.TsContainer.Refresh();

@@ -23,8 +23,9 @@ namespace WcfServiceModemToolbarSync
             {
                 new ModemWindowsService()
             };
-
+            
             ServiceBase.Run(servicesToRun);
+            
 
 #endif
         }

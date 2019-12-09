@@ -34,6 +34,7 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <PlatformTarget>x86</PlatformTarget>
+    <RegisterForComInterop>false</RegisterForComInterop>
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
@@ -63,6 +64,9 @@
     <RegisterForComInterop>false</RegisterForComInterop>
   </PropertyGroup>
   <PropertyGroup />
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="ClearScript, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=MSIL">
       <HintPath>..\packages\ClearScript.V8.5.5.2\lib\net45\ClearScript.dll</HintPath>
@@ -112,11 +116,23 @@
     <Compile Include="LinkListItem.cs" />
     <Compile Include="MenuListItem.cs" />
     <Compile Include="MenuStripItem.cs" />
+    <Compile Include="MergeForm\AddMwdItem.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MergeForm\AddMwdItem.Designer.cs">
+      <DependentUpon>AddMwdItem.cs</DependentUpon>
+    </Compile>
     <Compile Include="MergeForm\MergeForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="MergeForm\MergeForm.Designer.cs">
       <DependentUpon>MergeForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="MergeForm\MwdHeader.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="MergeForm\MwdHeader.Designer.cs">
+      <DependentUpon>MwdHeader.cs</DependentUpon>
     </Compile>
     <Compile Include="ModemToolbarInstaller.cs">
       <SubType>Component</SubType>
@@ -153,8 +169,14 @@
     <EmbeddedResource Include="BandObjectsLib\BandObject.resx">
       <DependentUpon>BandObject.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="MergeForm\AddMwdItem.resx">
+      <DependentUpon>AddMwdItem.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="MergeForm\MergeForm.resx">
       <DependentUpon>MergeForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MergeForm\MwdHeader.resx">
+      <DependentUpon>MwdHeader.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="PopupGo.resx">
       <DependentUpon>PopupGo.cs</DependentUpon>
@@ -241,6 +263,7 @@
     <ProjectReference Include="..\ModemWebUtility\ModemWebUtility.csproj">
       <Project>{05f2f706-d0e1-45c1-a0fa-72a5e6cd5b71}</Project>
       <Name>ModemWebUtility</Name>
+      <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\WcfServiceModemToolbarSync\WcfServiceModemToolbarSync.csproj">
       <Project>{b8da02bf-cbb8-4ab4-ab90-f196d246bb9d}</Project>
@@ -255,14 +278,29 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.6.1 Tools\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
+    <PostBuildEvent>
+::  "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\x64\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
+"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\gacutil.exe" /f /i "$(TargetDir)$(TargetFileName)"
+
+::  "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" /unregister "$(TargetDir)$(TargetFileName)"
+
+::  "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe" "$(TargetDir)$(TargetFileName)"
 
+::  "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\x64\gacutil.exe" /i "$(TargetDir)dll\HtmlAgilityPack.dll"
+"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\gacutil.exe" /i "$(TargetDir)dll\HtmlAgilityPack.dll"
+
+::   "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\x64\gacutil.exe" /i "$(TargetDir)dll\ClearScript.dll"
+"C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\gacutil.exe" /i "$(TargetDir)dll\ClearScript.dll"
 
 if not exist "$(TargetDir)" md "$(TargetDir)"
 xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\x86\*.*" "$(TargetDir)"
 if not exist "$(TargetDir)" md "$(TargetDir)"
-xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\amd64\*.*" "$(TargetDir)"</PostBuildEvent>
+xcopy /s /y "$(SolutionDir)packages\ClearScript.V8.5.5.2\tools\native\amd64\*.*" "$(TargetDir)"
+
+xcopy /s /y "$(TargetDir)$(TargetFileName)" "C:\Program Files (x86)\Internet Explorer\"
+
+xcopy /s /y "$(TargetDir)$(TargetFileName)" "C:\Program Files (x86)\AJ\Modem Toolbar\"</PostBuildEvent>
   </PropertyGroup>
 </Project>

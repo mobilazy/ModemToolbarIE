@@ -12,13 +12,14 @@ namespace WcfServiceModemToolbarSync
 
         public  string localConnectionString { get;  } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
                 @"Data source= " + localFile + ";";
-        //public string remoteConnectionString { get; set; } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
-        //    @"Data Source=""\\corp.halliburton.com\eu\NOR\TAN\DATA\Sperry Sun\09 RTO-Insite\RigAccessFolder\Common\StandardMwdDatabase\ModemToolDbServer.accdb"";";
+        //public string remoteConnectionString { get; set; } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read; Data Source=\\corp.halliburton.com\eu\NOR\TAN\DATA\temp\AJ_DropBox\StandardMwdDatabase\ModemToolDbServer.accdb;";
 
         public string remoteConnectionString { get;  } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
             @"Data Source= "+ remoteFile +";";
 
-        public static string remoteFile  = @"\\corp.halliburton.com\eu\NOR\TAN\DATA\Sperry Sun\09 RTO-Insite\RigAccessFolder\Common\StandardMwdDatabase\ModemToolDbServer.accdb";
+        //public static string remoteFile  = @"\\corp.halliburton.com\eu\NOR\TAN\DATA\Sperry Sun\09 RTO-Insite\RigAccessFolder\Common\StandardMwdDatabase\ModemToolDbServer.accdb";
+        public static string remoteFile = @"\\corp.halliburton.com\eu\NOR\TAN\DATA\temp\AJ_DropBox\StandardMwdDatabase\ModemToolDbServer.accdb";
+        
         public static string localFile  = WCFModemService.DataFolder + @"\ModemToolDbLocal.accdb";
 
         public void OpenConnection(string connectionString)

@@ -24,5 +24,13 @@ namespace WcfServiceModemToolbarSync
                 sc.Start();
             }
         }
+
+        private void ProjectInstaller_BeforeUninstall(object sender, InstallEventArgs e)
+        {
+            using (ServiceController sc = new ServiceController(serviceInstaller1.ServiceName))
+            {
+                sc.Stop();
+            }
+        }
     }
 }

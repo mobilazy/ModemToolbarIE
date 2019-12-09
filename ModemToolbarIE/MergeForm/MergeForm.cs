@@ -129,56 +129,56 @@ namespace ModemToolbarIE.MergeForm
 
 
 
-            //foreach (string item in mp.GpId)
-            //{
+            foreach (string item in mp.GpId)
+            {
 
-            //    ModemConnection mcTemp = new ModemConnection(gpEditViewUrl + item);
-            //    GpBhaParameters mbp = new GpBhaParameters(mcTemp.GetHtmlAsHdoc());
+                ModemConnection mcTemp = new ModemConnection(gpEditViewUrl + item);
+                GpBhaParameters mbp = new GpBhaParameters(mcTemp.GetHtmlAsHdoc());
 
-            //    //foreach (var p in mbp.GpBhaPosts.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            //    //{
-            //    //    if (p.PropertyType == typeof(Tuple<string, string>))
-            //    //    {
-            //    //        Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(mbp.GpBhaPosts, null);
-            //    //        if (p.Name == "P_L_HOLESEC")
-            //    //        {
-            //    //            MessageBox.Show("Original MBP: " + p.Name + " => " + temp.Item1 + " => " + temp.Item2);
-            //    //        }
-
-
-            //    //    }
-
-            //    //}
-
-            //    TreeNode tn = new TreeNode(ReplaceQuotes(mbp.GpBhaPosts.P_GP_DESC.Item2));
-            //    ModemGpPostObjects tagObj = new ModemGpPostObjects();
-
-            //    tagObj.GpCompPostDict = mbp.GpBhaCompPost;
-            //    tagObj.GpBhaPost = mbp.GpBhaPosts;
-            //    tn.Tag = tagObj;
-
-            //    //foreach (var p in tagObj.GpBhaPost.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            //    //{
-            //    //    if (p.PropertyType == typeof(Tuple<string, string>))
-            //    //    {
-            //    //        Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(tagObj.GpBhaPost, null);
-            //    //        if (p.Name == "P_L_HOLESEC")
-            //    //        {
-            //    //            MessageBox.Show("When getting from modem: "+ p.Name + " => " + temp.Item1 + " => " + temp.Item2);
-            //    //        }
+                //foreach (var p in mbp.GpBhaPosts.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                //{
+                //    if (p.PropertyType == typeof(Tuple<string, string>))
+                //    {
+                //        Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(mbp.GpBhaPosts, null);
+                //        if (p.Name == "P_L_HOLESEC")
+                //        {
+                //            MessageBox.Show("Original MBP: " + p.Name + " => " + temp.Item1 + " => " + temp.Item2);
+                //        }
 
 
-            //    //    }
+                //    }
 
-            //    //}
+                //}
 
-            //    gpNode.Nodes.Add(tn);
-            //    if (!mainNode.Nodes.Contains(gpNode))
-            //    {
-            //        mainNode.Nodes.Add(gpNode);
-            //    }
+                TreeNode tn = new TreeNode(ReplaceQuotes(mbp.GpBhaPosts.P_GP_DESC.Item2));
+                ModemGpPostObjects tagObj = new ModemGpPostObjects();
 
-            //}
+                tagObj.GpCompPostDict = mbp.GpBhaCompPost;
+                tagObj.GpBhaPost = mbp.GpBhaPosts;
+                tn.Tag = tagObj;
+
+                //foreach (var p in tagObj.GpBhaPost.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                //{
+                //    if (p.PropertyType == typeof(Tuple<string, string>))
+                //    {
+                //        Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(tagObj.GpBhaPost, null);
+                //        if (p.Name == "P_L_HOLESEC")
+                //        {
+                //            MessageBox.Show("When getting from modem: "+ p.Name + " => " + temp.Item1 + " => " + temp.Item2);
+                //        }
+
+
+                //    }
+
+                //}
+
+                gpNode.Nodes.Add(tn);
+                if (!mainNode.Nodes.Contains(gpNode))
+                {
+                    mainNode.Nodes.Add(gpNode);
+                }
+
+            }
 
 
             foreach (string item in mp.LooseId)

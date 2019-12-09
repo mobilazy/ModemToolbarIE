@@ -81,7 +81,7 @@ namespace BandObjectLib
             // 
             this.AutoSize = true;
             Name = "BandObject";
-            this.Size = new System.Drawing.Size(1250, 25);
+            this.Size = new System.Drawing.Size(1450, 25);
             this.ResumeLayout(false);
         }
 
@@ -102,9 +102,7 @@ namespace BandObjectLib
         public void OnDocumentComplete(object pDisp, ref object URL)
         {
             htmlDocument = (HTMLDocument)Explorer.Document;
-            
-
-
+ 
             if (URL.ToString().Contains("www.google.com"))
             {
                 IHTMLElement head = (IHTMLElement)((IHTMLElementCollection)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ModemToolbarIE.MergeForm;
 using ModemWebUtility;
 
 namespace ModemToolbarIE
@@ -82,39 +83,51 @@ namespace ModemToolbarIE
         {
             System.Windows.Forms.ToolStripMenuItem menuItem = sender as System.Windows.Forms.ToolStripMenuItem;
 
-            HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
-            doc.LoadHtml(HDocUtility.ConvertMshtmlToString(Engine.HtmlDoc));
-            string mwdId = HDocUtility.GetInputByName("P_104", doc);
-          
+            
+
             if (Engine.ModemStat == BandObjectLib.ModemEvents.BhaEdit)
             {
-                ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_10");
-                ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, true);
+                AddMwdItem addMWd = new AddMwdItem(Engine, linkObject);
                 
+
             }
             else if (Engine.ModemStat == BandObjectLib.ModemEvents.Edit)
             {
-               ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_SSORD_ID");
-               ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, false);
-            }
-            else
-            {
-                return;
+                AddMwdItem addMWd = new AddMwdItem(Engine, linkObject, true);
             }
 
-            if (!String.IsNullOrEmpty(mwdId))
-            {
-                Engine.SmartNavigate(HDocUtility.BhaEditUrlwMwdId + mwdId);
-            }
-            else
-            {
-                Engine.RefreshPage();
-            }
-            
+            //HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
+            //doc.LoadHtml(HDocUtility.ConvertMshtmlToString(Engine.HtmlDoc));
+            //string mwdId = HDocUtility.GetInputByName("P_104", doc);
+
+            //if (Engine.ModemStat == BandObjectLib.ModemEvents.BhaEdit)
+            //{
+            //    ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_10");
+            //    ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, true);
+
+            //}
+            //else if (Engine.ModemStat == BandObjectLib.ModemEvents.Edit)
+            //{
+            //   ModemParameters mp = new ModemParameters(Engine.HtmlDoc, true, "P_SSORD_ID");
+            //   ModemMwdInsert mi = new ModemMwdInsert(mp, linkObject, false);
+            //}
+            //else
+            //{
+            //    return;
+            //}
+
+            //if (!String.IsNullOrEmpty(mwdId))
+            //{
+            //    Engine.SmartNavigate(HDocUtility.BhaEditUrlwMwdId + mwdId);
+            //}
+            //else
+            //{
+            //    Engine.RefreshPage();
+            //}
+
         }
 
-
-
+        
 
         public System.Windows.Forms.ToolStripMenuItem menuStripItem;
     }

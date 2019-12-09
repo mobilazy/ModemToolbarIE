@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -24,9 +25,11 @@ namespace ModemWebUtility
             if (!InstertComonentOnly)
             {
                 AddGpBha();
+                //MessageBox.Show("Test1");
             }
 
             UpdateGpComponent(mp.GpId.Last());
+            //MessageBox.Show("Test2");
 
         }
 
@@ -41,12 +44,18 @@ namespace ModemWebUtility
             string headerResponse = mc.AddGpAndGetResponse();
            
             string pattern = @"QueryViewByKey\?P_GP_ID=([0-9]+)";
+            string patternZchk = @"z_chk=([0-9]+)";
             string input = headerResponse;
             
             Regex rx = new Regex(pattern);
             Match match = rx.Match(input);
             GroupCollection gr = match.Groups;
             string newGpId = gr[1].Value; // headerResponse.Substring(47, 5);
+
+            rx = new Regex(patternZchk);
+            match = rx.Match(input);
+            gr = match.Groups;
+            string z_chk = gr[1].Value; // headerResponse.Substring(47, 5);
 
 
             ModemConnection mc2 = new ModemConnection(urlGpBhaEdit+newGpId);
@@ -71,7 +80,7 @@ namespace ModemWebUtility
             mObj.GpBhaPost.O_PILOT_NUM = Tuple.Create<string, string>("O_PILOT_NUM", (lastItem+1).ToString());
             mObj.GpBhaPost.P_PILOT_NUM = Tuple.Create<string, string>("P_PILOT_NUM", (lastItem+1).ToString());
 
-
+            
             ModemDataPost mdp = new ModemDataPost(urlGpBhaInsert); // + ModemNumber
 
             foreach (var p in mObj.GpBhaPost.GetType()
@@ -92,7 +101,7 @@ namespace ModemWebUtility
 
             mdp.PostData();
 
-
+            Thread.Sleep(2000);
             mp = new ModemParameters(new ModemConnection(HDocUtility.UrlModemView + mp.ModemNo).GetHtmlAsHdoc(), mp.ModemNo);
             
         }

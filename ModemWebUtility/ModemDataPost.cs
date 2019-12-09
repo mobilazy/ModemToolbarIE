@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace ModemWebUtility
 {
@@ -68,11 +69,13 @@ namespace ModemWebUtility
                 counter++;
                 if (counter == postKeys.Count)
                 {
-                    postData += System.Net.WebUtility.UrlEncode(item.Value.Item1) + "=" + System.Net.WebUtility.UrlEncode(item.Value.Item2);
+                    //postData += System.Net.WebUtility.UrlEncode(item.Value.Item1) + "=" + System.Net.WebUtility.UrlEncode(item.Value.Item2);
+                    postData += HttpUtility.UrlEncode(item.Value.Item1, HDocUtility.CurrentEncoding) + "=" + HttpUtility.UrlEncode(item.Value.Item2, HDocUtility.CurrentEncoding);
                 }
                 else
                 {
-                    postData += System.Net.WebUtility.UrlEncode(item.Value.Item1) + "=" + System.Net.WebUtility.UrlEncode(item.Value.Item2) + "&";
+                    //postData += System.Net.WebUtility.UrlEncode(item.Value.Item1) + "=" + System.Net.WebUtility.UrlEncode(item.Value.Item2) + "&";
+                    postData += HttpUtility.UrlEncode(item.Value.Item1, HDocUtility.CurrentEncoding) + "=" + HttpUtility.UrlEncode(item.Value.Item2, HDocUtility.CurrentEncoding) + "&";
                 }
 
             }
@@ -98,7 +101,8 @@ namespace ModemWebUtility
         {
             string result = "";
             PostKeys();
-            byte[] byteArray = Encoding.ASCII.GetBytes(_postData);
+            byte[] byteArrayDefault = Encoding.Default.GetBytes(_postData);
+            byte[] byteArray = Encoding.Convert(Encoding.Default, HDocUtility.CurrentEncoding, byteArrayDefault);
             StreamReader reader = null;
 
             try
@@ -122,7 +126,8 @@ namespace ModemWebUtility
                 dataStream.Close();
 
                 _response = request.GetResponse();
-                reader = new StreamReader(_response.GetResponseStream(), Encoding.UTF8);
+                reader = new StreamReader(_response.GetResponseStream(), HDocUtility.CurrentEncoding);
+                //reader = new StreamReader(_response.GetResponseStream(), Encoding.UTF8);
                 _result = reader.ReadToEnd();
 
 

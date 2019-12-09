@@ -141,8 +141,8 @@ namespace ModemWebUtility
                 mcp.P_DESCRIPTION = HDocUtility.GetInputById("P_DESCRIPTION", hDoc);              //tempArray[i, 2];
                 mcp.P_CUST_STAT = HDocUtility.GetSelectedElementById("P_CUST_STAT", hDoc);                 // tempArray[i, 3];
                 mcp.P_COMMENTS = HDocUtility.GetInputById("P_COMMENTS", hDoc);            //tempArray[i, 4];
-                mcp.P_L_THREADSIZE_TOP = HDocUtility.GetInputById("P_L_THREADSIZE_TOP", hDoc);            //tempArray[i, 5];
-                mcp.P_L_THREADSIZE_BTM = HDocUtility.GetInputById("P_L_THREADSIZE_BTM", hDoc);               // tempArray[i, 6];
+                mcp.P_L_THREADSIZE_TOP = HDocUtility.GetSelectedElementById("P_L_THREADSIZE_TOP", hDoc);            //tempArray[i, 5];
+                mcp.P_L_THREADSIZE_BTM = HDocUtility.GetSelectedElementById("P_L_THREADSIZE_BTM", hDoc);               // tempArray[i, 6];
 
 
                 mcpDic.Add(0, mcp);

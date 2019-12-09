@@ -26,8 +26,8 @@ namespace WcfServiceModemToolbarSync.Properties {
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.SpecialSettingAttribute(global::System.Configuration.SpecialSetting.ConnectionString)]
-        [global::System.Configuration.DefaultSettingValueAttribute("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\\Users\\h111765\\ModemToolDbServer." +
-            "accdb")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=\\\\corp.halliburton.com\\eu\\NOR\\TAN\\D" +
+            "ATA\\temp\\AJ_DropBox\\StandardMwdDatabase\\ModemToolDbServer.accdb;Mode=Read")]
         public string RemoteDb {
             get {
                 return ((string)(this["RemoteDb"]));

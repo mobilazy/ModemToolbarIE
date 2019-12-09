@@ -290,7 +290,7 @@ namespace ModemToolbarIE
                     break;
                 case ModemEvents.Edit:
                     txtStatus.Text = modemNo + " - Edit";
-                    BhaEditMode = false;
+                    BhaEditMode = true;
                     break;
                 case ModemEvents.BhaEdit:
                     txtStatus.Text = modemNo + " - Mwd Edit";
@@ -348,7 +348,7 @@ namespace ModemToolbarIE
             _timer = new System.Timers.Timer(150000) { AutoReset = true };
             _timer.Elapsed += TimerElapsed;
             _timer.Enabled = true;
-
+            
         }
 
         private void TimerElapsed(object sender, ElapsedEventArgs e)
@@ -358,6 +358,7 @@ namespace ModemToolbarIE
 
         internal void StartWcfComms()
         {
+            //MessageBox.Show("Start WCF firing with sync status: " + syncStatus);
             NetTcpBinding myBinding = new NetTcpBinding()
             {
                 //CloseTimeout = TimeSpan.FromMinutes(2),
@@ -407,14 +408,17 @@ namespace ModemToolbarIE
 
                 SearchListClass sc = new SearchListClass();
                 sc = proxy.GetSearchBoxItemClasses();
+                sbic = new List<SearchBoxItemClass>();
                 sbic = sc.List;
 
                 LinkListClass lc = new LinkListClass();
                 lc = proxy.GetLinkListItemClasses();
+                llic = new List<LinkListItemClass>();
                 llic = lc.List;
 
                 MenuListClass mc = new MenuListClass();
                 mc = proxy.GetMenuListItemClasses();
+                mlic = new List<MenuListItemClass>();
                 mlic = mc.List;
 
                 CreateToolbarItems();
@@ -454,27 +458,18 @@ namespace ModemToolbarIE
 
                 // Clear previos state.
                 Clear();
+                toolStrip.Items.Clear();
+                menuStrip.Items.Clear();
+                tsContainer.ContentPanel.Size = new System.Drawing.Size(100, 0);
+                tsContainer.Location = new System.Drawing.Point(150, 0);
+                tsContainer.Size = new System.Drawing.Size(100, 25);
+                msContainer.ContentPanel.Size = new System.Drawing.Size(100, 0);
+                msContainer.Location = new System.Drawing.Point(250, 0);
+                msContainer.Size = new System.Drawing.Size(100, 25);
+                
 
                 Assembly currentAssembly = Assembly.GetAssembly(GetType());
                 //MessageBox.Show("Break 2");
-
-
-                if (mlic.Count != 0)
-                {
-                    foreach (var item in mlic)
-                    {
-
-                        Image image;
-                        using (var ms = new MemoryStream(item.Img))
-                        {
-                            image = Image.FromStream(ms);
-                        }
-
-                        MenuListItem mtemp = new MenuListItem(this, item.Caption, item.Hint, item.Links, image);
-                        baseToolbarItems.Add(mtemp);
-                    }
-                }
-
 
                 if (sbic.Count != 0)
                 {
@@ -508,13 +503,27 @@ namespace ModemToolbarIE
                 }
 
 
-
                 //merge button
                 Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
                 mergeButton = new MergeFormLink(this, "Merge", "Merge From a modem", img);
                 baseToolbarItems.Add(mergeButton);
 
 
+                if (mlic.Count != 0)
+                {
+                    foreach (var item in mlic)
+                    {
+
+                        Image image;
+                        using (var ms = new MemoryStream(item.Img))
+                        {
+                            image = Image.FromStream(ms);
+                        }
+
+                        MenuListItem mtemp = new MenuListItem(this, item.Caption, item.Hint, item.Links, image);
+                        baseToolbarItems.Add(mtemp);
+                    }
+                }
 
             }
             finally

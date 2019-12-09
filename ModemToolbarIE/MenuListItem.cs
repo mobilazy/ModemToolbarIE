@@ -44,9 +44,9 @@ namespace ModemToolbarIE
                 menuListItem.DropDownItems.Add(mnu.menuStripItem);
             }
 
-            Size sz = new Size(this.engine.MsContainer.Size.Width + this.menuListItem.Size.Width, this.engine.MsContainer.Height);
+            Size sz = new Size(engine.MsContainer.Size.Width + this.menuListItem.Size.Width + 20, this.engine.MsContainer.Height);
             engine.MsContainer.Size = sz; 
-            engine.MsContainer.Left += engine.TsContainer.Size.Width;
+            engine.MsContainer.Left = engine.TsContainer.Size.Width+150;
 
             engine.MenuStrip.Items.Add(this.menuListItem);
      
