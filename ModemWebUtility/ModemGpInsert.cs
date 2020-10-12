@@ -39,7 +39,14 @@ namespace ModemWebUtility
             string urlGpBhaInsert = HDocUtility.UrlGpBhaInsert;
             string urlGpBhaEdit = HDocUtility.UrlGpBhaEdit;
 
+            ModemConnection modem = new ModemConnection(HDocUtility.UrlModemView+mp.ModemNo);
+            bool modemActivated = (HDocUtility.GetInputByName("H_STAT_ORDER", modem.GetHtmlAsHdoc()).Equals("2"));
+
+            
+
             ModemConnection mc = new ModemConnection(urlGpInsert + mp.ModemNo);
+            
+            
 
             string headerResponse = mc.AddGpAndGetResponse();
            
@@ -59,7 +66,9 @@ namespace ModemWebUtility
 
 
             ModemConnection mc2 = new ModemConnection(urlGpBhaEdit+newGpId);
-            GpBhaParameters newGp = new GpBhaParameters(mc2.GetHtmlAsHdoc());
+            
+
+            GpBhaParameters newGp = new GpBhaParameters(mc2.GetHtmlAsHdoc(), modemActivated);
             
 
             mObj.GpBhaPost.P_10 = Tuple.Create<string, string>("P_10", ""); //mp.ModemNo
@@ -67,8 +76,9 @@ namespace ModemWebUtility
             mObj.GpBhaPost.O_GP_ID = newGp.GpBhaPosts.O_GP_ID;
             mObj.GpBhaPost.H_DEL_BHA = newGp.GpBhaPosts.H_DEL_BHA;
             mObj.GpBhaPost.Z_CHK = newGp.GpBhaPosts.Z_CHK;
+            mObj.GpBhaPost.O_PRECON_ID = newGp.GpBhaPosts.O_PRECON_ID;
+            mObj.GpBhaPost.H_L_PRECON_STATUS = newGp.GpBhaPosts.H_L_PRECON_STATUS;
 
-           
             existingGpId = mp.GpId;
             int lastItem = 0;
 

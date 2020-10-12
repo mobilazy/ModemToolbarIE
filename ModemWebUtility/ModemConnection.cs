@@ -15,6 +15,8 @@ namespace ModemWebUtility
     {
         string UrlView = "";
 
+        
+
         //public string ModemNumber { get; set; } = "";
 
         public ModemConnection(string _url)

@@ -22,14 +22,20 @@ namespace ModemWebUtility
         private Dictionary<int, GpCompPosts> gpBhaCompPost = new Dictionary<int, GpCompPosts>();
         private int gpBhaCount;
 
+        string preconId = "2";
+        string preconStatus = "TBA";
 
         public GpBhaPosts GpBhaPosts => gpBhaPost;
         public Dictionary<int, GpCompPosts> GpBhaCompPost => gpBhaCompPost;
         public int GpBhaCount => gpBhaCount;
 
 
-        public GpBhaParameters(HtmlAgilityPack.HtmlDocument _hDoc)
+        public GpBhaParameters(HtmlAgilityPack.HtmlDocument _hDoc, bool activated = true)
         {
+
+            preconId = activated ? "2" : "1";
+            preconStatus = activated ? "TBA" : "N/A";
+
             hDoc = _hDoc;
             Init();
 
@@ -169,7 +175,7 @@ namespace ModemWebUtility
 
 
             //gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.H_L_PRECON_STATUS.Item1, hDoc));
-            gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, "N/A");
+            gpBhaPost.H_L_PRECON_STATUS = Tuple.Create(gpBhaPost.H_L_PRECON_STATUS.Item1, preconStatus);
 
             gpBhaPost.O_PILOT_NUM = Tuple.Create(gpBhaPost.O_PILOT_NUM.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_PILOT_NUM.Item1, hDoc));
             //gpBhaPost.O_GP_DESC = Tuple.Create(gpBhaPost.O_GP_DESC.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_GP_DESC.Item1, hDoc));
@@ -209,7 +215,7 @@ namespace ModemWebUtility
 
 
             ////gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.O_PRECON_ID.Item1, hDoc));
-            gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, "2");
+            gpBhaPost.O_PRECON_ID = Tuple.Create(gpBhaPost.O_PRECON_ID.Item1, preconId);
 
 
             //gpBhaPost.P_GP_ID_o = Tuple.Create(gpBhaPost.P_GP_ID_o.Item1, HDocUtility.GetOneFromListValueOfInputsByName(gpBhaPost.P_GP_ID_o.Item1, hDoc));

@@ -358,6 +358,8 @@ namespace ModemToolbarIE
 
         internal void StartWcfComms()
         {
+            
+            
             //MessageBox.Show("Start WCF firing with sync status: " + syncStatus);
             NetTcpBinding myBinding = new NetTcpBinding()
             {
@@ -395,6 +397,7 @@ namespace ModemToolbarIE
 
             EndpointAddress endpoint = new EndpointAddress("net.tcp://localhost:9124/");
             var client = new ModemService.WCFModemServiceClient(myBinding, endpoint);
+            bool commError = false;
 
             try
             {
@@ -429,20 +432,32 @@ namespace ModemToolbarIE
             }
             catch (CommunicationException e)
             {
-                txtStatus.Text = "Error 1";
+                txtStatus.Text = "Comm Error";
+                commError = true;
                 client.Abort();
             }
             catch (TimeoutException e)
             {
-                txtStatus.Text = "Error 2";
+                txtStatus.Text = "Timeout";
+                commError = true;
                 client.Abort();
             }
             catch (Exception ex)
             {
-                txtStatus.Text = "Error 3";
+                txtStatus.Text = "Error";
+                commError = true;
                 client.Abort();
                 //MessageBox.Show(ex.ToString());
             }
+            finally
+            {
+                if (commError)
+                {
+
+                }
+
+            }
+
 
 
         }

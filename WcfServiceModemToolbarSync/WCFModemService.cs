@@ -92,7 +92,7 @@ namespace WcfServiceModemToolbarSync
                 }
                 catch (Exception e)
                 {
-                    System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCopy File Error: => " + e.ToString());
+                    //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCopy File Error: => " + e.ToString());
                 }
 
                 return true;
@@ -105,7 +105,25 @@ namespace WcfServiceModemToolbarSync
             }
             else
             {
-                return false;
+                try
+                {
+                    using (FileStream fileStream = File.Create(DbHelper.localFile))
+                    {
+                        Assembly.GetExecutingAssembly().GetManifestResourceStream("WcfServiceModemToolbarSync.Resources.ModemToolDbLocal.accdb").CopyTo(fileStream);
+                    }
+
+                    connectionString = dbHelper.localConnectionString;
+                    return true;
+
+                }
+                catch (Exception ex)
+                {
+                    return false;
+
+                }
+                
+
+                
             }
         }
 
@@ -129,7 +147,7 @@ namespace WcfServiceModemToolbarSync
             }
             catch (Exception e)
             {
-                System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIsRemoteDbAvailable check DB error: => \n" + e.ToString());
+                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIsRemoteDbAvailable check DB error: => \n" + e.ToString());
             }
 
             return returnValue;
@@ -154,7 +172,7 @@ namespace WcfServiceModemToolbarSync
             }
             catch (Exception e)
             {
-                System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIslocalDbAvailable check DB error: => \n" + e.ToString());
+                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIslocalDbAvailable check DB error: => \n" + e.ToString());
             }
 
             return returnValue;
