@@ -18,7 +18,7 @@ namespace WcfServiceModemToolbarSync
             @"Data Source= "+ remoteFile +";";
 
         //public static string remoteFile  = @"\\corp.halliburton.com\eu\NOR\TAN\DATA\Sperry Sun\09 RTO-Insite\RigAccessFolder\Common\StandardMwdDatabase\ModemToolDbServer.accdb";
-        public static string remoteFile = @"\\corp.halliburton.com\eu\NOR\TAN\DATA\temp\AJ_DropBox\StandardMwdDatabase\ModemToolDbServer.accdb";
+        public static string remoteFile = @"C:\Users\h111765\ModemToolDbServer.accdb";
         
         public static string localFile  = WCFModemService.DataFolder + @"\ModemToolDbLocal.accdb";
 

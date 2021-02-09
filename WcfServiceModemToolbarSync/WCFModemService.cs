@@ -50,12 +50,16 @@ namespace WcfServiceModemToolbarSync
                 if (File.Exists(RemoteFilepathFromFile()))
                 {
                     DbHelper.remoteFile = RemoteFilepathFromFile();
+                    System.IO.File.AppendAllText(@"C:\Users\h111765\wcfstartoutput.txt", "\nCurrent Remote File: " + DbHelper.remoteFile);
+
 
                 }
 
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                //MessageBox.Show(ex.ToString());
+                System.IO.File.AppendAllText(@"C:\Users\h111765\wcfstarterror.txt", "\nCurrent Error: " + ex.ToString());
 
             }
 
@@ -92,7 +96,7 @@ namespace WcfServiceModemToolbarSync
                 }
                 catch (Exception e)
                 {
-                    //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCopy File Error: => " + e.ToString());
+                    System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCopy File Error: => " + e.ToString());
                 }
 
                 return true;
@@ -132,7 +136,7 @@ namespace WcfServiceModemToolbarSync
             if (!File.Exists(DbHelper.remoteFile))
             {
                 //MessageBox.Show("Remote not accessibøe");
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "IsRemoteDbAvailable => Remote not accessibøe \n");
+                System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "IsRemoteDbAvailable => Remote not accessibøe \n");
                 return false;
             }
 
@@ -147,7 +151,7 @@ namespace WcfServiceModemToolbarSync
             }
             catch (Exception e)
             {
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIsRemoteDbAvailable check DB error: => \n" + e.ToString());
+                System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIsRemoteDbAvailable check DB error: => \n" + e.ToString());
             }
 
             return returnValue;
@@ -158,22 +162,22 @@ namespace WcfServiceModemToolbarSync
             if (!File.Exists(DbHelper.localFile))
             {
                 //MessageBox.Show("local not accessibøe"); 
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "IsLocalDbAvailable local not accessibøe");
+                System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "IsLocalDbAvailable local not accessibøe");
                 return false;
             }
 
             connectionString = dbHelper.localConnectionString;
             bool returnValue = false;
 
-            try
-            {
-                CheckDbChanged();
-                returnValue = true;
-            }
-            catch (Exception e)
-            {
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIslocalDbAvailable check DB error: => \n" + e.ToString());
-            }
+            //try
+            //{
+            //    CheckDbChanged();
+            //    returnValue = true;
+            //}
+            //catch (Exception e)
+            //{
+            //    System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nIslocalDbAvailable check DB error: => \n" + e.ToString());
+            //}
 
             return returnValue;
         }
@@ -232,24 +236,29 @@ namespace WcfServiceModemToolbarSync
             get
             {
                 string result = AppDomain.CurrentDomain.BaseDirectory;
-                return Path.Combine(result, @"remotefilename.dat");
+                return result;
+                //return Path.Combine(result, @"remotefilename.dat");
+                System.IO.File.AppendAllText( @"C:\Users\h111765\programfolderoutput.txt", "\nCurrent Directory: " + result);
 
             }
 
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCurrent Directory: " + Environment.CurrentDirectory);
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nEnvironment.SpecialFolder.ApplicationData: " + Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nEnvironment.SpecialFolder.ProgramFilesX86: " + Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nAppDomain.CurrentDomain.BaseDirectory: " + AppDomain.CurrentDomain.BaseDirectory);
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nAssembly.GetExecutingAssembly().Location: " + System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nDirectory.GetCurrentDirectory(): " + System.IO.Directory.GetCurrentDirectory());
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nPath.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase): " + System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase));
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nPath.GetDirectoryName(Application.ExecutablePath): " + System.IO.Path.GetDirectoryName(Application.ExecutablePath));
-        
-}
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nCurrent Directory: " + Environment.CurrentDirectory);
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nEnvironment.SpecialFolder.ApplicationData: " + Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nEnvironment.SpecialFolder.ProgramFilesX86: " + Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nAppDomain.CurrentDomain.BaseDirectory: " + AppDomain.CurrentDomain.BaseDirectory);
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nAssembly.GetExecutingAssembly().Location: " + System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nDirectory.GetCurrentDirectory(): " + System.IO.Directory.GetCurrentDirectory());
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nPath.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase): " + System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase));
+            //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "\nPath.GetDirectoryName(Application.ExecutablePath): " + System.IO.Path.GetDirectoryName(Application.ExecutablePath));
+
+        }
 
     public static string RemoteFilepathFromFile()
     {
-        string filepath = ProgramFolder + @"\remotefilename.dat";
+        string filepath = ProgramFolder + @"remotefilename.dat";
+
+        System.IO.File.AppendAllText(@"C:\Users\h111765\wcfstartRemoteFilepathFromFileoutput.txt", "\nCurrent Remote File: " + filepath);
+
         return System.IO.File.ReadAllText(filepath);
     }
 
@@ -294,7 +303,7 @@ namespace WcfServiceModemToolbarSync
             }
 
         }
-        //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "Check DB Changes => \n connection string => " + connectionString) ;
+        System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "Check DB Changes => \n connection string => " + connectionString) ;
 
         auditAdapter.Dispose();
         return isCountsEqual;

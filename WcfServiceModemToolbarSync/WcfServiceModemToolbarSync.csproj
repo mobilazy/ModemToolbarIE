@@ -49,6 +49,9 @@
   <PropertyGroup>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
@@ -173,8 +176,21 @@
     </VisualStudio>
   </ProjectExtensions>
   <PropertyGroup>
-    <PostBuildEvent>
-    </PostBuildEvent>
+    <PostBuildEvent>xcopy /s /y "$(TargetDir)$(TargetFileName)" "C:\Program Files (x86)\Internet Explorer\"
+
+xcopy /s /y "$(TargetDir)$(TargetFileName)" "C:\Program Files (x86)\AJ\Modem Toolbar\"
+xcopy /s /y "$(TargetDir)$(TargetFileName).config" "C:\Program Files (x86)\AJ\Modem Toolbar\"
+
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe "C:\Program Files (x86)\AJ\Modem Toolbar\$(TargetFileName)"
+
+</PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>sc query "ModemWindowsService" | findstr /i running | if "%25errorlevel%25"=="0" (sc stop "ModemWindowsService") 
+SET ERRORLEVEL = 0
+
+sc query "ModemWindowsService" | findstr /i running | if "%25errorlevel%25"=="0" (sc delete "ModemWindowsService")
+SET ERRORLEVEL = 0</PreBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

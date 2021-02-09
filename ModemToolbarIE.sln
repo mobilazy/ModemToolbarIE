@@ -9,10 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WcfServiceModemToolbarSync"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModemWebUtility", "ModemWebUtility\ModemWebUtility.csproj", "{05F2F706-D0E1-45C1-A0FA-72A5E6CD5B71}"
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "ModemToolbarServiceSetupv1", "ModemToolbarSetupv1\ModemToolbarSetupv1.vdproj", "{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}"
-EndProject
-Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "ModemToolbarPatchNov19", "ModemToolbarPatchNov19\ModemToolbarPatchNov19.wixproj", "{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,26 +55,6 @@ Global
 		{05F2F706-D0E1-45C1-A0FA-72A5E6CD5B71}.Release|x64.Build.0 = Release|Any CPU
 		{05F2F706-D0E1-45C1-A0FA-72A5E6CD5B71}.Release|x86.ActiveCfg = Release|Any CPU
 		{05F2F706-D0E1-45C1-A0FA-72A5E6CD5B71}.Release|x86.Build.0 = Release|Any CPU
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|Any CPU.ActiveCfg = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|Any CPU.Build.0 = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|x64.ActiveCfg = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|x64.Build.0 = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|x86.ActiveCfg = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Debug|x86.Build.0 = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|Any CPU.ActiveCfg = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|Any CPU.Build.0 = Debug
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|x64.ActiveCfg = Release
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|x64.Build.0 = Release
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|x86.ActiveCfg = Release
-		{0800766E-1E07-46BE-A6B9-4DB8D2E6384D}.Release|x86.Build.0 = Release
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Debug|Any CPU.ActiveCfg = Debug|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Debug|x64.ActiveCfg = Debug|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Debug|x86.ActiveCfg = Debug|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Debug|x86.Build.0 = Debug|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Release|Any CPU.ActiveCfg = Release|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Release|x64.ActiveCfg = Release|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Release|x86.ActiveCfg = Release|x86
-		{605F162F-FBAE-4FC7-8506-EB3FD5C87E60}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

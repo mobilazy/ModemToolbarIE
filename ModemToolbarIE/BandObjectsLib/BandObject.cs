@@ -466,9 +466,19 @@ namespace BandObjectLib
             }
             else
             {
-                Explorer.DocumentComplete -= new DWebBrowserEvents2_DocumentCompleteEventHandler(this.OnDocumentComplete);
-                Explorer.BeforeNavigate2 -= new DWebBrowserEvents2_BeforeNavigate2EventHandler(this.OnBeforeNavigate2);
-                Explorer = null;
+                try
+                {
+                    Explorer.DocumentComplete -= new DWebBrowserEvents2_DocumentCompleteEventHandler(this.OnDocumentComplete);
+                    Explorer.BeforeNavigate2 -= new DWebBrowserEvents2_BeforeNavigate2EventHandler(this.OnBeforeNavigate2);
+                    Explorer = null;
+                }
+                catch (Exception ex)
+                {
+
+                    
+                }
+                
+                
             }
 
            
