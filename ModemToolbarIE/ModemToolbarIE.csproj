@@ -230,6 +230,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\listofsoftsensor.dat" />
+    <None Include="Resources\listofthread.dat" />
+    <None Include="Resources\listoftorque.dat" />
     <None Include="Resources\ModemToolDbLocal.accdb">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

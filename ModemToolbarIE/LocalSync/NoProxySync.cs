@@ -30,6 +30,9 @@ namespace ModemToolbarIE.LocalSync
         private string connectionString;
 
         public static string localFile = Toolbar.DataFolder + @"\ModemToolDbLocal.accdb";
+        private static string listofsoftsensorFile = Toolbar.DataFolder + @"\listofsoftsensor.dat";
+        private static string listofthreadFile = Toolbar.DataFolder + @"\listofthread.dat";
+        private static string listoftorqueFile = Toolbar.DataFolder + @"\listoftorque.dat";
 
         public string localConnectionString { get; } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
                 @"Data source= " + localFile + ";";
@@ -43,6 +46,45 @@ namespace ModemToolbarIE.LocalSync
                 try
                 {
                     File.WriteAllBytes(localFile, Properties.Resources.ModemToolDbLocal);
+                }
+                catch (Exception ex)
+                {
+
+                }
+
+            }
+
+            if (!File.Exists(listofsoftsensorFile))
+            {
+                try
+                {
+                    File.WriteAllBytes(localFile, Properties.Resources.listofsoftsensor);
+                }
+                catch (Exception ex)
+                {
+
+                }
+
+            }
+
+            if (!File.Exists(listofthreadFile))
+            {
+                try
+                {
+                    File.WriteAllBytes(localFile, Properties.Resources.listofthread);
+                }
+                catch (Exception ex)
+                {
+
+                }
+
+            }
+
+            if (!File.Exists(listoftorqueFile))
+            {
+                try
+                {
+                    File.WriteAllBytes(localFile, Properties.Resources.listoftorque);
                 }
                 catch (Exception ex)
                 {

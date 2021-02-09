@@ -63,6 +63,36 @@ namespace ModemToolbarIE.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] listofsoftsensor {
+            get {
+                object obj = ResourceManager.GetObject("listofsoftsensor", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] listofthread {
+            get {
+                object obj = ResourceManager.GetObject("listofthread", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] listoftorque {
+            get {
+                object obj = ResourceManager.GetObject("listoftorque", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] ModemToolDbLocal {
             get {
                 object obj = ResourceManager.GetObject("ModemToolDbLocal", resourceCulture);
