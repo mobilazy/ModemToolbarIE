@@ -72,6 +72,14 @@
       <HintPath>..\packages\ClearScript.V8.5.5.2\lib\net45\ClearScript.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="ClearScriptV8-32, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\ClearScript.V8.5.5.2\tools\native\x86\ClearScriptV8-32.dll</HintPath>
+    </Reference>
+    <Reference Include="ClearScriptV8-64, Version=5.5.2.0, Culture=neutral, PublicKeyToken=935d0c957da47c73, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\ClearScript.V8.5.5.2\tools\native\amd64\ClearScriptV8-64.dll</HintPath>
+    </Reference>
     <Reference Include="HtmlAgilityPack, Version=1.8.11.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
       <HintPath>..\packages\HtmlAgilityPack.1.8.11\lib\Net45\HtmlAgilityPack.dll</HintPath>
       <Private>True</Private>
@@ -106,14 +114,12 @@
     <Compile Include="BandObjectsLib\ComInterop.cs" />
     <Compile Include="BandObjectsLib\MiscClasses.cs" />
     <Compile Include="BaseToolbarItem.cs" />
-    <Compile Include="Connected Services\ModemService\Reference.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Reference.svcmap</DependentUpon>
-    </Compile>
     <Compile Include="IToolbarItem.cs" />
     <Compile Include="LinkItem.cs" />
     <Compile Include="LinkListItem.cs" />
+    <Compile Include="LocalSync\DbHelper.cs" />
+    <Compile Include="LocalSync\NoProxySync.cs" />
+    <Compile Include="LocalSync\NoProxySyncClasses.cs" />
     <Compile Include="MenuListItem.cs" />
     <Compile Include="MenuStripItem.cs" />
     <Compile Include="MergeForm\AddMwdItem.cs">
@@ -139,6 +145,11 @@
     </Compile>
     <Compile Include="ModemToolbarInstaller.Designer.cs">
       <DependentUpon>ModemToolbarInstaller.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ModemToolDbLocalDataSet.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ModemToolDbLocalDataSet.xsd</DependentUpon>
     </Compile>
     <Compile Include="PopupGo.cs">
       <SubType>Form</SubType>
@@ -195,31 +206,17 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="bin\Debug\KeyModemToolBarIE.SNK" />
-    <None Include="Connected Services\ModemService\item.xsd">
+    <None Include="ModemToolDbLocalDataSet.xsc">
+      <DependentUpon>ModemToolDbLocalDataSet.xsd</DependentUpon>
+    </None>
+    <None Include="ModemToolDbLocalDataSet.xsd">
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>ModemToolDbLocalDataSet.Designer.cs</LastGenOutput>
       <SubType>Designer</SubType>
     </None>
-    <None Include="Connected Services\ModemService\item1.xsd">
-      <SubType>Designer</SubType>
+    <None Include="ModemToolDbLocalDataSet.xss">
+      <DependentUpon>ModemToolDbLocalDataSet.xsd</DependentUpon>
     </None>
-    <None Include="Connected Services\ModemService\item11.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\item12.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\item13.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\item14.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\item15.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\item16.xsd">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Connected Services\ModemService\WCFModemService.wsdl" />
     <None Include="packages.config" />
     <None Include="Properties\DataSources\WcfServiceModemToolbarSync.LinkListClass.datasource" />
     <None Include="Properties\DataSources\WcfServiceModemToolbarSync.LinkListItemClass.datasource" />
@@ -233,12 +230,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Connected Services\ModemService\item.disco" />
-    <None Include="Connected Services\ModemService\configuration91.svcinfo" />
-    <None Include="Connected Services\ModemService\configuration.svcinfo" />
-    <None Include="Connected Services\ModemService\Reference.svcmap">
-      <Generator>WCF Proxy Generator</Generator>
-      <LastGenOutput>Reference.cs</LastGenOutput>
+    <None Include="Resources\ModemToolDbLocal.accdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <Content Include="Licenses\clearscript-license.txt" />
     <Content Include="Licenses\v8-license.txt" />
@@ -265,16 +258,9 @@
       <Name>ModemWebUtility</Name>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\WcfServiceModemToolbarSync\WcfServiceModemToolbarSync.csproj">
-      <Project>{b8da02bf-cbb8-4ab4-ab90-f196d246bb9d}</Project>
-      <Name>WcfServiceModemToolbarSync</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
-  </ItemGroup>
-  <ItemGroup>
-    <WCFMetadataStorage Include="Connected Services\ModemService\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

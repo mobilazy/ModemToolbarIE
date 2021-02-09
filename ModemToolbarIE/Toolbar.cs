@@ -10,10 +10,11 @@ using System.Runtime.InteropServices;
 using System.ServiceModel;
 using System.Windows.Forms;
 using System.Xml;
-using WcfServiceModemToolbarSync;
+//using WcfServiceModemToolbarSync;
 
 namespace ModemToolbarIE
 {
+    using ModemToolbarIE.LocalSync;
     using System.Timers;
 
     [Guid("0823E052-F731-40A2-BE47-42527C602B0D")]
@@ -344,7 +345,8 @@ namespace ModemToolbarIE
         {
 
             CreateToolbarItems();
-            StartWcfComms();
+            //StartWcfComms();
+            StartLocalComms();
             _timer = new System.Timers.Timer(150000) { AutoReset = true };
             _timer.Elapsed += TimerElapsed;
             _timer.Enabled = true;
@@ -353,9 +355,11 @@ namespace ModemToolbarIE
 
         private void TimerElapsed(object sender, ElapsedEventArgs e)
         {
-            StartWcfComms();
+            //StartWcfComms();
+            StartLocalComms();
         }
 
+        /*
         internal void StartWcfComms()
         {
             
@@ -460,6 +464,60 @@ namespace ModemToolbarIE
 
 
 
+        }
+        */
+        internal void StartLocalComms()
+        {
+            bool commError = false;
+
+            try
+            {
+
+                using (NoProxySync npProxy = new NoProxySync())
+                {
+                    SearchListClass sc = new SearchListClass();
+                    sc = npProxy.GetSearchBoxItemClasses();
+                    sbic = new List<SearchBoxItemClass>();
+                    sbic = sc.List;
+
+                    LinkListClass lc = new LinkListClass();
+                    lc = npProxy.GetLinkListItemClasses();
+                    llic = new List<LinkListItemClass>();
+                    llic = lc.List;
+
+                    MenuListClass mc = new MenuListClass();
+                    mc = npProxy.GetMenuListItemClasses();
+                    mlic = new List<MenuListItemClass>();
+                    mlic = mc.List;
+
+                    CreateToolbarItems();
+                }
+
+            }
+            catch (CommunicationException e)
+            {
+                txtStatus.Text = "Comm Error";
+                commError = true;
+            }
+            catch (TimeoutException e)
+            {
+                txtStatus.Text = "Timeout";
+                commError = true;
+            }
+            catch (Exception ex)
+            {
+                txtStatus.Text = "Error";
+                commError = true;
+
+            }
+            finally
+            {
+                if (commError)
+                {
+
+                }
+
+            }
         }
 
         internal void CreateToolbarItems()
