@@ -210,6 +210,8 @@ namespace ModemToolbarIE
         {
             //MessageBox.Show("Break -2");
 
+            CosturaUtility.Initialize();
+
             Assembly asm = Assembly.GetExecutingAssembly();
             string fullName = asm.GetModules()[0].FullyQualifiedName;
             toolbarFolder = Path.GetDirectoryName(fullName);
@@ -347,9 +349,9 @@ namespace ModemToolbarIE
             CreateToolbarItems();
             //StartWcfComms();
             StartLocalComms();
-            _timer = new System.Timers.Timer(150000) { AutoReset = true };
-            _timer.Elapsed += TimerElapsed;
-            _timer.Enabled = true;
+            //_timer = new System.Timers.Timer(150000) { AutoReset = true };
+            //_timer.Elapsed += TimerElapsed;
+            //_timer.Enabled = true;
             
         }
 
@@ -491,7 +493,10 @@ namespace ModemToolbarIE
                     mlic = mc.List;
 
                     CreateToolbarItems();
+
                 }
+
+                
 
             }
             catch (CommunicationException e)

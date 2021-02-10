@@ -159,6 +159,7 @@ namespace ModemToolbarIE.MergeForm
 
             }
 
+            this.TopMost = true;
             Show();
             UpdateGrid(null, null);
             //Timer t = new Timer() { Interval = 1000};

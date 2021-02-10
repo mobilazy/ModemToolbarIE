@@ -17,7 +17,7 @@ namespace ModemToolbarIE.LocalSync
     using MenuLink = KeyValuePair<string, KeyValuePair<string, ModemMwdPostObjects>[]>;
     using PostLink = KeyValuePair<string, ModemMwdPostObjects>;
 
-    public class NoProxySync:IDisposable
+    public class NoProxySync : IDisposable
     {
         Assembly currentAssembly;
 
@@ -28,6 +28,7 @@ namespace ModemToolbarIE.LocalSync
         DbHelper dbHelper;
         //const string connectionStringName = "WcfServiceModemToolbarSync.Properties.Settings.RemoteDb";
         private string connectionString;
+        private bool isDisposed = false;
 
         public static string localFile = Toolbar.DataFolder + @"\ModemToolDbLocal.accdb";
         private static string listofsoftsensorFile = Toolbar.DataFolder + @"\listofsoftsensor.dat";
@@ -94,6 +95,7 @@ namespace ModemToolbarIE.LocalSync
             }
 
             DbHelper dbHelper = new DbHelper(localConnectionString);
+            isDisposed = false;
             currentAssembly = Assembly.GetAssembly(GetType());
             if (SetDbConnectionString())
             {
@@ -101,7 +103,7 @@ namespace ModemToolbarIE.LocalSync
             }
 
         }
-       
+
 
         private void FixConnectionString()
         {
@@ -114,7 +116,7 @@ namespace ModemToolbarIE.LocalSync
             return true;
         }
 
-       internal static void CopyFolder(string srcFolder, string dstFolder, bool overwrite)
+        internal static void CopyFolder(string srcFolder, string dstFolder, bool overwrite)
         {
             try
             {
@@ -154,9 +156,9 @@ namespace ModemToolbarIE.LocalSync
 
         }
 
-        
 
-        
+
+
         public void InitPublicProperties()
         {
             //here connect to remote db and populate items for toolbar
@@ -278,7 +280,7 @@ namespace ModemToolbarIE.LocalSync
         private List<MenuListItemClass> PopulateMenuLinkItems()
         {
             //check if there are any tools in tools menu in Db. if there are no tools return.
-            
+
             ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter toolAdapter = new ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter();
             toolAdapter.Connection.ConnectionString = connectionString;
             ModemToolDbLocalDataSet.ToolsDataTable dsTools = new ModemToolDbLocalDataSet.ToolsDataTable();
@@ -496,7 +498,11 @@ namespace ModemToolbarIE.LocalSync
 
         public void Dispose()
         {
-            dbHelper.Dispose();
+            if (!isDisposed && dbHelper != null)
+            {
+                dbHelper.Dispose();
+            }
+
         }
     }
 

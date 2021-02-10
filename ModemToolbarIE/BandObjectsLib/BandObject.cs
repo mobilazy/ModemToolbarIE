@@ -33,7 +33,7 @@ namespace BandObjectLib
         /// <summary>
         /// Reference to the host explorer.
         /// </summary>
-        protected WebBrowserClass Explorer; //protected changed to internal
+        protected SHDocVw.WebBrowserClass Explorer; //protected changed to internal
         
         protected IInputObjectSite BandObjectSite;
         
@@ -101,6 +101,11 @@ namespace BandObjectLib
 
         public void OnDocumentComplete(object pDisp, ref object URL)
         {
+            if (String.IsNullOrEmpty(URL.ToString()) || (URL.ToString() == "about:blank"))
+            {
+                return;
+            }
+            
             htmlDocument = (HTMLDocument)Explorer.Document;
  
             if (URL.ToString().Contains("www.google.com"))
@@ -448,9 +453,9 @@ namespace BandObjectLib
                         out w);
 
                     //once we have interface to the COM object we can create RCW from it
-                    Explorer = (WebBrowserClass)Marshal.CreateWrapperOfType(
+                    Explorer = (SHDocVw.WebBrowserClass)Marshal.CreateWrapperOfType(
                         w as IWebBrowser,
-                        typeof(WebBrowserClass)
+                        typeof(SHDocVw.WebBrowserClass)
                         );
 
                     Explorer.DocumentComplete += new DWebBrowserEvents2_DocumentCompleteEventHandler(this.OnDocumentComplete);
@@ -466,19 +471,21 @@ namespace BandObjectLib
             }
             else
             {
-                try
-                {
-                    Explorer.DocumentComplete -= new DWebBrowserEvents2_DocumentCompleteEventHandler(this.OnDocumentComplete);
-                    Explorer.BeforeNavigate2 -= new DWebBrowserEvents2_BeforeNavigate2EventHandler(this.OnBeforeNavigate2);
-                    Explorer = null;
-                }
-                catch (Exception ex)
-                {
+                //if (Explorer != null)
+                //{
+                //    try
+                //    {
+                //        Explorer.DocumentComplete -= new DWebBrowserEvents2_DocumentCompleteEventHandler(this.OnDocumentComplete);
+                //        Explorer.BeforeNavigate2 -= new DWebBrowserEvents2_BeforeNavigate2EventHandler(this.OnBeforeNavigate2);
+                //        Explorer = null;
+                //    }
+                //    catch (Exception ex)
+                //    {
 
-                    
-                }
-                
-                
+
+                //    }
+                //}
+  
             }
 
            
@@ -721,4 +728,6 @@ namespace BandObjectLib
 
         #endregion
     }
+
+   
 }

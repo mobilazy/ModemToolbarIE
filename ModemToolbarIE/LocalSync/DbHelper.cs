@@ -12,7 +12,7 @@ namespace ModemToolbarIE.LocalSync
     {
         private OleDbConnection accessConn = null;
         private string connString = "";
-
+        private bool isDisposed = false;
 
         public DbHelper(string localConnectionString)
         {
@@ -25,6 +25,7 @@ namespace ModemToolbarIE.LocalSync
             accessConn = new OleDbConnection();
             accessConn.ConnectionString = connectionString;
             accessConn.Open();
+            isDisposed = false;
         }
 
         public void CloseConnection()
@@ -32,6 +33,7 @@ namespace ModemToolbarIE.LocalSync
             accessConn.Close();
             accessConn.Dispose();
             
+
         }
 
         public object GetRecordObject(int id, string tableName)
@@ -420,7 +422,12 @@ namespace ModemToolbarIE.LocalSync
 
         public void Dispose()
         {
-            CloseConnection();
+            if (!isDisposed)
+            {
+                CloseConnection();
+                isDisposed = true;
+            }
+            
 
         }
 

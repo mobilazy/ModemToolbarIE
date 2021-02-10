@@ -107,7 +107,7 @@ namespace ModemToolbarIE
             string.Concat(net_base, "\\Framework64\\", RuntimeEnvironment.GetSystemVersion(), "\\regasm.exe")
         };
 
-            var dll_path = ModemToolbarIE.Toolbar.DataFolder + "\\ModemToolbarIE.dll"; //Assembly.GetExecutingAssembly().Location;
+            var dll_path = Assembly.GetExecutingAssembly().Location; //ModemToolbarIE.Toolbar.DataFolder + "\\ModemToolbarIE.dll"; //
             MessageBox.Show(dll_path);
             foreach (var path in to_exec)
             {
