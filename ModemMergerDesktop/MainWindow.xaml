@@ -1,0 +1,85 @@
+﻿<Window x:Class="ModemMergerDesktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ModemMergerDesktop"
+        mc:Ignorable="d"
+        Title="Modem Merger" Height="600" Width="800" MinHeight="600" MinWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30"/>
+            <RowDefinition/>
+            <RowDefinition Height="45"/>
+        </Grid.RowDefinitions>
+        <!--upper most grid for textboxes and buttons for entering modem numbers from and to-->
+        <Grid Grid.Row="0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Width="Auto" Margin="5 5 5 5" Text="Enter modem no to copy from:"></TextBlock>
+                <TextBox Name="TextboxModemSource" Width="200" Margin="5 5 5 5"></TextBox>
+                <Button Name="ButtonModemLoad" Width="100" Margin="5 5 5 5" Content="Load"></Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition Height="30"/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <!--grid for displaying tools from selected modem-->
+                <Grid Grid.Row="0">
+                    <TreeView Name="treeViewSource">
+                        
+                    </TreeView>
+                </Grid>
+                <!--grid for buttons for adding and removing tools from the merge list-->
+                <Grid Grid.Row="1">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Name="ButtonAddTool" Width="100" Margin="5"  Content="Add"></Button>
+                        <Button Name="ButtonRemoveTool" Width="100" Margin="5"  Content="Remove"></Button>
+                    </StackPanel>
+                </Grid>
+                <!--grid for displaying list of added tools-->
+                <Grid Grid.Row="2">
+                    <TreeView Name="treeViewDestination">
+                        
+                    </TreeView>
+                </Grid>
+            </Grid>
+            <!--grid for the right column-->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition Height="30"/>
+                </Grid.RowDefinitions>
+                <!--grid for displaying the details of selected tool, tool build and also software versions
+                tool build to be editable
+                software versions to be editable-->
+                <Grid Grid.Row="0">
+
+                </Grid>
+                <!--grid for buttons for saving selected tool into database-->
+                <Grid Grid.Row="1">
+
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!--grid for the lower row for main buttons-->
+        <Grid Grid.Row="2">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Width="Auto" Margin="10 10 10 10" Text="Enter modem number to merge to: " ></TextBlock>
+                <TextBox Name="TextboxModemDestination" Width="200" Margin="10 10 10 10"></TextBox>
+                <Button Name="ButtonMerge" Width="150" Margin="10 10 10 10" Content="Merge" ></Button>
+                <Button Name="ButtonClose" Width="150" Margin="10 10 10 10" Content="Cancel/Close" ></Button>
+            </StackPanel>
+        </Grid>
+
+    </Grid>
+</Window>

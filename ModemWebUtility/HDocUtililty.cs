@@ -10,24 +10,24 @@ namespace ModemWebUtility
 {
     public static class HDocUtility
     {
-        public static string UrlMwdInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.actioninsert";
-        public static string UrlModemView = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
-        public static string UrlMwdComponentInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$bhaitm_mc.actioninsert";
-        public static string UrlMwdSoftInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$mc_swversion.actioninsert	";
-        public static string BhaEdittUrl = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.QueryViewByKey";
-        public static string BhaEditUrlAlt = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.actionview";
-        public static string BhaEditUrlwMwdId = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.QueryViewByKey?P_MWDDWD_ID=";
-        public static string UrlModemEdit = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$header_mc.QueryViewByKey?P_SSORD_ID=";
-        public static string UrlModemHeaderUpdate = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$header_mc.actionview";
-        public static string UrlLooseItemEdit = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$items_mc.QueryViewByKey?P_LOOSE_ITEMS_ID=";
-        public static string UrlGpBhaEdit = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$gp_mc.QueryViewByKey?P_GP_ID=";
-        public static string UrlDdBhaEdit = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$motor_mc.QueryViewByKey?P_MOTORS_ID=";
-        public static string UrlLooseItemInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$items_mc.actioninsert";
-        public static string UrlGpBhaInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$gp_mc.actionview";
-        public static string UrlGpCompInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$gpitm_mc.actioninsert";
-        public static string UrlDdBhaInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$motor_mc.actioninsert";
-        public static string UrlDdCompInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_order_new$motoritm_mc.actioninsert";
-        public static string UrlGpInsert = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_gp.InsertDefaultGP?p_ssord_id=";
+        public static string UrlMwdInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.actioninsert";
+        public static string UrlModemView = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
+        public static string UrlMwdComponentInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$bhaitm_mc.actioninsert";
+        public static string UrlMwdSoftInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$mc_swversion.actioninsert	";
+        public static string BhaEdittUrl = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.QueryViewByKey";
+        public static string BhaEditUrlAlt = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.actionview";
+        public static string BhaEditUrlwMwdId = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$bha_mc.QueryViewByKey?P_MWDDWD_ID=";
+        public static string UrlModemEdit = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$header_mc.QueryViewByKey?P_SSORD_ID=";
+        public static string UrlModemHeaderUpdate = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$header_mc.actionview";
+        public static string UrlLooseItemEdit = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$items_mc.QueryViewByKey?P_LOOSE_ITEMS_ID=";
+        public static string UrlGpBhaEdit = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$gp_mc.QueryViewByKey?P_GP_ID=";
+        public static string UrlDdBhaEdit = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$motor_mc.QueryViewByKey?P_MOTORS_ID=";
+        public static string UrlLooseItemInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$items_mc.actioninsert";
+        public static string UrlGpBhaInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$gp_mc.actionview";
+        public static string UrlGpCompInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$gpitm_mc.actioninsert";
+        public static string UrlDdBhaInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$motor_mc.actioninsert";
+        public static string UrlDdCompInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$motoritm_mc.actioninsert";
+        public static string UrlGpInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_gp.InsertDefaultGP?p_ssord_id=";
 
 
         private static Encoding EncodingUnicode = Encoding.Unicode; // Encoding.GetEncoding("UTF-8");
@@ -287,7 +287,7 @@ namespace ModemWebUtility
             try
             {
                 value1 = hDoc.DocumentNode.SelectSingleNode("//input[@id='" + elementId + "']")
-                             .Attributes["value"].Value;
+                             .Attributes["value"].Value ?? "";
             }
             catch (NullReferenceException)
             {

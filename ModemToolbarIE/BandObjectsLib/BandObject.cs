@@ -66,7 +66,7 @@ namespace BandObjectLib
 
             //MessageBox.Show("Break Bandobject 1");
             
-            FixConnectionString();
+            //FixConnectionString();
             InitializeComponent();
             BackColor = Color.Transparent;
         }
@@ -101,42 +101,38 @@ namespace BandObjectLib
 
         public void OnDocumentComplete(object pDisp, ref object URL)
         {
-            if (String.IsNullOrEmpty(URL.ToString()) || (URL.ToString() == "about:blank"))
-            {
-                return;
-            }
-            
-            htmlDocument = (HTMLDocument)Explorer.Document;
+                     
  
-            if (URL.ToString().Contains("www.google.com"))
-            {
-                IHTMLElement head = (IHTMLElement)((IHTMLElementCollection)
-                           htmlDocument.all.tags("head")).item(null, 0);
-                IHTMLScriptElement scriptObject =
-                  (IHTMLScriptElement)htmlDocument.createElement("script");
-                scriptObject.type = @"text/javascript";
-                scriptObject.text = "\nfunction hidediv(){document.getElementById" +
-                                    "('myOwnUniqueId12345').style.visibility = 'hidden';}\n\n";
-                ((HTMLHeadElement)head).appendChild((IHTMLDOMNode)scriptObject);
+            //if (URL.ToString().Contains("www.google.com"))
+            //{
+            //    htmlDocument = (HTMLDocument)Explorer.Document;
+            //    IHTMLElement head = (IHTMLElement)((IHTMLElementCollection)
+            //               htmlDocument.all.tags("head")).item(null, 0);
+            //    IHTMLScriptElement scriptObject =
+            //      (IHTMLScriptElement)htmlDocument.createElement("script");
+            //    scriptObject.type = @"text/javascript";
+            //    scriptObject.text = "\nfunction hidediv(){document.getElementById" +
+            //                        "('myOwnUniqueId12345').style.visibility = 'hidden';}\n\n";
+            //    ((HTMLHeadElement)head).appendChild((IHTMLDOMNode)scriptObject);
 
-                string div = "<div id=\"myOwnUniqueId12345\" style=\"position:" +
-                             "fixed;bottom:0px;right:0px;z-index:9999;width=300px;" +
-                             "height=150px;\"> <div style=\"position:relative;" +
-                             "float:right;font-size:9px;\"><a " +
-                             "href=\"javascript:hidediv();\">close</a></div>" +
-                    "My content goes here ...</div>";
+            //    string div = "<div id=\"myOwnUniqueId12345\" style=\"position:" +
+            //                 "fixed;bottom:0px;right:0px;z-index:9999;width=300px;" +
+            //                 "height=150px;\"> <div style=\"position:relative;" +
+            //                 "float:right;font-size:9px;\"><a " +
+            //                 "href=\"javascript:hidediv();\">close</a></div>" +
+            //        "My content goes here ...</div>";
 
-                htmlDocument.body.insertAdjacentHTML("afterBegin", div);
+            //    htmlDocument.body.insertAdjacentHTML("afterBegin", div);
 
-            }
+            //}
 
             ModemEvents me = ModemEvents.None;
             
             
 
-            if (URL.ToString().Contains(@"http://tanwebs.corp.halliburton.com/pls/log_web/"))
+            if (URL.ToString().Contains(@"http://norwayappsprd.corp.halliburton.com/pls/log_web/"))
             {
-
+                htmlDocument = (HTMLDocument)Explorer.Document;
                 currentUrl = URL.ToString();
 
                 if (URL.ToString().Contains(@"mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID"))

@@ -15,7 +15,7 @@ namespace ModemToolbarIE
     {
         static byte[] Key = { 0x31, 0x56, 0x26, 0x89, 0x1a, 0x86, 0xaa, 0xb5, 0x8e, 0x86, 0x30, 0x00, 0x10, 0x54, 0x23, 0x82 };
         static byte[] IV = { 0x38, 0x94, 0x24, 0x47, 0x15, 0x96, 0x81, 0x89, 0x34, 0x27, 0x92, 0x96, 0x42, 0x23, 0x43, 0x13 };
-        const string modemViewUrl = @"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
+        const string modemViewUrl = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
         /// <summary>
         /// Constructor
         /// </summary>

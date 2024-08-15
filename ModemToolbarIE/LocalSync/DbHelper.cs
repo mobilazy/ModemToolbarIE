@@ -11,7 +11,6 @@ namespace ModemToolbarIE.LocalSync
     public class DbHelper:IDisposable
     {
         private OleDbConnection accessConn = null;
-        private string connString = "";
         private bool isDisposed = false;
 
         public DbHelper(string localConnectionString)
@@ -21,7 +20,6 @@ namespace ModemToolbarIE.LocalSync
 
         private void OpenConnection(string connectionString)
         {
-            connString = connectionString;
             accessConn = new OleDbConnection();
             accessConn.ConnectionString = connectionString;
             accessConn.Open();
@@ -32,7 +30,6 @@ namespace ModemToolbarIE.LocalSync
         {
             accessConn.Close();
             accessConn.Dispose();
-            
 
         }
 

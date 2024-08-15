@@ -28,7 +28,7 @@ namespace ModemToolbarIE
 
             base.Install(stateSaver);
             //RegAsm("");
-            Toolbar.InstallationDate = DateTime.Now;
+            //Toolbar.InstallationDate = DateTime.Now;
 
             RegistrationServices regsrv = new RegistrationServices();
             if (!regsrv.RegisterAssembly(GetType().Assembly,

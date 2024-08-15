@@ -35,7 +35,7 @@ namespace ModemToolbarIE.LocalSync
         private static string listofthreadFile = Toolbar.DataFolder + @"\listofthread.dat";
         private static string listoftorqueFile = Toolbar.DataFolder + @"\listoftorque.dat";
 
-        public string localConnectionString { get; } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
+        public static string localConnectionString { get; } = @"Provider=Microsoft.ACE.OLEDB.12.0;Mode=Read;" +
                 @"Data source= " + localFile + ";";
 
         public bool IsUpdated { get; set; } = false;
@@ -97,24 +97,10 @@ namespace ModemToolbarIE.LocalSync
             DbHelper dbHelper = new DbHelper(localConnectionString);
             isDisposed = false;
             currentAssembly = Assembly.GetAssembly(GetType());
-            if (SetDbConnectionString())
-            {
-                InitPublicProperties();
-            }
-
-        }
-
-
-        private void FixConnectionString()
-        {
-            AppDomain.CurrentDomain.SetData("DataDirectory", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
-        }
-
-        private bool SetDbConnectionString()
-        {
             connectionString = localConnectionString;
-            return true;
+
         }
+
 
         internal static void CopyFolder(string srcFolder, string dstFolder, bool overwrite)
         {
@@ -151,28 +137,7 @@ namespace ModemToolbarIE.LocalSync
             catch (Exception) { }
 
             System.IO.File.Copy(srcFile, dstFiler, overwrite);
-
-
-
         }
-
-
-
-
-        public void InitPublicProperties()
-        {
-            //here connect to remote db and populate items for toolbar
-            menuListItemClasses = new List<MenuListItemClass>();
-            linkListItemClasses = new List<LinkListItemClass>();
-            searchBoxItemClasses = new List<SearchBoxItemClass>();
-
-            menuListItemClasses = PopulateMenuLinkItems();
-            linkListItemClasses = PopulateLinkItems();
-            searchBoxItemClasses = PopulateSearchBox();
-
-
-        }
-
 
 
         private Dictionary<int, MwdCompPosts> GetRowsToModemComp(IEnumerable<ModemToolDbLocalDataSet.SubToolsRow> comps)
@@ -277,220 +242,236 @@ namespace ModemToolbarIE.LocalSync
         /// it connects to Acces Database and poplate the menus
         /// </summary>
         /// <returns></returns>
-        private List<MenuListItemClass> PopulateMenuLinkItems()
+        private async Task<List<MenuListItemClass>> PopulateMenuLinkItems()
         {
-            //check if there are any tools in tools menu in Db. if there are no tools return.
-
-            ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter toolAdapter = new ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter();
-            toolAdapter.Connection.ConnectionString = connectionString;
-            ModemToolDbLocalDataSet.ToolsDataTable dsTools = new ModemToolDbLocalDataSet.ToolsDataTable();
-
-            toolAdapter.Fill(dsTools);
-
-            int? count = toolAdapter.ToolsCount();
-
-            if (count.HasValue)
+            return await Task.Run(() =>
             {
-                if (count == 0)
+                List<MenuListItemClass> menuClass = new List<MenuListItemClass>();
+
+                //check if there are any tools in tools menu in Db. if there are no tools return.
+
+                ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter toolAdapter = new ModemToolDbLocalDataSetTableAdapters.ToolsTableAdapter();
+                toolAdapter.Connection.ConnectionString = connectionString;
+                ModemToolDbLocalDataSet.ToolsDataTable dsTools = new ModemToolDbLocalDataSet.ToolsDataTable();
+
+                toolAdapter.Fill(dsTools);
+
+                int? count = toolAdapter.ToolsCount();
+
+                if (count.HasValue)
                 {
-                    return null;
-                }
-            }
-
-            //menu sub items is collection of items used to populate the menu. Key is the menu name (or toolname + tool size), and value is what is used to generate the sub menu
-            Dictionary<string, List<PostLink>> menuSubItems = new Dictionary<string, List<PostLink>>();
-            //this is also key value pair, key is the Menu display name, value is a class that gets posted to webpage when clicked.
-
-
-            List<MenuListItemClass> menuClass = new List<MenuListItemClass>();
-
-
-            foreach (ModemToolDbLocalDataSet.ToolsRow item in dsTools.Rows)
-            {
-                ModemToolDbLocalDataSetTableAdapters.SubToolsTableAdapter compAdapter = new ModemToolDbLocalDataSetTableAdapters.SubToolsTableAdapter();
-                compAdapter.Connection.ConnectionString = connectionString;
-                ModemToolDbLocalDataSetTableAdapters.SoftwareTableAdapter softAdapter = new ModemToolDbLocalDataSetTableAdapters.SoftwareTableAdapter();
-                softAdapter.Connection.ConnectionString = connectionString;
-
-                ModemToolDbLocalDataSet.SubToolsDataTable subTools = new ModemToolDbLocalDataSet.SubToolsDataTable();
-                ModemToolDbLocalDataSet.SoftwareDataTable softTools = new ModemToolDbLocalDataSet.SoftwareDataTable();
-
-                compAdapter.Fill(subTools);
-                softAdapter.Fill(softTools);
-
-                var varTools = from tool in subTools
-                               where tool.ToolID == item.ID
-                               select tool;
-
-                var varSofts = from soft in softTools
-                               where soft.ToolID == item.ID
-                               select soft;
-
-                //this is modem object, subcomponent and tools soft etc, which gets posted to webpage when menu is clicked.
-                //it is derived from database items
-                ModemMwdPostObjects mpo = new ModemMwdPostObjects(); //(ModemNoEngine, htmlDocument);
-                mpo.MwdBhaPost = GetBhaObj(item.ToolName, "Please check components accordingly", true);
-                mpo.MwdCompPostDict = GetRowsToModemComp(varTools);
-                mpo.MwdSoftPostDict = GetRowsToModemSoft(varSofts);
-
-                PostLink lnk = new PostLink(item.ToolName, mpo);
-
-                string keyForDic = item.Category + "/" + item.ToolSize.ToString();
-
-                if (menuSubItems.ContainsKey(keyForDic))
-                {
-                    menuSubItems[keyForDic].Add(lnk);
-                }
-                else
-                {
-                    List<PostLink> lst = new List<PostLink>();
-                    lst.Add(lnk);
-                    menuSubItems[keyForDic] = lst;
-
+                    if (count == 0)
+                    {
+                        return null;
+                    }
                 }
 
-                //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "Populate Meny => /n connection string => \n" + connectionString);
-
-                compAdapter.Dispose();
-                softAdapter.Dispose();
-            }
-
-            toolAdapter.Dispose();
+                //menu sub items is collection of items used to populate the menu. Key is the menu name (or toolname + tool size), and value is what is used to generate the sub menu
+                Dictionary<string, List<PostLink>> menuSubItems = new Dictionary<string, List<PostLink>>();
+                //this is also key value pair, key is the Menu display name, value is a class that gets posted to webpage when clicked.
 
 
-
-            Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
-            byte[] imageByte;
-
-            using (var ms = new MemoryStream())
-            {
-                img.Save(ms, ImageFormat.Png);
-                imageByte = ms.ToArray();
-            }
-
-            Dictionary<string, List<MenuLink>> menuLinkPairs = new Dictionary<string, List<MenuLink>>();
-
-            foreach (var item in menuSubItems)
-            {
-                string[] typeSize;
-                typeSize = item.Key.Split('/');
-
-                MenuLink ml = new MenuLink(typeSize[1], item.Value.ToArray());
-
-                if (menuLinkPairs.ContainsKey(typeSize[0]))
+                foreach (ModemToolDbLocalDataSet.ToolsRow item in dsTools.Rows)
                 {
-                    menuLinkPairs[typeSize[0]].Add(ml);
+                    ModemToolDbLocalDataSetTableAdapters.SubToolsTableAdapter compAdapter = new ModemToolDbLocalDataSetTableAdapters.SubToolsTableAdapter();
+                    compAdapter.Connection.ConnectionString = connectionString;
+                    ModemToolDbLocalDataSetTableAdapters.SoftwareTableAdapter softAdapter = new ModemToolDbLocalDataSetTableAdapters.SoftwareTableAdapter();
+                    softAdapter.Connection.ConnectionString = connectionString;
+
+                    ModemToolDbLocalDataSet.SubToolsDataTable subTools = new ModemToolDbLocalDataSet.SubToolsDataTable();
+                    ModemToolDbLocalDataSet.SoftwareDataTable softTools = new ModemToolDbLocalDataSet.SoftwareDataTable();
+
+                    compAdapter.Fill(subTools);
+                    softAdapter.Fill(softTools);
+
+                    var varTools = from tool in subTools
+                                   where tool.ToolID == item.ID
+                                   select tool;
+
+                    var varSofts = from soft in softTools
+                                   where soft.ToolID == item.ID
+                                   select soft;
+
+                    //this is modem object, subcomponent and tools soft etc, which gets posted to webpage when menu is clicked.
+                    //it is derived from database items
+                    ModemMwdPostObjects mpo = new ModemMwdPostObjects(); //(ModemNoEngine, htmlDocument);
+                    mpo.MwdBhaPost = GetBhaObj(item.ToolName, "Please check components accordingly", true);
+                    mpo.MwdCompPostDict = GetRowsToModemComp(varTools);
+                    mpo.MwdSoftPostDict = GetRowsToModemSoft(varSofts);
+
+                    PostLink lnk = new PostLink(item.ToolName, mpo);
+
+                    string keyForDic = item.Category + "/" + item.ToolSize.ToString();
+
+                    if (menuSubItems.ContainsKey(keyForDic))
+                    {
+                        menuSubItems[keyForDic].Add(lnk);
+                    }
+                    else
+                    {
+                        List<PostLink> lst = new List<PostLink>();
+                        lst.Add(lnk);
+                        menuSubItems[keyForDic] = lst;
+
+                    }
+
+                    //System.IO.File.AppendAllText(@"C:\Users\h111765\wcferrorlog.txt", "Populate Meny => /n connection string => \n" + connectionString);
+                    compAdapter.Dispose();
+                    softAdapter.Dispose();
                 }
-                else
+
+                toolAdapter.Dispose();
+
+
+                Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
+                byte[] imageByte;
+
+                using (var ms = new MemoryStream())
                 {
-                    List<MenuLink> mllink = new List<MenuLink>();
-                    mllink.Add(ml);
-                    menuLinkPairs[typeSize[0]] = mllink;
+                    img.Save(ms, ImageFormat.Png);
+                    imageByte = ms.ToArray();
+                }
+
+                Dictionary<string, List<MenuLink>> menuLinkPairs = new Dictionary<string, List<MenuLink>>();
+
+                foreach (var item in menuSubItems)
+                {
+                    string[] typeSize;
+                    typeSize = item.Key.Split('/');
+
+                    MenuLink ml = new MenuLink(typeSize[1], item.Value.ToArray());
+
+                    if (menuLinkPairs.ContainsKey(typeSize[0]))
+                    {
+                        menuLinkPairs[typeSize[0]].Add(ml);
+                    }
+                    else
+                    {
+                        List<MenuLink> mllink = new List<MenuLink>();
+                        mllink.Add(ml);
+                        menuLinkPairs[typeSize[0]] = mllink;
+                    }
+
+
+
+                }
+
+                foreach (var item in menuLinkPairs)
+                {
+                    //string[] typeSize;
+                    //typeSize = item.Key.Split('/');
+
+                    MenuListItemClass mlic = new MenuListItemClass();
+
+                    mlic.Caption = item.Key; // typeSize[0];
+                    mlic.Hint = item.Key; // typeSize[0];
+                    mlic.Links = item.Value.ToArray();
+                    mlic.Img = imageByte;
+
+                    menuClass.Add(mlic);
                 }
 
 
-
-            }
-
-            foreach (var item in menuLinkPairs)
-            {
-                //string[] typeSize;
-                //typeSize = item.Key.Split('/');
-
-                MenuListItemClass mlic = new MenuListItemClass();
-
-
-                mlic.Caption = item.Key; // typeSize[0];
-                mlic.Hint = item.Key; // typeSize[0];
-                mlic.Links = item.Value.ToArray();
-                mlic.Img = imageByte;
-
-                menuClass.Add(mlic);
-            }
-
-            return menuClass;
+                return menuClass;
+            });
         }
 
-        public List<LinkListItemClass> PopulateLinkItems()
+        public async Task<List<LinkListItemClass>> PopulateLinkItems()
         {
-            linkListItemClasses = new List<LinkListItemClass>();
-
-            Link link1 = new Link("Gant", "http://tanwebs.corp.halliburton.com/pls/log_web/gant.web");
-            Link link2 = new Link("SperryWeb", "http://sperryweb.corp.halliburton.com/");
-            Link link3 = new Link("Tool Softwares", "http://sperryweb.corp.halliburton.com/PESoftTest/download/");
-            Link link4 = new Link("Rob Stat", "http://34.163.71.70/robSTAT.htm");
-
-            //
-            //List of links
-            //
-
-            Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
-            byte[] imageByte;
-
-            using (var ms = new MemoryStream())
+            return await Task.Run(() =>
             {
-                img.Save(ms, ImageFormat.Png);
-                imageByte = ms.ToArray();
-            }
 
-            LinkListItemClass llic = new LinkListItemClass();
-            llic.Caption = "My Links";
-            llic.Hint = "Some Useful Link";
-            llic.Links = new Link[] { link1, link2, link3, link4 };
-            llic.Img = imageByte;
 
-            linkListItemClasses.Add(llic);
+                linkListItemClasses = new List<LinkListItemClass>();
 
-            return linkListItemClasses;
+                Link link1 = new Link("Gant", "http://norwayappsprd.corp.halliburton.com/pls/log_web/gant.web");
+                Link link2 = new Link("SperryWeb", "http://sperryweb.corp.halliburton.com/");
+                Link link3 = new Link("Tool Softwares", "http://sperryweb.corp.halliburton.com/PESoftTest/download/");
+                Link link4 = new Link("Rob Stat", "http://34.163.71.70/robSTAT.htm");
+
+                //
+                //List of links
+                //
+
+                Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
+                byte[] imageByte;
+
+                using (var ms = new MemoryStream())
+                {
+                    img.Save(ms, ImageFormat.Png);
+                    imageByte = ms.ToArray();
+                }
+
+                LinkListItemClass llic = new LinkListItemClass();
+                llic.Caption = "My Links";
+                llic.Hint = "Some Useful Link";
+                llic.Links = new Link[] { link1, link2, link3, link4 };
+                llic.Img = imageByte;
+
+                linkListItemClasses.Add(llic);
+
+                return linkListItemClasses;
+            });
         }
 
-        public List<SearchBoxItemClass> PopulateSearchBox()
+        public async Task<List<SearchBoxItemClass>> PopulateSearchBox()
         {
-            searchBoxItemClasses = new List<SearchBoxItemClass>();
-
-            Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
-            byte[] imageByte;
-
-            using (var ms = new MemoryStream())
+            return await Task.Run(() =>
             {
-                img.Save(ms, ImageFormat.Png);
-                imageByte = ms.ToArray();
-            }
 
-            SearchBoxItemClass sbic = new SearchBoxItemClass();
-            sbic.ClearHistoryText = "<clear>";
-            sbic.GreetingText = "terms to serach!";
-            sbic.SearchURL = "http://sphq.corp.halliburton.com/Search/Pages/results.aspx?k={0}";
-            sbic.SearchBoxTooltip = "Search here";
-            sbic.ButtonText = "Search";
-            sbic.ButtonTooltip = "Click to search";
-            sbic.InputBoxSize = new Size(160, 16);
-            sbic.InputBoxFlatStyle = FlatStyle.System;
-            sbic.Img = imageByte;
+                searchBoxItemClasses = new List<SearchBoxItemClass>();
 
-            searchBoxItemClasses.Add(sbic);
+                Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
+                byte[] imageByte;
 
-            return searchBoxItemClasses;
+                using (var ms = new MemoryStream())
+                {
+                    img.Save(ms, ImageFormat.Png);
+                    imageByte = ms.ToArray();
+                }
+
+                SearchBoxItemClass sbic = new SearchBoxItemClass();
+                sbic.ClearHistoryText = "<clear>";
+                sbic.GreetingText = "test1"; // "terms to serach!";
+                sbic.SearchURL = "http://sphq.corp.halliburton.com/Search/Pages/results.aspx?k={0}";
+                sbic.SearchBoxTooltip = "Search here";
+                sbic.ButtonText = "Search";
+                sbic.ButtonTooltip = "Click to search";
+                sbic.InputBoxSize = new Size(160, 16);
+                sbic.InputBoxFlatStyle = FlatStyle.System;
+                sbic.Img = imageByte;
+
+                searchBoxItemClasses.Add(sbic);
+
+                return searchBoxItemClasses;
+            });
 
         }
 
 
-        public MenuListClass GetMenuListItemClasses()
+        public async Task<MenuListClass> GetMenuListItemClasses()
         {
+            menuListItemClasses = new List<MenuListItemClass>();
+            menuListItemClasses = await PopulateMenuLinkItems();
             MenuListClass mc = new MenuListClass();
             mc.List = menuListItemClasses;
             return mc;
         }
 
-        public SearchListClass GetSearchBoxItemClasses()
+        public async Task<SearchListClass> GetSearchBoxItemClasses()
         {
+
+            searchBoxItemClasses = new List<SearchBoxItemClass>();
+            searchBoxItemClasses = await PopulateSearchBox();
             SearchListClass sc = new SearchListClass();
             sc.List = searchBoxItemClasses;
             return sc;
         }
 
-        public LinkListClass GetLinkListItemClasses()
+        public async Task<LinkListClass> GetLinkListItemClasses()
         {
+            linkListItemClasses = new List<LinkListItemClass>();
+            linkListItemClasses = await PopulateLinkItems();
             LinkListClass lc = new LinkListClass();
             lc.List = linkListItemClasses;
             return lc;

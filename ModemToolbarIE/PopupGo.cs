@@ -28,7 +28,7 @@ namespace ModemToolbarIE
 
         private void btnOpenModem_Click(object sender, EventArgs e)
         {
-            tlb.Navigate2(@"http://tanwebs.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=" + txtModemNo.Text);
+            tlb.Navigate2(@"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=" + txtModemNo.Text);
         }
 
         private void txtModemNo_TextChanged(object sender, EventArgs e)

@@ -15,6 +15,7 @@ using System.Xml;
 namespace ModemToolbarIE
 {
     using ModemToolbarIE.LocalSync;
+    using System.Threading.Tasks;
     using System.Timers;
 
     [Guid("0823E052-F731-40A2-BE47-42527C602B0D")]
@@ -45,9 +46,9 @@ namespace ModemToolbarIE
 
         private bool bhaEditMode = false;
         public ModemEvents ModemStat { get; set; }
-        public List<MenuListItemClass> mlic = new List<MenuListItemClass>();
-        public List<SearchBoxItemClass> sbic = new List<SearchBoxItemClass>();
-        public List<LinkListItemClass> llic = new List<LinkListItemClass>();
+        public static List<MenuListItemClass> mlic = new List<MenuListItemClass>();
+        public static List<SearchBoxItemClass> sbic = new List<SearchBoxItemClass>();
+        public static List<LinkListItemClass> llic = new List<LinkListItemClass>();
         public int syncStatus = 0;
 
         MergeFormLink mergeButton;
@@ -55,36 +56,34 @@ namespace ModemToolbarIE
 
         List<BaseToolbarItem> baseToolbarItems = new List<BaseToolbarItem>();
 
-        private System.Timers.Timer _timer;
-
         #region "Static Code"
 
-        internal static DateTime InstallationDate
-        {
-            get
-            {
-                try
-                {
-                    using (RegistryKey rk = Registry.LocalMachine.OpenSubKey(SettingsKey, false))
-                    {
-                        string val = rk.GetValue(InstalledValue).ToString();
-                        DateTime result = new DateTime(Convert.ToInt64(val));
-                        return result;
-                    }
-                }
-                catch (Exception)
-                {
-                    return DateTime.MaxValue;
-                }
-            }
-            set
-            {
-                using (RegistryKey rk = Registry.LocalMachine.CreateSubKey(SettingsKey))
-                {
-                    rk.SetValue(InstalledValue, value.Ticks.ToString());
-                }
-            }
-        }
+        //internal static DateTime InstallationDate
+        //{
+        //    get
+        //    {
+        //        try
+        //        {
+        //            using (RegistryKey rk = Registry.LocalMachine.OpenSubKey(SettingsKey, false))
+        //            {
+        //                string val = rk.GetValue(InstalledValue).ToString();
+        //                DateTime result = new DateTime(Convert.ToInt64(val));
+        //                return result;
+        //            }
+        //        }
+        //        catch (Exception)
+        //        {
+        //            return DateTime.MaxValue;
+        //        }
+        //    }
+        //    set
+        //    {
+        //        using (RegistryKey rk = Registry.LocalMachine.CreateSubKey(SettingsKey))
+        //        {
+        //            rk.SetValue(InstalledValue, value.Ticks.ToString());
+        //        }
+        //    }
+        //}
 
         /// <summary>
         /// Forms URL for internal command.
@@ -125,24 +124,23 @@ namespace ModemToolbarIE
             try
             {
                 Directory.CreateDirectory(dstFolder);
-            }
-            catch (Exception) { }
-
-            DirectoryInfo di = new DirectoryInfo(srcFolder);
-            foreach (FileInfo fi in di.GetFiles())
-            {
-                fi.CopyTo(Path.Combine(dstFolder, fi.Name), overwrite);
-            }
-
-            foreach (DirectoryInfo sdi in di.GetDirectories())
-            {
-                if (sdi.Name == "." || sdi.Name == "..")
+                DirectoryInfo di = new DirectoryInfo(srcFolder);
+                foreach (FileInfo fi in di.GetFiles())
                 {
-                    continue;
+                    fi.CopyTo(Path.Combine(dstFolder, fi.Name), overwrite);
                 }
 
-                CopyFolder(sdi.FullName, Path.Combine(dstFolder, sdi.Name), overwrite);
+                foreach (DirectoryInfo sdi in di.GetDirectories())
+                {
+                    if (sdi.Name == "." || sdi.Name == "..")
+                    {
+                        continue;
+                    }
+
+                    CopyFolder(sdi.FullName, Path.Combine(dstFolder, sdi.Name), overwrite);
+                }
             }
+            catch (Exception) { }
 
         }
 
@@ -189,7 +187,18 @@ namespace ModemToolbarIE
             get
             {
                 string result = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); //C:\Users\<user>\AppData\Roaming\myProgram\ 
-                return Path.Combine(result, "ModemToolbar");
+                string filePath = Path.Combine(result, "ModemToolbar");
+                try
+                {
+                    Directory.CreateDirectory(filePath);
+                }
+                catch (Exception)
+                {
+
+
+                }
+
+                return filePath;
             }
         }
         #endregion
@@ -208,13 +217,10 @@ namespace ModemToolbarIE
 
         public Toolbar()
         {
-            //MessageBox.Show("Break -2");
-
-            CosturaUtility.Initialize();
-
-            Assembly asm = Assembly.GetExecutingAssembly();
-            string fullName = asm.GetModules()[0].FullyQualifiedName;
-            toolbarFolder = Path.GetDirectoryName(fullName);
+            //Assembly asm = Assembly.GetExecutingAssembly();
+            //string fullName = asm.GetModules()[0].FullyQualifiedName;
+            //toolbarFolder = Path.GetDirectoryName(fullName);
+            InitializeComponent();
             dataFolder = DataFolder;
             try
             {
@@ -224,36 +230,11 @@ namespace ModemToolbarIE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                
             }
-
-
-            //try
-            //{
-            //    settingsFolder = Path.Combine(dataFolder, "Settings");
-            //    //if (!Directory.Exists (settingsFolder))
-            //    {
-            //        //MessageBox.Show (Path.Combine (toolbarFolder, "Settings"), settingsFolder);
-            //        CopyFolder(Path.Combine(toolbarFolder, "Settings"), settingsFolder, false);
-
-            //    }
-
-            //}
-            //catch (Exception) { }
-
-            //try
-            //{
-            //    imagesFolder = Path.Combine(cacheFolder, "Images");
-            //    //if (!Directory.Exists (imagesFolder))
-            //    {
-            //        CopyFolder(Path.Combine(toolbarFolder, "Images"), imagesFolder, false);
-            //    }
-            //}
-            //catch (Exception) { }
-
-
-            InitializeComponent();
             HtmlDocCompleted += Toolbar_HtmlDocComplete;
+            CosturaUtility.Initialize();
+            
 
         }
 
@@ -345,195 +326,70 @@ namespace ModemToolbarIE
 
         private void Toolbar_Load(object sender, EventArgs e)
         {
-
             CreateToolbarItems();
-            //StartWcfComms();
-            StartLocalComms();
-            //_timer = new System.Timers.Timer(150000) { AutoReset = true };
-            //_timer.Elapsed += TimerElapsed;
-            //_timer.Enabled = true;
-            
+            Task.Run(()=> StartLocalComms());
         }
 
-        private void TimerElapsed(object sender, ElapsedEventArgs e)
+        private async void StartLocalComms()
         {
-            //StartWcfComms();
-            StartLocalComms();
-        }
-
-        /*
-        internal void StartWcfComms()
-        {
-            
-            
-            //MessageBox.Show("Start WCF firing with sync status: " + syncStatus);
-            NetTcpBinding myBinding = new NetTcpBinding()
-            {
-                //CloseTimeout = TimeSpan.FromMinutes(2),
-                ListenBacklog = 50,
-                MaxBufferPoolSize = 10485760,
-                MaxBufferSize = 10485760,
-                MaxConnections = 50,
-                MaxReceivedMessageSize = 10485760,
-                //OpenTimeout = TimeSpan.FromMinutes(5),
-                //PortSharingEnabled = false,
-                //ReceiveTimeout = TimeSpan.FromMinutes(5),
-                //SendTimeout = TimeSpan.FromMinutes(5),
-                //TransactionFlow = false,
-                //TransactionProtocol = TransactionProtocol.OleTransactions,
-                //TransferMode = TransferMode.Buffered,
-                //ReaderQuotas = new XmlDictionaryReaderQuotas()
-                //{
-                //    MaxArrayLength = 10240,
-                //    MaxBytesPerRead = 10485760,
-                //    MaxDepth = 100,
-                //    MaxNameTableCharCount = 10485760,
-                //    MaxStringContentLength = 10485760
-                //},
-
-                //ReliableSession = new OptionalReliableSession()
-                //{
-                //    Enabled = true,
-                //    InactivityTimeout = TimeSpan.FromMinutes(10),
-                //    Ordered = true
-                //}
-
-            };
-
-
-            EndpointAddress endpoint = new EndpointAddress("net.tcp://localhost:9124/");
-            var client = new ModemService.WCFModemServiceClient(myBinding, endpoint);
-            bool commError = false;
-
-            try
-            {
-                var proxy = client.ChannelFactory.CreateChannel();
-
-                if (syncStatus == proxy.GetSyncStatus())
-                {
-                    client.Close();
-                    return;
-                }
-
-                SearchListClass sc = new SearchListClass();
-                sc = proxy.GetSearchBoxItemClasses();
-                sbic = new List<SearchBoxItemClass>();
-                sbic = sc.List;
-
-                LinkListClass lc = new LinkListClass();
-                lc = proxy.GetLinkListItemClasses();
-                llic = new List<LinkListItemClass>();
-                llic = lc.List;
-
-                MenuListClass mc = new MenuListClass();
-                mc = proxy.GetMenuListItemClasses();
-                mlic = new List<MenuListItemClass>();
-                mlic = mc.List;
-
-                CreateToolbarItems();
-                syncStatus = proxy.GetSyncStatus();
-                client.Close();
-
-
-            }
-            catch (CommunicationException e)
-            {
-                txtStatus.Text = "Comm Error";
-                commError = true;
-                client.Abort();
-            }
-            catch (TimeoutException e)
-            {
-                txtStatus.Text = "Timeout";
-                commError = true;
-                client.Abort();
-            }
-            catch (Exception ex)
-            {
-                txtStatus.Text = "Error";
-                commError = true;
-                client.Abort();
-                //MessageBox.Show(ex.ToString());
-            }
-            finally
-            {
-                if (commError)
-                {
-
-                }
-
-            }
-
-
-
-        }
-        */
-        internal void StartLocalComms()
-        {
-            bool commError = false;
-
             try
             {
 
                 using (NoProxySync npProxy = new NoProxySync())
                 {
-                    SearchListClass sc = new SearchListClass();
-                    sc = npProxy.GetSearchBoxItemClasses();
-                    sbic = new List<SearchBoxItemClass>();
-                    sbic = sc.List;
+                    if (sbic.Count<1)
+                    {
+                        SearchListClass sc = new SearchListClass();
+                        sc = await npProxy.GetSearchBoxItemClasses();
+                        sbic = new List<SearchBoxItemClass>();
+                        sbic.AddRange(sc.List.ToArray());
+                    }
 
-                    LinkListClass lc = new LinkListClass();
-                    lc = npProxy.GetLinkListItemClasses();
-                    llic = new List<LinkListItemClass>();
-                    llic = lc.List;
+                    if (llic.Count<1)
+                    {
+                        LinkListClass lc = new LinkListClass();
+                        lc = await npProxy.GetLinkListItemClasses();
+                        llic = new List<LinkListItemClass>();
+                        llic.AddRange(lc.List.ToArray());
+                    }
 
-                    MenuListClass mc = new MenuListClass();
-                    mc = npProxy.GetMenuListItemClasses();
-                    mlic = new List<MenuListItemClass>();
-                    mlic = mc.List;
+                    if (mlic.Count <1)
+                    {
+                        MenuListClass mc = new MenuListClass();
+                        mc = await npProxy.GetMenuListItemClasses();
+                        mlic = new List<MenuListItemClass>();
+                        mlic.AddRange(mc.List.ToArray());
+                    }
+                    
 
                     CreateToolbarItems();
 
                 }
-
-                
-
+ 
             }
             catch (CommunicationException e)
             {
                 txtStatus.Text = "Comm Error";
-                commError = true;
             }
             catch (TimeoutException e)
             {
                 txtStatus.Text = "Timeout";
-                commError = true;
             }
             catch (Exception ex)
             {
                 txtStatus.Text = "Error";
-                commError = true;
 
             }
-            finally
-            {
-                if (commError)
-                {
 
-                }
-
-            }
         }
 
-        internal void CreateToolbarItems()
+        private void CreateToolbarItems()
         {
-
 
             try
             {
                 // Prevent redrowing of this toolbar control.
                 SuspendLayout();
-
                 // Clear previos state.
                 Clear();
                 toolStrip.Items.Clear();
@@ -544,10 +400,7 @@ namespace ModemToolbarIE
                 msContainer.ContentPanel.Size = new System.Drawing.Size(100, 0);
                 msContainer.Location = new System.Drawing.Point(250, 0);
                 msContainer.Size = new System.Drawing.Size(100, 25);
-                
-
-                Assembly currentAssembly = Assembly.GetAssembly(GetType());
-                //MessageBox.Show("Break 2");
+ 
 
                 if (sbic.Count != 0)
                 {
@@ -580,8 +433,8 @@ namespace ModemToolbarIE
                     }
                 }
 
-
                 //merge button
+                Assembly currentAssembly = Assembly.GetAssembly(GetType());
                 Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
                 mergeButton = new MergeFormLink(this, "Merge", "Merge From a modem", img);
                 baseToolbarItems.Add(mergeButton);
@@ -612,7 +465,6 @@ namespace ModemToolbarIE
 
             }
         }
-
 
 
         internal void SmartNavigate(string url)
@@ -701,53 +553,5 @@ namespace ModemToolbarIE
         }
     }
 
-    //[CallbackBehavior(ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
-    //public class CallbackHandler : ModemToolbarIE.ModemService.IWCFModemServiceCallback
-    //{
-    //    private Toolbar toolbar;
-
-    //    public CallbackHandler(Toolbar _toolbar)
-    //    {
-    //        toolbar = _toolbar;
-    //    }
-
-    //    public void Alive()
-    //    {
-    //        throw new NotImplementedException();
-    //    }
-
-    //    public void DataLinkListItemClassEquals(LinkListClass linkList)
-    //    {
-    //        throw new NotImplementedException();
-    //    }
-
-    //    public void DataMenuListItemClassEquals(MenuListClass menuList)
-    //    {
-    //        throw new NotImplementedException();
-    //    }
-
-    //    public void DataSearchBoxItemClassEquals(SearchListClass searchBox)
-    //    {
-    //        throw new NotImplementedException();
-    //    }
-
-    //    public void SyncStatusEquals(int status)
-    //    {
-    //        MessageBox.Show("Sync status is: " + status.ToString());
-    //        toolbar.syncStatus = status;
-
-    //    }
-    //}
-
-    //public class ModemServiceClient : DuplexChannelFactory<ModemService.IWCFModemService>
-    //{
-    //    public ModemServiceClient(object callbackInstance, System.ServiceModel.Channels.Binding binding, EndpointAddress remoteAddress)
-    //    : base(callbackInstance, binding, remoteAddress)
-    //    {
-
-    //    }
-    //}
-
-
-
+    
 }
