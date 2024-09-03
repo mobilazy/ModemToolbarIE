@@ -7,7 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>C:\Users\h111765\source\repos\ModemToolbarIE\ModemWebUtility\ModemWebUtilityKey.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>C:\Users\h111765\source\repos\ajumanazarov\ModemToolbarIE\ModemWebUtility\ModemWebUtilityKey.snk</AssemblyOriginatorKeyFile>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.ClearScript" Version="7.3.0" />
     <PackageReference Include="Microsoft.ClearScript.Core" Version="7.3.0" />
     <PackageReference Include="Microsoft.ClearScript.V8" Version="7.3.0" />
+    <PackageReference Include="Unofficial.Microsoft.mshtml" Version="7.0.3300" />
   </ItemGroup>
 
   <ItemGroup>
