@@ -12,7 +12,7 @@ namespace ModemWebUtility
     {
         private readonly CookieContainer cookieContainer = new CookieContainer();
         
-        public string LastError { get; private set; }
+        public string LastError { get; set; }
 
         public event EventHandler<DownloadProgressEventArgs> DownloadProgress;
         public event EventHandler<DownloadCompletedEventArgs> DownloadCompleted;

@@ -676,14 +676,45 @@ namespace ModemMergerWinFormsApp
                 if (success)
                 {
                     lblStatus.Text = $"Successfully copied Gant tools to modem {destModem}";
-                    MessageBox.Show($"Gant tools copied successfully to modem {destModem}!", "Success",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    // Prepare full log
+                    string fullLog = $"Gant tools copied successfully to modem {destModem}!\n\n";
+                    if (!string.IsNullOrWhiteSpace(copier.DebugInfo))
+                    {
+                        fullLog += "=== Debug Info ===\n" + copier.DebugInfo;
+                    }
+                    
+                    // Show dialog with Copy Log button
+                    ShowSuccessDialog($"Gant tools copied successfully to modem {destModem}!", fullLog);
                 }
                 else
                 {
                     lblStatus.Text = $"Failed to copy Gant tools: {copier.LastError}";
-                    MessageBox.Show($"Failed to copy Gant tools:\n\n{copier.LastError}", "Copy Failed",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    
+                    // Build full error message with debug info
+                    string fullMessage = $"Failed to copy Gant tools:\n\n{copier.LastError}";
+                    if (!string.IsNullOrWhiteSpace(copier.DebugInfo))
+                    {
+                        fullMessage += "\n\n=== Debug Info ===\n" + copier.DebugInfo;
+                    }
+                    
+                    // Save to temp file for easy viewing
+                    string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"GantToolsDebug_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                    System.IO.File.WriteAllText(tempFile, fullMessage);
+                    
+                    // Copy to clipboard
+                    try { Clipboard.SetText(fullMessage); } catch { }
+                    
+                    // Show message with file path and clipboard notice
+                    string displayMessage = $"{copier.LastError}\n\n";
+                    displayMessage += "Debug info copied to clipboard!\n";
+                    displayMessage += $"Also saved to: {tempFile}\n\n";
+                    displayMessage += "First 500 chars of debug:\n" + 
+                                     (copier.DebugInfo.Length > 500 
+                                         ? copier.DebugInfo.Substring(0, 500) + "..." 
+                                         : copier.DebugInfo);
+                    
+                    MessageBox.Show(displayMessage, "Copy Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex)
@@ -695,6 +726,62 @@ namespace ModemMergerWinFormsApp
             finally
             {
                 SetButtonsEnabled(true);
+            }
+        }
+
+        private void ShowSuccessDialog(string message, string logText)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = "Success";
+                dialog.Size = new Size(400, 150);
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MaximizeBox = false;
+                dialog.MinimizeBox = false;
+                
+                var lblMessage = new Label
+                {
+                    Text = message,
+                    Location = new Point(20, 20),
+                    Size = new Size(340, 40),
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                
+                var btnOK = new Button
+                {
+                    Text = "OK",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 75),
+                    Size = new Size(80, 30)
+                };
+                
+                var btnCopyLog = new Button
+                {
+                    Text = "Copy Log",
+                    Location = new Point(290, 75),
+                    Size = new Size(80, 30)
+                };
+                
+                btnCopyLog.Click += (s, e) =>
+                {
+                    try
+                    {
+                        Clipboard.SetText(logText);
+                        MessageBox.Show("Log copied to clipboard!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed to copy: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                };
+                
+                dialog.Controls.Add(lblMessage);
+                dialog.Controls.Add(btnOK);
+                dialog.Controls.Add(btnCopyLog);
+                dialog.AcceptButton = btnOK;
+                
+                dialog.ShowDialog(this);
             }
         }
 
