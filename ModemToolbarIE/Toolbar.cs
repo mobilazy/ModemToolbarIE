@@ -256,6 +256,10 @@ namespace ModemToolbarIE
                     txtStatus.Text = "Modem Gant";
                     BhaEditMode = false;
                     break;
+                case ModemEvents.GantTools:
+                    txtStatus.Text = modemNo != "" ? "Gant Tools - " + modemNo : "Gant Tools";
+                    BhaEditMode = false;
+                    break;
                 case ModemEvents.View:
                     txtStatus.Text = modemNo + " - View";
                     BhaEditMode = false;
@@ -438,6 +442,11 @@ namespace ModemToolbarIE
                 Image img = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.magic-wand.png"));
                 mergeButton = new MergeFormLink(this, "Merge", "Merge From a modem", img);
                 baseToolbarItems.Add(mergeButton);
+
+                //attachment button
+                Image imgAttach = Image.FromStream(currentAssembly.GetManifestResourceStream("ModemToolbarIE.Resources.view.png"));
+                AttachmentFormLink attachmentButton = new AttachmentFormLink(this, "Files", "View and download attachments", imgAttach);
+                baseToolbarItems.Add(attachmentButton);
 
 
                 if (mlic.Count != 0)

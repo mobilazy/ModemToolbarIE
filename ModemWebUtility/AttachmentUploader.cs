@@ -1,0 +1,149 @@
+using System;
+using System.IO;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace ModemWebUtility
+{
+    /// <summary>
+    /// Handles uploading attachments to modem pages
+    /// </summary>
+    public class AttachmentUploader
+    {
+        private readonly CookieContainer cookieContainer = new CookieContainer();
+
+        public string LastError { get; private set; }
+
+        public event EventHandler<UploadProgressEventArgs> UploadProgress;
+        public event EventHandler<UploadCompletedEventArgs> UploadCompleted;
+
+        /// <summary>
+        /// Uploads a file to a modem using multipart/form-data
+        /// </summary>
+        public async Task<bool> UploadFileAsync(string filePath, string destinationModemNumber, string fileType = "")
+        {
+            LastError = null;
+
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    LastError = "File not found: " + filePath;
+                    return false;
+                }
+
+                string fileName = Path.GetFileName(filePath);
+                byte[] fileData = File.ReadAllBytes(filePath);
+
+                OnUploadProgress(new UploadProgressEventArgs { FileName = fileName, BytesUploaded = 0, TotalBytes = fileData.Length });
+
+                string url = HDocUtility.UrlDocregUpload + destinationModemNumber;
+                string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request.Method = "POST";
+                request.ContentType = "multipart/form-data; boundary=" + boundary;
+                request.UseDefaultCredentials = true;
+                request.CookieContainer = cookieContainer;
+
+                using (var requestStream = await request.GetRequestStreamAsync())
+                {
+                    var encoding = Encoding.UTF8;
+
+                    // Write file data
+                    byte[] header = encoding.GetBytes($"--{boundary}\r\nContent-Disposition: form-data" + 
+                        $"; name=\"file\"; filename=\"{fileName}\"\r\nContent-Type: application/octet-stream\r\n\r\n");
+                    await requestStream.WriteAsync(header, 0, header.Length);
+                    await requestStream.WriteAsync(fileData, 0, fileData.Length);
+
+                    // Optional: Add file type if provided
+                    if (!string.IsNullOrWhiteSpace(fileType))
+                    {
+                        byte[] typeField = encoding.GetBytes($"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file_type\"\r\n\r\n{fileType}");
+                        await requestStream.WriteAsync(typeField, 0, typeField.Length);
+                    }
+
+                    // Close boundary
+                    byte[] footer = encoding.GetBytes($"\r\n--{boundary}--\r\n");
+                    await requestStream.WriteAsync(footer, 0, footer.Length);
+                }
+
+                OnUploadProgress(new UploadProgressEventArgs { FileName = fileName, BytesUploaded = fileData.Length, TotalBytes = fileData.Length });
+
+                using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+                {
+                    bool success = response.StatusCode == HttpStatusCode.OK;
+
+                    OnUploadCompleted(new UploadCompletedEventArgs
+                    {
+                        FileName = fileName,
+                        Success = success,
+                        ErrorMessage = success ? null : $"Server returned {response.StatusCode}"
+                    });
+
+                    return success;
+                }
+            }
+            catch (WebException wex)
+            {
+                LastError = $"Upload failed: {wex.Message}";
+                if (wex.Response != null)
+                {
+                    using (var errorResponse = (HttpWebResponse)wex.Response)
+                    using (var reader = new StreamReader(errorResponse.GetResponseStream()))
+                    {
+                        LastError += "\r\n" + reader.ReadToEnd();
+                    }
+                }
+
+                OnUploadCompleted(new UploadCompletedEventArgs
+                {
+                    FileName = Path.GetFileName(filePath),
+                    Success = false,
+                    ErrorMessage = LastError
+                });
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                LastError = $"Upload failed: {ex.Message}";
+
+                OnUploadCompleted(new UploadCompletedEventArgs
+                {
+                    FileName = Path.GetFileName(filePath),
+                    Success = false,
+                    ErrorMessage = LastError
+                });
+
+                return false;
+            }
+        }
+
+        protected virtual void OnUploadProgress(UploadProgressEventArgs e)
+        {
+            UploadProgress?.Invoke(this, e);
+        }
+
+        protected virtual void OnUploadCompleted(UploadCompletedEventArgs e)
+        {
+            UploadCompleted?.Invoke(this, e);
+        }
+    }
+
+    public class UploadProgressEventArgs : EventArgs
+    {
+        public string FileName { get; set; }
+        public long BytesUploaded { get; set; }
+        public long TotalBytes { get; set; }
+        public int ProgressPercentage => TotalBytes > 0 ? (int)((BytesUploaded * 100) / TotalBytes) : 0;
+    }
+
+    public class UploadCompletedEventArgs : EventArgs
+    {
+        public string FileName { get; set; }
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+}

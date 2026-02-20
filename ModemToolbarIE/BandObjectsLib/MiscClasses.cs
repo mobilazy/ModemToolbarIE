@@ -22,6 +22,7 @@ namespace BandObjectLib
 
         None,
         Gant,
+        GantTools,
         View,
         BhaView,
         DdView,

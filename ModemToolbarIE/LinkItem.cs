@@ -167,4 +167,81 @@ namespace ModemToolbarIE
         private System.Windows.Forms.ToolStripButton linkButton;
        // private ModemPostObjects targetObj;
     }
-}
+
+    internal class AttachmentFormLink : BaseToolbarItem
+    {
+        /// <summary>
+        /// Constructor for Attachment button
+        /// </summary>
+        /// <param name="engine">Toolbar engine</param>
+        internal AttachmentFormLink(Toolbar engine, string caption, string hint, System.Drawing.Image img)
+            : base(engine, img)
+        {
+            Create(caption, hint);
+        }
+
+        public override ToolbarItemType TypeID
+        {
+            get { return ToolbarItemType.Link; }
+        }
+
+        public void Create(string buttonText, string buttonTooltip)
+        {
+            this.linkButton = new System.Windows.Forms.ToolStripButton();
+
+            this.linkButton.Image = this.Image;
+            this.linkButton.ImageAlign = ContentAlignment.MiddleLeft;
+            this.linkButton.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
+            this.linkButton.Text = buttonText;
+            this.linkButton.ToolTipText = buttonTooltip;
+            this.linkButton.Enabled = false;
+            this.linkButton.Click += new EventHandler(linkButton_Click);
+            engine.HtmlDocCompleted += Engine_HtmlDocCompleted;
+            int marginPad = 15;
+            this.linkButton.Margin = new System.Windows.Forms.Padding(0, 0, marginPad, 0);
+            items.Add(this.linkButton);
+
+            engine.ToolStrip.Items.AddRange(this.items.ToArray());
+            Size sz = new Size(this.engine.TsContainer.Size.Width + this.linkButton.Size.Width + marginPad + 30, this.engine.TsContainer.Height);
+            engine.TsContainer.Size = sz;
+            engine.TsContainer.Refresh();
+        }
+
+        private void Engine_HtmlDocCompleted(object sender, BandObjectLib.ModemEventArgs e)
+        {
+            BandObjectLib.ModemEvents me = e.ModemEvent;
+            // Enable on View, Edit, and GantTools pages
+            if (me == BandObjectLib.ModemEvents.View || 
+                me == BandObjectLib.ModemEvents.Edit || 
+                me == BandObjectLib.ModemEvents.BhaView ||
+                me == BandObjectLib.ModemEvents.BhaEdit ||
+                me == BandObjectLib.ModemEvents.DdView ||
+                me == BandObjectLib.ModemEvents.DdEdit ||
+                me == BandObjectLib.ModemEvents.GpView ||
+                me == BandObjectLib.ModemEvents.GpEdit ||
+                me == BandObjectLib.ModemEvents.GantTools)
+            {
+                this.linkButton.Enabled = true;
+            }
+            else
+            {
+                this.linkButton.Enabled = false;
+            }
+        }
+
+        void linkButton_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                AttachmentUI.AttachmentForm af = new AttachmentUI.AttachmentForm(engine);
+                af.Show();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show($"Error opening attachments: {ex.Message}", "Error", 
+                    System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
+            }
+        }
+
+        private System.Windows.Forms.ToolStripButton linkButton;
+    }}

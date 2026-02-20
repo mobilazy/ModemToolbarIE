@@ -591,6 +591,12 @@ namespace ModemMergerWinFormsApp
                 e.Handled = true;
             }
         }
+
+        private void btnFileManager_Click(object sender, EventArgs e)
+        {
+            AttachmentForm attachmentForm = new AttachmentForm();
+            attachmentForm.ShowDialog();
+        }
     }
 
     //public class TreeViewTagObj

@@ -5,81 +5,88 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ModemMergerDesktop"
         mc:Ignorable="d"
-        Title="Modem Merger" Height="600" Width="800" MinHeight="600" MinWidth="800">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="30"/>
-            <RowDefinition/>
-            <RowDefinition Height="45"/>
-        </Grid.RowDefinitions>
-        <!--upper most grid for textboxes and buttons for entering modem numbers from and to-->
-        <Grid Grid.Row="0">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Width="Auto" Margin="5 5 5 5" Text="Enter modem no to copy from:"></TextBlock>
-                <TextBox Name="TextboxModemSource" Width="200" Margin="5 5 5 5"></TextBox>
-                <Button Name="ButtonModemLoad" Width="100" Margin="5 5 5 5" Content="Load"></Button>
-            </StackPanel>
-        </Grid>
+        Title="Modem Merger" Height="600" Width="800" MinHeight="600" MinWidth="800"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent" 
+        AllowsTransparency="True" 
+        WindowStyle="None">
+    <Grid Background="Transparent" >
+        <!-- Border that applies the rounded corners -->
+        <Border Background="White" CornerRadius="20" BorderBrush="Gray" BorderThickness="1" Margin="5">
+            <Grid  >
+                <!-- Top Bar for Drag and Combination of macOS and Windows-style Buttons -->
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition Height="30"/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
-                <!--grid for displaying tools from selected modem-->
-                <Grid Grid.Row="0">
-                    <TreeView Name="treeViewSource">
-                        
-                    </TreeView>
-                </Grid>
-                <!--grid for buttons for adding and removing tools from the merge list-->
-                <Grid Grid.Row="1">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Name="ButtonAddTool" Width="100" Margin="5"  Content="Add"></Button>
-                        <Button Name="ButtonRemoveTool" Width="100" Margin="5"  Content="Remove"></Button>
-                    </StackPanel>
-                </Grid>
-                <!--grid for displaying list of added tools-->
-                <Grid Grid.Row="2">
-                    <TreeView Name="treeViewDestination">
-                        
-                    </TreeView>
-                </Grid>
+
+                <DockPanel LastChildFill="True" Height="40" Background="Transparent" VerticalAlignment="Top">
+
+                    <Grid x:Name="gridTitleBar" Background="Transparent" MouseLeftButtonDown="Grid_MouseLeftButtonDown" MouseLeftButtonUp="Grid_MouseLeftButtonUp" >
+                        <Border Background="Azure" CornerRadius="20" BorderThickness="1" BorderBrush="Gray">
+                            <Grid >
+                            <!-- Title of the Window -->
+                            <TextBlock Text="Rounded Window" FontSize="16" Foreground="#333" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="20,0,0,0"/>
+
+                            <!-- Custom macOS + Windows-style buttons on the right side -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <!-- Minimize Button (Yellow) with '_' symbol -->
+                                <Button Width="30" Height="30" BorderBrush="Transparent" Background="Transparent" Click="MinimizeButton_Click">
+                                    <Grid>
+                                        <Ellipse Width="20" Height="20" Fill="#FFBD2E" Stroke="Gray" StrokeThickness="0.5"/>
+                                        <TextBlock Text="_" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                                <!-- Maximize Button (Green) with '☐' symbol -->
+                                <Button Width="30" Height="30" BorderBrush="Transparent" Background="Transparent" Click="MaximizeButton_Click">
+                                    <Grid>
+                                        <Ellipse Width="20" Height="20" Fill="#27C93F" Stroke="Gray" StrokeThickness="0.5"/>
+                                        <TextBlock Text="☐" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                                <!-- Close Button (Red) with '×' symbol -->
+                                <Button Width="30" Height="30" BorderBrush="Transparent" Background="Transparent" Click="CloseButton_Click">
+                                    <Grid>
+                                        <Ellipse Width="20" Height="20" Fill="#FF5F56" Stroke="Gray" StrokeThickness="0.5"/>
+                                        <TextBlock Text="×" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </DockPanel>
+
+
+                <!-- Address Bar (Below Title Bar) -->
+
+                <DockPanel  LastChildFill="True" Height="30" VerticalAlignment="Top" Margin="10,50,10,0" >
+                    <!-- Border wrapping the TextBox to apply CornerRadius -->
+                    <Border Background="#E8E8E8" BorderBrush="Gray" BorderThickness="1" CornerRadius="5">
+                        <!-- TextBox to act as the Address Bar -->
+                        <TextBox Text="https://www.example.com" FontSize="14" Padding="5"  VerticalContentAlignment="Center"
+                             Background="Transparent" BorderThickness="0" />
+                    </Border>
+
+                    <!-- Button on the Right (Rounded Edges Styled) -->
+                    <Button Width="100" Height="35" BorderBrush="Transparent" Margin="10,0,0,0"  HorizontalAlignment="Right" VerticalAlignment="Center" Padding="5" Cursor="Hand">
+                        <Button.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#56CCF2" Offset="0.0" />
+                                <GradientStop Color="#2F80ED" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Button.Background>
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="15" BorderBrush="Transparent" Padding="5">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <!-- Button Content -->
+                        <TextBlock Text="Change" FontSize="14" FontWeight="Bold" Foreground="White" />
+                    </Button>
+                </DockPanel>
+
+
             </Grid>
-            <!--grid for the right column-->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition Height="30"/>
-                </Grid.RowDefinitions>
-                <!--grid for displaying the details of selected tool, tool build and also software versions
-                tool build to be editable
-                software versions to be editable-->
-                <Grid Grid.Row="0">
-
-                </Grid>
-                <!--grid for buttons for saving selected tool into database-->
-                <Grid Grid.Row="1">
-
-                </Grid>
-            </Grid>
-        </Grid>
-
-        <!--grid for the lower row for main buttons-->
-        <Grid Grid.Row="2">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Width="Auto" Margin="10 10 10 10" Text="Enter modem number to merge to: " ></TextBlock>
-                <TextBox Name="TextboxModemDestination" Width="200" Margin="10 10 10 10"></TextBox>
-                <Button Name="ButtonMerge" Width="150" Margin="10 10 10 10" Content="Merge" ></Button>
-                <Button Name="ButtonClose" Width="150" Margin="10 10 10 10" Content="Cancel/Close" ></Button>
-            </StackPanel>
-        </Grid>
-
+        </Border>
     </Grid>
 </Window>

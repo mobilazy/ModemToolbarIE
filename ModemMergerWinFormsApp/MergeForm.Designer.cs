@@ -30,6 +30,7 @@
         {
             this.txtModemNo = new System.Windows.Forms.TextBox();
             this.btnGetModem = new System.Windows.Forms.Button();
+            this.btnFileManager = new System.Windows.Forms.Button();
             this.treeView1 = new System.Windows.Forms.TreeView();
             this.treeView2 = new System.Windows.Forms.TreeView();
             this.btnAdd = new System.Windows.Forms.Button();
@@ -61,6 +62,17 @@
             this.btnGetModem.Text = "Get Modem";
             this.btnGetModem.UseVisualStyleBackColor = true;
             this.btnGetModem.Click += new System.EventHandler(this.btnGetModem_Click);
+            // 
+            // btnFileManager
+            // 
+            this.btnFileManager.Location = new System.Drawing.Point(299, 15);
+            this.btnFileManager.Margin = new System.Windows.Forms.Padding(4);
+            this.btnFileManager.Name = "btnFileManager";
+            this.btnFileManager.Size = new System.Drawing.Size(100, 26);
+            this.btnFileManager.TabIndex = 10;
+            this.btnFileManager.Text = "File Manager";
+            this.btnFileManager.UseVisualStyleBackColor = true;
+            this.btnFileManager.Click += new System.EventHandler(this.btnFileManager_Click);
             // 
             // treeView1
             // 
@@ -162,6 +174,7 @@
             this.Controls.Add(this.btnAdd);
             this.Controls.Add(this.treeView2);
             this.Controls.Add(this.treeView1);
+            this.Controls.Add(this.btnFileManager);
             this.Controls.Add(this.btnGetModem);
             this.Controls.Add(this.txtModemNo);
             this.Margin = new System.Windows.Forms.Padding(4);
@@ -176,6 +189,7 @@
 
         private System.Windows.Forms.TextBox txtModemNo;
         private System.Windows.Forms.Button btnGetModem;
+        private System.Windows.Forms.Button btnFileManager;
         private System.Windows.Forms.TreeView treeView1;
         private System.Windows.Forms.TreeView treeView2;
         private System.Windows.Forms.Button btnAdd;

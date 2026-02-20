@@ -183,6 +183,21 @@ namespace BandObjectLib
                     int str = URL.ToString().IndexOf("&P_10=")+6;
                     mNo = URL.ToString().Substring(str, 7);
                 }
+                else if (URL.ToString().Contains(@"gant_tools.web"))
+                {
+                    me = ModemEvents.GantTools;
+                    // Extract mob_id parameter
+                    string pattern = @"mob_id=(\d+)";
+                    System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(URL.ToString(), pattern);
+                    if (match.Success)
+                    {
+                        mNo = match.Groups[1].Value;
+                    }
+                    else
+                    {
+                        mNo = "";
+                    }
+                }
                 else if (URL.ToString().Contains(@"gant.web"))
                 {
                     me = ModemEvents.Gant;

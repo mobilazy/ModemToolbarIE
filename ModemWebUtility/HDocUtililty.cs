@@ -28,6 +28,8 @@ namespace ModemWebUtility
         public static string UrlDdBhaInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$motor_mc.actioninsert";
         public static string UrlDdCompInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$motoritm_mc.actioninsert";
         public static string UrlGpInsert = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_gp.InsertDefaultGP?p_ssord_id=";
+        public static string UrlGantTools = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/gant_tools.web?mob_id=";
+        public static string UrlDocregUpload = @"http://norwayappsprd.corp.halliburton.com/pls/log_web/docreg.upload_winpul?ssord_id=";
 
 
         private static Encoding EncodingUnicode = Encoding.Unicode; // Encoding.GetEncoding("UTF-8");
