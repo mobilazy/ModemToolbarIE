@@ -63,7 +63,7 @@ namespace ModemMergerWinFormsApp
             this.txtDestModem = new TextBox();
             this.btnCopySelected = new Button();
             this.btnCopyAll = new Button();
-            this.btnCopyAllTools = new Button();
+            this.btnCopyGantTools = new Button();
 
             this.SuspendLayout();
 
@@ -120,11 +120,12 @@ namespace ModemMergerWinFormsApp
             this.lvAttachments.Location = new System.Drawing.Point(3, 3);
             this.lvAttachments.Size = new System.Drawing.Size(750, 395);
             this.lvAttachments.View = View.Details;
-            this.lvAttachments.Columns.Add("File Name", 250);
-            this.lvAttachments.Columns.Add("Type", 80);
-            this.lvAttachments.Columns.Add("Link Text", 200);
-            this.lvAttachments.Columns.Add("Method", 100);
-            this.lvAttachments.Columns.Add("URL", 120);
+            this.lvAttachments.Columns.Add("File Name", 200);
+            this.lvAttachments.Columns.Add("Type", 60);
+            this.lvAttachments.Columns.Add("Doc Type", 100);
+            this.lvAttachments.Columns.Add("Link Text", 150);
+            this.lvAttachments.Columns.Add("Method", 80);
+            this.lvAttachments.Columns.Add("URL", 160);
             this.lvAttachments.DoubleClick += LvAttachments_DoubleClick;
 
             // 
@@ -237,12 +238,12 @@ namespace ModemMergerWinFormsApp
             this.btnCopyAll.Click += BtnCopyAll_Click;
 
             // 
-            // btnCopyAllTools
+            // btnCopyGantTools
             // 
-            this.btnCopyAllTools.Location = new System.Drawing.Point(314, 585);
-            this.btnCopyAllTools.Size = new System.Drawing.Size(140, 30);
-            this.btnCopyAllTools.Text = "Copy All Tools";
-            this.btnCopyAllTools.Click += BtnCopyAllTools_Click;
+            this.btnCopyGantTools.Location = new System.Drawing.Point(314, 585);
+            this.btnCopyGantTools.Size = new System.Drawing.Size(140, 30);
+            this.btnCopyGantTools.Text = "Copy Gant Tools";
+            this.btnCopyGantTools.Click += BtnCopyGantTools_Click;
 
             // 
             // AttachmentForm
@@ -263,7 +264,7 @@ namespace ModemMergerWinFormsApp
             this.Controls.Add(this.txtDestModem);
             this.Controls.Add(this.btnCopySelected);
             this.Controls.Add(this.btnCopyAll);
-            this.Controls.Add(this.btnCopyAllTools);
+            this.Controls.Add(this.btnCopyGantTools);
             this.Controls.Add(this.progressBar);
             this.Controls.Add(this.lblStatus);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -372,6 +373,7 @@ namespace ModemMergerWinFormsApp
                 {
                     var item = new ListViewItem(attachment.FileName);
                     item.SubItems.Add(attachment.FileType);
+                    item.SubItems.Add(GetDocTypDescription(attachment.DocTyp));
                     item.SubItems.Add(attachment.LinkText);
                     item.SubItems.Add(attachment.DownloadMethod.ToString());
                     item.SubItems.Add(TruncateUrl(attachment.Url, 30));
@@ -639,7 +641,7 @@ namespace ModemMergerWinFormsApp
             await CopyAttachments(allItems, destModem);
         }
 
-        private async void BtnCopyAllTools_Click(object sender, EventArgs e)
+        private async void BtnCopyGantTools_Click(object sender, EventArgs e)
         {
             string destModem = txtDestModem.Text.Trim();
             if (string.IsNullOrWhiteSpace(destModem) || destModem.Length != 7)
@@ -649,20 +651,51 @@ namespace ModemMergerWinFormsApp
                 return;
             }
 
-            if (gantParams == null || gantParams.Tools.Count == 0)
+            if (string.IsNullOrWhiteSpace(modemNumber))
             {
-                MessageBox.Show("No tools to copy. Please load a modem first.", "No Tools",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please load a source modem first.", "No Source Modem",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var result = MessageBox.Show($"This will copy all {gantParams.Tools.Count} tools from modem {modemNumber} to modem {destModem}.\n\nContinue?",
+            var result = MessageBox.Show($"This will copy Gant tool configuration from modem {modemNumber} to modem {destModem}.\n\nContinue?",
                 "Confirm Copy", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result != DialogResult.Yes)
                 return;
 
-            await CopyAllTools(destModem);
+            SetButtonsEnabled(false);
+            lblStatus.Text = $"Copying Gant tools from {modemNumber} to {destModem}...";
+            Application.DoEvents();
+
+            try
+            {
+                var copier = new GantToolCopier();
+                bool success = await copier.CopyGantToolsAsync(modemNumber, destModem);
+
+                if (success)
+                {
+                    lblStatus.Text = $"Successfully copied Gant tools to modem {destModem}";
+                    MessageBox.Show($"Gant tools copied successfully to modem {destModem}!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    lblStatus.Text = $"Failed to copy Gant tools: {copier.LastError}";
+                    MessageBox.Show($"Failed to copy Gant tools:\n\n{copier.LastError}", "Copy Failed",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = $"Error: {ex.Message}";
+                MessageBox.Show($"Error copying Gant tools:\n\n{ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                SetButtonsEnabled(true);
+            }
         }
 
         private async Task CopyAttachments(List<ListViewItem> items, string destModem)
@@ -694,8 +727,8 @@ namespace ModemMergerWinFormsApp
                         {
                             string tempFile = Path.Combine(tempFolder, attachment.FileName);
 
-                            // Upload to destination modem
-                            if (await uploader.UploadFileAsync(tempFile, destModem, attachment.FileType))
+                            // Upload to destination modem with exact document type (1:1 copy)
+                            if (await uploader.UploadFileAsync(tempFile, destModem, attachment.DocTyp))
                             {
                                 successCount++;
                             }
@@ -741,33 +774,6 @@ namespace ModemMergerWinFormsApp
             }
         }
 
-        private async Task CopyAllTools(string destModem)
-        {
-            SetButtonsEnabled(false);
-            progressBar.Value = 0;
-
-            try
-            {
-                lblStatus.Text = $"Copying tools to modem {destModem}...";
-                Application.DoEvents();
-
-                // TODO: Implement tool copying logic
-                // This would need to use the appropriate Insert classes (ModemMwdInsert, ModemLooseInsert, etc.)
-                // based on tool type and POST the data to the destination modem
-                
-                await Task.Delay(100); // Placeholder
-
-                MessageBox.Show("Tool copying not yet implemented. This will copy all tools 1:1 without picker.",
-                    "Not Implemented", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                lblStatus.Text = "Tool copy feature pending implementation";
-            }
-            finally
-            {
-                SetButtonsEnabled(true);
-            }
-        }
-
         private List<ListViewItem> GetCheckedItems()
         {
             var items = new List<ListViewItem>();
@@ -787,7 +793,7 @@ namespace ModemMergerWinFormsApp
             btnLoadModem.Enabled = enabled;
             btnCopySelected.Enabled = enabled;
             btnCopyAll.Enabled = enabled;
-            btnCopyAllTools.Enabled = enabled;
+            btnCopyGantTools.Enabled = enabled;
         }
 
         private void UpdateProgress(DownloadProgressEventArgs e)
@@ -810,6 +816,22 @@ namespace ModemMergerWinFormsApp
                 return url;
 
             return url.Substring(0, maxLength) + "...";
+        }
+
+        private string GetDocTypDescription(string docTyp)
+        {
+            if (string.IsNullOrWhiteSpace(docTyp))
+                return "Other (22)";
+
+            switch (docTyp)
+            {
+                case "1": return "WinPul (1)";
+                case "2": return "Shipping (2)";
+                case "3": return "BHA (3)";
+                case "4": return "Download (4)";
+                case "22": return "Other (22)";
+                default: return $"Unknown ({docTyp})";
+            }
         }
 
         private string FormatBytes(long bytes)
@@ -847,6 +869,6 @@ namespace ModemMergerWinFormsApp
         private TextBox txtDestModem;
         private Button btnCopySelected;
         private Button btnCopyAll;
-        private Button btnCopyAllTools;
+        private Button btnCopyGantTools;
     }
 }

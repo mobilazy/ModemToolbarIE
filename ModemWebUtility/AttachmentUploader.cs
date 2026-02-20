@@ -21,7 +21,10 @@ namespace ModemWebUtility
         /// <summary>
         /// Uploads a file to a modem using multipart/form-data
         /// </summary>
-        public async Task<bool> UploadFileAsync(string filePath, string destinationModemNumber, string fileType = "")
+        /// <param name="filePath">Path to file to upload</param>
+        /// <param name="destinationModemNumber">Modem ID (P_SSORD_ID)</param>
+        /// <param name="docTyp">Document type value (1=WinPul, 2=Shipping, 3=BHA, 4=Download, 22=Other)</param>
+        public async Task<bool> UploadFileAsync(string filePath, string destinationModemNumber, string docTyp = "")
         {
             LastError = null;
 
@@ -38,8 +41,9 @@ namespace ModemWebUtility
 
                 OnUploadProgress(new UploadProgressEventArgs { FileName = fileName, BytesUploaded = 0, TotalBytes = fileData.Length });
 
-                string url = HDocUtility.UrlDocregUpload + destinationModemNumber;
+                string url = HDocUtility.UrlDocregUpload;
                 string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+                string docTypValue = string.IsNullOrWhiteSpace(docTyp) ? "22" : docTyp;
 
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "POST";
@@ -51,21 +55,22 @@ namespace ModemWebUtility
                 {
                     var encoding = Encoding.UTF8;
 
-                    // Write file data
+                    // Add doctyp field (document type selector)
+                    byte[] doctypField = encoding.GetBytes($"--{boundary}\r\nContent-Disposition: form-data; name=\"doctyp\"\r\n\r\n{docTypValue}\r\n");
+                    await requestStream.WriteAsync(doctypField, 0, doctypField.Length);
+
+                    // Add file data (field name is "name" per the HTML form)
                     byte[] header = encoding.GetBytes($"--{boundary}\r\nContent-Disposition: form-data" + 
-                        $"; name=\"file\"; filename=\"{fileName}\"\r\nContent-Type: application/octet-stream\r\n\r\n");
+                        $"; name=\"name\"; filename=\"{fileName}\"\r\nContent-Type: application/octet-stream\r\n\r\n");
                     await requestStream.WriteAsync(header, 0, header.Length);
                     await requestStream.WriteAsync(fileData, 0, fileData.Length);
 
-                    // Optional: Add file type if provided
-                    if (!string.IsNullOrWhiteSpace(fileType))
-                    {
-                        byte[] typeField = encoding.GetBytes($"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file_type\"\r\n\r\n{fileType}");
-                        await requestStream.WriteAsync(typeField, 0, typeField.Length);
-                    }
+                    // Add p_ssord_id field (modem number)
+                    byte[] ssordField = encoding.GetBytes($"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"p_ssord_id\"\r\n\r\n{destinationModemNumber}\r\n");
+                    await requestStream.WriteAsync(ssordField, 0, ssordField.Length);
 
                     // Close boundary
-                    byte[] footer = encoding.GetBytes($"\r\n--{boundary}--\r\n");
+                    byte[] footer = encoding.GetBytes($"--{boundary}--\r\n");
                     await requestStream.WriteAsync(footer, 0, footer.Length);
                 }
 

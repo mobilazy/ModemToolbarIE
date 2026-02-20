@@ -226,6 +226,7 @@
     <Compile Include="AttachmentUploader.cs" />
     <Compile Include="DdBhaParameters.cs" />
     <Compile Include="GantParameters.cs" />
+    <Compile Include="GantToolCopier.cs" />
     <Compile Include="GpBhaParameters.cs" />
     <Compile Include="HDocUtililty.cs" />
     <Compile Include="LooseBhaParameters.cs" />

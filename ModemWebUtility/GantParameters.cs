@@ -134,6 +134,7 @@ namespace ModemWebUtility
                         Url = NormalizeUrl(href),
                         LinkText = text,
                         FileType = GetFileType(href),
+                        DocTyp = ExtractDocTypFromContext(link),
                         DownloadMethod = DownloadMethod.DirectLink
                     };
 
@@ -300,6 +301,58 @@ namespace ModemWebUtility
             return match.Success ? match.Groups[1].Value.ToUpper() : "UNKNOWN";
         }
 
+        /// <summary>
+        /// Extract document type from HTML context around the link
+        /// Looks for nearby table cells or spans containing type info
+        /// </summary>
+        private string ExtractDocTypFromContext(HtmlNode linkNode)
+        {
+            try
+            {
+                // Look for parent row and check adjacent cells
+                var parentRow = linkNode.Ancestors("tr").FirstOrDefault();
+                if (parentRow != null)
+                {
+                    var cells = parentRow.SelectNodes(".//td");
+                    if (cells != null && cells.Count > 1)
+                    {
+                        // Check second column for type description
+                        var typeCell = cells.Count > 1 ? cells[1].InnerText.Trim() : "";
+                        return MapTypeTextToDocTyp(typeCell);
+                    }
+                }
+
+                // Fallback: look for type in link text or nearby elements
+                var linkText = linkNode.InnerText.ToLower();
+                return MapTypeTextToDocTyp(linkText);
+            }
+            catch
+            {
+                return "22"; // Default: Other Documents
+            }
+        }
+
+        /// <summary>
+        /// Maps type description text to doctyp value
+        /// </summary>
+        private string MapTypeTextToDocTyp(string typeText)
+        {
+            if (string.IsNullOrWhiteSpace(typeText))
+                return "22";
+
+            var lower = typeText.ToLower();
+            if (lower.Contains("winpul") || lower.Contains("image"))
+                return "1";
+            if (lower.Contains("shipping") || lower.Contains("signed"))
+                return "2";
+            if (lower.Contains("bha"))
+                return "3";
+            if (lower.Contains("download"))
+                return "4";
+
+            return "22"; // Other Documents
+        }
+
         private string NormalizeUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return url;
@@ -359,6 +412,7 @@ namespace ModemWebUtility
         public string Url { get; set; }
         public string LinkText { get; set; }
         public string FileType { get; set; }
+        public string DocTyp { get; set; } // Document type: 1=WinPul, 2=Shipping, 3=BHA, 4=Download, 22=Other
         public long FileSize { get; set; }
         public DateTime? LastModified { get; set; }
         public DownloadMethod DownloadMethod { get; set; }
