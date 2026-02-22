@@ -2,6 +2,12 @@
 
 ## Current Status
 ✅ Application renamed from "ModemMergerWinFormsApp" to "ModemCopier 2.0"
+✅ Fixed GP BHA cross-modem copying functionality
+✅ Added field truncation to prevent Oracle buffer errors
+✅ Updated ALL O_ fields (LOV IDs) from target modem
+✅ Removed all debug popups
+✅ Repository cleaned up (old projects removed)
+✅ New simplified solution file (ModemCopier.sln)
 ✅ Deployment package created with installer scripts
 ✅ Release build completed
 
@@ -39,7 +45,7 @@ https://wixtoolset.org/releases/
 
 ### Build MSI
 1. Install WiX Toolset
-2. Open Visual Studio
+2. Open `ModemCopier.sln` in Visual Studio
 3. Add `ModemCopierSetup\ModemCopierSetup.wixproj` to solution
 4. Build the project
 5. MSI file will be in `ModemCopierSetup\bin\Release\ModemCopier-Setup.msi`
@@ -69,6 +75,20 @@ Halliburton
 ### Version
 2.0.0.0
 
+### Key Features
+- ✅ Copy GP (Geo-Pilot) BHA configurations between different modems
+- ✅ Copy DD (Directional Drilling) BHA configurations
+- ✅ Copy Loose BHA items
+- ✅ **Cross-modem compatibility** - Automatically updates List of Values (O_ fields) from target modem
+- ✅ **Field truncation** - Prevents Oracle "character string buffer too small" errors
+- ✅ **Completion warning clearing** - Automatically clears H_GP_COMPL_WARN from copies
+- ✅ Optional "Main" text renaming in descriptions
+
+### Solution File
+ModemCopier.sln (simplified solution with only 2 projects)
+- ModemWebUtility (core library)
+- ModemMergerWinFormsApp (main application)
+
 ### Executable
 ModemCopier.exe (renamed from ModemMergerWinFormsApp.exe)
 
@@ -84,12 +104,48 @@ ModemCopier.exe (renamed from ModemMergerWinFormsApp.exe)
 - Newtonsoft.Json.dll
 - ModemWebUtility.dll
 
-## Files Modified
+## Files Modified (v2.0.0)
+
+### Application Branding
 1. `ModemMergerWinFormsApp\Properties\AssemblyInfo.cs`
    - AssemblyTitle: "ModemCopier 2.0"
    - AssemblyProduct: "ModemCopier 2.0"
    - AssemblyCompany: "Halliburton"
    - Version: 2.0.0.0
+
+2. `ModemMergerWinFormsApp\MergeForm.Designer.cs`
+   - Window title: "ModemCopier 2.0"
+
+### Core Functionality Fixes
+3. `ModemWebUtility\ModemGpInsert.cs`
+   - Added field truncation (P_GP_DESC: 50 chars, P_GP_COMMENT: 1000 chars, etc.)
+   - Updated ALL O_ fields from target modem (13 LOV fields)
+   - Cleared H_GP_COMPL_WARN completion warnings
+
+4. `ModemWebUtility\GpBhaParameters.cs`
+   - Removed debug MessageBox popups
+   - Silent error handling
+
+5. `ModemWebUtility\DdBhaParameters.cs`
+   - Removed debug MessageBox popups
+   - Silent error handling
+
+6. `ModemWebUtility\LooseBhaParameters.cs`
+   - Removed debug MessageBox popups
+   - Silent error handling
+
+7. `ModemWebUtility\MwdBhaParameters.cs`
+   - Removed debug MessageBox popups
+   - Silent error handling
+
+8. `ModemMergerWinFormsApp\MergeForm.cs`
+   - Removed debug MessageBox popups
+
+### Repository Structure
+9. Created `ModemCopier.sln` (simplified solution)
+10. Created `README.md` (comprehensive documentation)
+11. Updated `.gitignore` (better exclusions)
+12. Removed old IE toolbar and installer projects
 
 ## Next Steps
 
