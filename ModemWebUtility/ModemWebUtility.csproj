@@ -234,6 +234,7 @@
     <Compile Include="ModemDataPost.cs" />
     <Compile Include="ModemDdInsert.cs" />
     <Compile Include="ModemGpInsert.cs" />
+    <Compile Include="ModemHeaderCopy.cs" />
     <Compile Include="ModemLooseInsert.cs" />
     <Compile Include="ModemMwdInsert.cs" />
     <Compile Include="ModemParameters.cs" />

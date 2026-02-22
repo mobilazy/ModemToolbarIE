@@ -263,11 +263,7 @@ __pycache__/
 temp_*.txt
 *.net6backup
 
-# Upgrade logs
-UpgradeLog*.htm
-UpgradeLog*.XML
-
-# Old/obsolete files
+# Obsolete project files and notes
 build events.txt
 DD BHA HTML.txt
 GP BHA HTML.txt
@@ -286,16 +282,3 @@ CPOL.zip
 WCFModemService.cs
 SvcUtil.exe
 BUILD.bat
-BandObjects.snk
-README_START_HERE.md
-BUILD_INSTRUCTIONS.md
-
-# Deployment build artifacts
-ModemCopierSetup/DeploymentPackage/*.exe
-ModemCopierSetup/DeploymentPackage/*.dll
-ModemCopierSetup/DeploymentPackage/*.config
-ModemCopierSetup/bin/
-ModemCopierSetup/obj/
-
-# Old solution file
-ModemToolbarIE.sln

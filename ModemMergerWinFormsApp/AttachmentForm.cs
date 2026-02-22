@@ -98,6 +98,15 @@ namespace ModemMergerWinFormsApp
             this.btnLoadModem.Click += BtnLoadModem_Click;
 
             // 
+            // btnCopyHeader
+            // 
+            this.btnCopyHeader = new Button();
+            this.btnCopyHeader.Location = new System.Drawing.Point(350, 40);
+            this.btnCopyHeader.Size = new System.Drawing.Size(105, 27);
+            this.btnCopyHeader.Text = "Copy Header";
+            this.btnCopyHeader.Click += BtnCopyHeader_Click;
+
+            // 
             // tabControl
             // 
             this.tabControl.Location = new System.Drawing.Point(12, 75);
@@ -253,6 +262,7 @@ namespace ModemMergerWinFormsApp
             this.Controls.Add(this.lblModemNumber);
             this.Controls.Add(this.txtModemNumber);
             this.Controls.Add(this.btnLoadModem);
+            this.Controls.Add(this.btnCopyHeader);
             this.Controls.Add(this.tabControl);
             this.Controls.Add(this.txtDownloadPath);
             this.Controls.Add(this.btnBrowse);
@@ -315,6 +325,73 @@ namespace ModemMergerWinFormsApp
             }
 
             LoadAttachments();
+        }
+
+        private void BtnCopyHeader_Click(object sender, EventArgs e)
+        {
+            string sourceModem = txtModemNumber.Text.Trim();
+            string destModem = txtDestModem.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(sourceModem) || sourceModem.Length != 7)
+            {
+                MessageBox.Show("Please enter a valid 7-digit source modem number.", "Invalid Input",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(destModem) || destModem.Length != 7)
+            {
+                MessageBox.Show("Please enter a valid 7-digit destination modem number.", "Invalid Input",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (sourceModem == destModem)
+            {
+                MessageBox.Show("Source and destination modem numbers must be different.", "Invalid Input",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Copy header information from modem {sourceModem} to modem {destModem}?\n\n" +
+                "Do you want to continue?",
+                "Confirm Copy Header",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                lblStatus.Text = $"Copying header from {sourceModem} to {destModem}...";
+                Application.DoEvents();
+
+                ModemHeaderCopy headerCopy = new ModemHeaderCopy(sourceModem, destModem);
+                bool success = headerCopy.CopyHeaderFields();
+
+                if (success)
+                {
+                    lblStatus.Text = $"Header successfully copied from modem {sourceModem} to {destModem}";
+                    MessageBox.Show($"Header fields successfully copied from modem {sourceModem} to modem {destModem}.",
+                        "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    lblStatus.Text = $"Failed to copy header from {sourceModem} to {destModem}";
+                    MessageBox.Show($"Failed to copy header. The server returned an error.",
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = $"Error copying header: {ex.Message}";
+                MessageBox.Show($"Error copying header:\n{ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadAttachments()
@@ -908,16 +985,16 @@ namespace ModemMergerWinFormsApp
         private string GetDocTypDescription(string docTyp)
         {
             if (string.IsNullOrWhiteSpace(docTyp))
-                return "Other";
+                return "Other (22)";
 
             switch (docTyp)
             {
-                case "1": return "WinPul";
-                case "2": return "Shipping";
-                case "3": return "BHA";
-                case "4": return "Download";
-                case "22": return "Other";
-                default: return "Unknown";
+                case "1": return "WinPul (1)";
+                case "2": return "Shipping (2)";
+                case "3": return "BHA (3)";
+                case "4": return "Download (4)";
+                case "22": return "Other (22)";
+                default: return $"Unknown ({docTyp})";
             }
         }
 
@@ -948,6 +1025,7 @@ namespace ModemMergerWinFormsApp
         private Label lblTitle;
         private TextBox txtModemNumber;
         private Button btnLoadModem;
+        private Button btnCopyHeader;
         private Label lblModemNumber;
         private TabControl tabControl;
         private TabPage tabAttachments;
