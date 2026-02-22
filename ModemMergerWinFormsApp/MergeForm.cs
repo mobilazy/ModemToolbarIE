@@ -161,10 +161,11 @@ namespace ModemMergerWinFormsApp
                 //}
 
                 TreeNode tn = new TreeNode(ReplaceQuotes(mbp.GpBhaPosts.P_GP_DESC.Item2));
-                ModemGpPostObjects tagObj = new ModemGpPostObjects();
-
-                tagObj.GpCompPostDict = mbp.GpBhaCompPost;
-                tagObj.GpBhaPost = mbp.GpBhaPosts;
+                ModemGpPostObjects tagObj = new ModemGpPostObjects
+                {
+                    GpCompPostDict = mbp.GpBhaCompPost,
+                    GpBhaPost = mbp.GpBhaPosts
+                };
                 tn.Tag = tagObj;
 
                 //foreach (var p in tagObj.GpBhaPost.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -241,9 +242,15 @@ namespace ModemMergerWinFormsApp
                 newNode.Text = node.Text;
                 newNode.Tag = node.Tag;
 
+                // Apply Main rename to node text for MWD and GP
+                if (node.Parent != null && (node.Parent.Name == mwdName || node.Parent.Name == gpName))
+                {
+                    newNode.Text = RenameMainInText(newNode.Text);
+                }
+
                 int index = 0;
 
-                switch (node.Parent.Name)
+                switch (node.Parent != null ? node.Parent.Name : "")
                 {
                     case mwdName:
                         index = targetNode.Nodes.IndexOf(targetMwdNode);
@@ -358,6 +365,21 @@ namespace ModemMergerWinFormsApp
                                 ModemMwdPostObjects mpo = new ModemMwdPostObjects();
                                 mpo = subNode.Tag as ModemMwdPostObjects;
 
+                                // Apply Main rename to MWD items
+                                if (chkRenameMain.Checked && mpo != null)
+                                {
+                                    // Rename BHA-level fields
+                                    mpo.MwdBhaPost.P_BHA_DESC = RenameMainInText(mpo.MwdBhaPost.P_BHA_DESC);
+                                    mpo.MwdBhaPost.P_MWDDWD_ADD_INFO = RenameMainInText(mpo.MwdBhaPost.P_MWDDWD_ADD_INFO);
+                                    
+                                    // Rename component-level fields
+                                    foreach (var compPost in mpo.MwdCompPostDict.Values)
+                                    {
+                                        compPost.P_DESCRIPTION = RenameMainInText(compPost.P_DESCRIPTION);
+                                        compPost.P_COMMENTS = RenameMainInText(compPost.P_COMMENTS);
+                                    }
+                                }
+
                                 ModemParameters mpm = new ModemParameters(mc.GetHtmlAsHdoc(), targetModemNumber);
                                 ModemMwdInsert mim = new ModemMwdInsert(mpm, mpo, false);
                                 break;
@@ -371,23 +393,26 @@ namespace ModemMergerWinFormsApp
                                 break;
 
                             case gpName:
-                                ModemGpPostObjects mdg = new ModemGpPostObjects();
-                                mdg = subNode.Tag as ModemGpPostObjects;
+                                ModemGpPostObjects mdg = subNode.Tag as ModemGpPostObjects;
 
-                                //foreach (var p in mdg.GpBhaPost.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                                //{
-                                //    if (p.PropertyType == typeof(Tuple<string, string>))
-                                //    {
-                                //        Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(mdg.GpBhaPost, null);
-                                //        if (p.Name == "P_L_HOLESEC")
-                                //        {
-                                //            MessageBox.Show("When adding to modem: " + p.Name + " => " + temp.Item1 + " => " + temp.Item2);
-                                //        }
-
-
-                                //    }
-
-                                //}
+                                // Apply Main rename to GP items
+                                if (chkRenameMain.Checked && mdg != null)
+                                {
+                                    // Rename BHA-level fields (Tuples - need to recreate with renamed Item2)
+                                    mdg.GpBhaPost.P_GP_DESC = new Tuple<string, string>(
+                                        mdg.GpBhaPost.P_GP_DESC.Item1,
+                                        RenameMainInText(mdg.GpBhaPost.P_GP_DESC.Item2));
+                                    mdg.GpBhaPost.P_GP_COMMENT = new Tuple<string, string>(
+                                        mdg.GpBhaPost.P_GP_COMMENT.Item1,
+                                        RenameMainInText(mdg.GpBhaPost.P_GP_COMMENT.Item2));
+                                    
+                                    // Rename component-level fields
+                                    foreach (var compPost in mdg.GpCompPostDict.Values)
+                                    {
+                                        compPost.P_DESCRIPTION = RenameMainInText(compPost.P_DESCRIPTION);
+                                        compPost.P_COMMENTS = RenameMainInText(compPost.P_COMMENTS);
+                                    }
+                                }
 
                                 ModemParameters mpg = new ModemParameters(mc.GetHtmlAsHdoc(), targetModemNumber);
                                 ModemGpInsert mig = new ModemGpInsert(mpg, mdg, false);
@@ -590,6 +615,60 @@ namespace ModemMergerWinFormsApp
             {
                 e.Handled = true;
             }
+        }
+
+        private void chkRenameMain_CheckedChanged(object sender, EventArgs e)
+        {
+            txtRenameMainTo.Enabled = chkRenameMain.Checked;
+        }
+
+        private void btnResetForm_Click(object sender, EventArgs e)
+        {
+            // Clear all textboxes
+            txtModemNo.Text = "";
+            txtTargetModem.Text = "";
+            txtRenameMainTo.Text = "";
+            
+            // Uncheck checkbox
+            chkRenameMain.Checked = false;
+            
+            // Clear both tree views
+            treeView1.Nodes.Clear();
+            treeView2.Nodes.Clear();
+            
+            // Re-initialize target nodes
+            targetNode = new TreeNode();
+            targetMwdNode = new TreeNode(mwdName);
+            targetDdNode = new TreeNode(ddName);
+            targetGpNode = new TreeNode(gpName);
+            targetLooseNode = new TreeNode(looseName);
+            
+            // Rebuild target tree structure
+            UpdateTargetNodes(treeView2, "default");
+            
+            // Reset buttons
+            btnAdd.Enabled = false;
+            btnGetModem.Enabled = false;
+            
+            // Reset focused state
+            lastFocused = FocusedTreeview.none;
+        }
+
+        private string RenameMainInText(string text)
+        {
+            if (!chkRenameMain.Checked || string.IsNullOrWhiteSpace(txtRenameMainTo.Text))
+                return text;
+
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Case-insensitive replacement of "Main" with custom text
+            return System.Text.RegularExpressions.Regex.Replace(
+                text, 
+                "Main", 
+                txtRenameMainTo.Text.Trim(), 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            );
         }
 
         private void btnFileManager_Click(object sender, EventArgs e)

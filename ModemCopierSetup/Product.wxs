@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" 
+           Name="ModemCopier 2.0" 
+           Language="1033" 
+           Version="2.0.0.0" 
+           Manufacturer="Halliburton" 
+           UpgradeCode="8F2A3B4C-5D6E-7F8A-9B0C-1D2E3F4A5B6C">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="ModemCopier 2.0 - Halliburton Modem Data Copy Tool"
+             Comments="Installer for ModemCopier 2.0" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="ModemCopier 2.0" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="Dependencies" />
+    </Feature>
+
+    <Icon Id="AppIcon.exe" SourceFile="$(var.ModemMergerWinFormsApp.TargetPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+    
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
+    </UI>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="WixShellExecTarget" Value="[#ModemMergerWinFormsApp.exe]" />
+    <CustomAction Id="LaunchApplication"
+                  BinaryKey="WixCA"
+                  DllEntry="WixShellExec"
+                  Impersonate="yes" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="CompanyFolder" Name="Halliburton">
+          <Directory Id="INSTALLFOLDER" Name="ModemCopier 2.0" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="ModemCopier 2.0"/>
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="ModemCopierExe" Guid="1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D">
+        <File Id="ModemMergerWinFormsApp.exe" 
+              Name="ModemCopier.exe"
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ModemMergerWinFormsApp.exe" 
+              KeyPath="yes">
+          <Shortcut Id="DesktopShortcut"
+                    Directory="DesktopFolder"
+                    Name="ModemCopier 2.0"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="AppIcon.exe"
+                    IconIndex="0"
+                    Advertise="yes" />
+          <Shortcut Id="StartMenuShortcut"
+                    Directory="ApplicationProgramsFolder"
+                    Name="ModemCopier 2.0"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="AppIcon.exe"
+                    IconIndex="0"
+                    Advertise="yes" />
+        </File>
+      </Component>
+      
+      <Component Id="ModemCopierConfig" Guid="2B3C4D5E-6F7A-8B9C-0D1E-2F3A4B5C6D7E">
+        <File Id="ModemMergerWinFormsApp.exe.config" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ModemMergerWinFormsApp.exe.config" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ModemWebUtilityDll" Guid="3C4D5E6F-7A8B-9C0D-1E2F-3A4B5C6D7E8F">
+        <File Id="ModemWebUtility.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ModemWebUtility.dll" 
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="Dependencies" Directory="INSTALLFOLDER">
+      <Component Id="HtmlAgilityPack" Guid="4D5E6F7A-8B9C-0D1E-2F3A-4B5C6D7E8F9A">
+        <File Id="HtmlAgilityPack.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)HtmlAgilityPack.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="NewtonsoftJson" Guid="5E6F7A8B-9C0D-1E2F-3A4B-5C6D7E8F9A0B">
+        <File Id="Newtonsoft.Json.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)Newtonsoft.Json.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ClearScriptCore" Guid="6F7A8B9C-0D1E-2F3A-4B5C-6D7E8F9A0B1C">
+        <File Id="ClearScript.Core.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ClearScript.Core.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ClearScriptV8" Guid="7A8B9C0D-1E2F-3A4B-5C6D-7E8F9A0B1C2D">
+        <File Id="ClearScript.V8.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ClearScript.V8.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ClearScriptV8x64" Guid="8B9C0D1E-2F3A-4B5C-6D7E-8F9A0B1C2D3E">
+        <File Id="ClearScriptV8.win_x64.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ClearScriptV8.win-x64.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ClearScriptV8x86" Guid="9C0D1E2F-3A4B-5C6D-7E8F-9A0B1C2D3E4F">
+        <File Id="ClearScriptV8.win_x86.dll" 
+              Source="$(var.ModemMergerWinFormsApp.TargetDir)ClearScriptV8.win-x86.dll" 
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="ApplicationProgramsMenuFolder" Directory="ApplicationProgramsFolder" Guid="0D1E2F3A-4B5C-6D7E-8F9A-0B1C2D3E4F5A">
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+      <RegistryValue Root="HKCU" Key="Software\Halliburton\ModemCopier" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
+    </Component>
+  </Fragment>
+</Wix>

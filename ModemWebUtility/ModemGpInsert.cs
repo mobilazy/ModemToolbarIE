@@ -14,8 +14,8 @@ namespace ModemWebUtility
     {
         private List<string> existingGpId = new List<string>();
         private List<string> newGpId = new List<string>();
-        private ModemParameters mp;// = new ModemParameters();
-        private ModemGpPostObjects mObj = new ModemGpPostObjects();
+        private ModemParameters mp;
+        private ModemGpPostObjects mObj;
 
         public ModemGpInsert(ModemParameters _mp, ModemGpPostObjects _mObj, bool InstertComonentOnly)
         {
@@ -25,7 +25,6 @@ namespace ModemWebUtility
             if (!InstertComonentOnly)
             {
                 AddGpBha();
-                //MessageBox.Show("Test1");
             }
 
             UpdateGpComponent(mp.GpId.Last());
@@ -70,14 +69,31 @@ namespace ModemWebUtility
 
             GpBhaParameters newGp = new GpBhaParameters(mc2.GetHtmlAsHdoc(), modemActivated);
             
-
-            mObj.GpBhaPost.P_10 = Tuple.Create<string, string>("P_10", ""); //mp.ModemNo
-            mObj.GpBhaPost.P_GP_ID = newGp.GpBhaPosts.P_GP_ID;
-            mObj.GpBhaPost.O_GP_ID = newGp.GpBhaPosts.O_GP_ID;
-            mObj.GpBhaPost.H_DEL_BHA = newGp.GpBhaPosts.H_DEL_BHA;
-            mObj.GpBhaPost.Z_CHK = newGp.GpBhaPosts.Z_CHK;
+            // CRITICAL: Update ALL O_ fields (List of Values IDs) from target modem to avoid invalid ID errors
+            // These O_ IDs are modem-specific and must match the target modem's available options
+            mObj.GpBhaPost.P_10 = Tuple.Create<string, string>("P_10", mp.ModemNo); // Target modem number
+            mObj.GpBhaPost.P_GP_ID = newGp.GpBhaPosts.P_GP_ID; // New GP BHA ID
+            mObj.GpBhaPost.O_GP_ID = newGp.GpBhaPosts.O_GP_ID; // Original GP BHA ID for update
+            mObj.GpBhaPost.H_DEL_BHA = newGp.GpBhaPosts.H_DEL_BHA; // Delete button HTML
+            mObj.GpBhaPost.Z_CHK = newGp.GpBhaPosts.Z_CHK; // Checksum
+            mObj.GpBhaPost.H_GP_COMPL_WARN = newGp.GpBhaPosts.H_GP_COMPL_WARN; // Completion warning
+            mObj.GpBhaPost.H_L_PRECON_STATUS = newGp.GpBhaPosts.H_L_PRECON_STATUS; // Preconfig status
+            
+            // Update ALL O_ fields with target modem's valid IDs
             mObj.GpBhaPost.O_PRECON_ID = newGp.GpBhaPosts.O_PRECON_ID;
-            mObj.GpBhaPost.H_L_PRECON_STATUS = newGp.GpBhaPosts.H_L_PRECON_STATUS;
+            mObj.GpBhaPost.O_ABITYPE_ID = newGp.GpBhaPosts.O_ABITYPE_ID;
+            mObj.GpBhaPost.O_CONN_LOWER_ID = newGp.GpBhaPosts.O_CONN_LOWER_ID;
+            mObj.GpBhaPost.O_CONN_UPHOLE_ID = newGp.GpBhaPosts.O_CONN_UPHOLE_ID;
+            mObj.GpBhaPost.O_GPSIZE_ID = newGp.GpBhaPosts.O_GPSIZE_ID;
+           mObj.GpBhaPost.O_HOLESEC_ID = newGp.GpBhaPosts.O_HOLESEC_ID;
+            mObj.GpBhaPost.O_OILTYPE_ID = newGp.GpBhaPosts.O_OILTYPE_ID;
+            mObj.GpBhaPost.O_ORDER_ID = newGp.GpBhaPosts.O_ORDER_ID;
+            mObj.GpBhaPost.O_SW_DM_ID = newGp.GpBhaPosts.O_SW_DM_ID;
+            mObj.GpBhaPost.O_SW_GP_ID = newGp.GpBhaPosts.O_SW_GP_ID;
+            mObj.GpBhaPost.O_LWR_SLICK_HOUS = newGp.GpBhaPosts.O_LWR_SLICK_HOUS;
+            mObj.GpBhaPost.O_STATUS = newGp.GpBhaPosts.O_STATUS;
+            mObj.GpBhaPost.O_SUB_CONF_ID = newGp.GpBhaPosts.O_SUB_CONF_ID;
+            mObj.GpBhaPost.O_LOWHOUSEID = newGp.GpBhaPosts.O_LOWHOUSEID;
 
             existingGpId = mp.GpId;
             int lastItem = 0;
@@ -90,7 +106,33 @@ namespace ModemWebUtility
             mObj.GpBhaPost.O_PILOT_NUM = Tuple.Create<string, string>("O_PILOT_NUM", (lastItem+1).ToString());
             mObj.GpBhaPost.P_PILOT_NUM = Tuple.Create<string, string>("P_PILOT_NUM", (lastItem+1).ToString());
 
+            // Truncate text fields to prevent "character string buffer too small" Oracle error
+            // Different modems may have different column size limits
+            if (mObj.GpBhaPost.P_GP_DESC != null && mObj.GpBhaPost.P_GP_DESC.Item2 != null && mObj.GpBhaPost.P_GP_DESC.Item2.Length > 50)
+            {
+                mObj.GpBhaPost.P_GP_DESC = Tuple.Create("P_GP_DESC", mObj.GpBhaPost.P_GP_DESC.Item2.Substring(0, 50));
+            }
             
+            if (mObj.GpBhaPost.P_GP_COMMENT != null && mObj.GpBhaPost.P_GP_COMMENT.Item2 != null && mObj.GpBhaPost.P_GP_COMMENT.Item2.Length > 1000)
+            {
+                mObj.GpBhaPost.P_GP_COMMENT = Tuple.Create("P_GP_COMMENT", mObj.GpBhaPost.P_GP_COMMENT.Item2.Substring(0, 1000));
+            }
+            
+            if (mObj.GpBhaPost.P_BIT_TYPE != null && mObj.GpBhaPost.P_BIT_TYPE.Item2 != null && mObj.GpBhaPost.P_BIT_TYPE.Item2.Length > 100)
+            {
+                mObj.GpBhaPost.P_BIT_TYPE = Tuple.Create("P_BIT_TYPE", mObj.GpBhaPost.P_BIT_TYPE.Item2.Substring(0, 100));
+            }
+            
+            if (mObj.GpBhaPost.P_BIT_MAKEUP_TORQUE != null && mObj.GpBhaPost.P_BIT_MAKEUP_TORQUE.Item2 != null && mObj.GpBhaPost.P_BIT_MAKEUP_TORQUE.Item2.Length > 10)
+            {
+                mObj.GpBhaPost.P_BIT_MAKEUP_TORQUE = Tuple.Create("P_BIT_MAKEUP_TORQUE", mObj.GpBhaPost.P_BIT_MAKEUP_TORQUE.Item2.Substring(0, 10));
+            }
+            
+            if (mObj.GpBhaPost.P_BIT_SN != null && mObj.GpBhaPost.P_BIT_SN.Item2 != null && mObj.GpBhaPost.P_BIT_SN.Item2.Length > 10)
+            {
+                mObj.GpBhaPost.P_BIT_SN = Tuple.Create("P_BIT_SN", mObj.GpBhaPost.P_BIT_SN.Item2.Substring(0, 10));
+            }
+
             ModemDataPost mdp = new ModemDataPost(urlGpBhaInsert); // + ModemNumber
 
             foreach (var p in mObj.GpBhaPost.GetType()

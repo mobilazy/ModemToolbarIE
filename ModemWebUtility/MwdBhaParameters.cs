@@ -54,7 +54,7 @@ namespace ModemWebUtility
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                // Error during initialization - silently continue
             }
 
             

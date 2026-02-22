@@ -68,7 +68,7 @@ namespace ModemWebUtility
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                // Error during initialization - silently continue
             }
 
 
@@ -380,7 +380,7 @@ namespace ModemWebUtility
 
 
             int rowCount = rowId;
-            int colNum = 5;
+            int colNum = 5;  // GP table has only 5 columns (Seq, Torque, ThreadTop, ThreadBtm, Description)
             string[,] tempArray = new string[rowCount, colNum];
 
             foreach (var item in qCell)
@@ -394,9 +394,10 @@ namespace ModemWebUtility
                 GpCompPosts mcp = new GpCompPosts();
                 mcp.P_SEQ_NO = tempArray[i, 0];
                 mcp.P_L_MWDTORQUE_TORQUE = tempArray[i, 1];
-                mcp.P_L_THREADTOP_THREADSIZE = tempArray[i, 2];
-                mcp.P_L_THREADBTM_THREADSIZE = tempArray[i, 3];
-                mcp.P_DESCRIPTION = tempArray[i, 4]; ;
+                mcp.P_L_THREADTOP_THREADSIZE = tempArray[i, 2];  // Column 2 = "Threadsize Top"
+                mcp.P_L_THREADBTM_THREADSIZE = tempArray[i, 3];  // Column 3 = "Threadsize Bottom"
+                mcp.P_DESCRIPTION = tempArray[i, 4];
+                mcp.P_COMMENTS = "";  // No comments column in GP table
 
                 mcpDic.Add(i, mcp);
 

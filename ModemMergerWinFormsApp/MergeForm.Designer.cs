@@ -31,6 +31,7 @@
             this.txtModemNo = new System.Windows.Forms.TextBox();
             this.btnGetModem = new System.Windows.Forms.Button();
             this.btnFileManager = new System.Windows.Forms.Button();
+            this.btnResetForm = new System.Windows.Forms.Button();
             this.treeView1 = new System.Windows.Forms.TreeView();
             this.treeView2 = new System.Windows.Forms.TreeView();
             this.btnAdd = new System.Windows.Forms.Button();
@@ -39,6 +40,8 @@
             this.btnRemoveSelected = new System.Windows.Forms.Button();
             this.txtTargetModem = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.chkRenameMain = new System.Windows.Forms.CheckBox();
+            this.txtRenameMainTo = new System.Windows.Forms.TextBox();
             this.SuspendLayout();
             // 
             // txtModemNo
@@ -73,6 +76,17 @@
             this.btnFileManager.Text = "File Manager";
             this.btnFileManager.UseVisualStyleBackColor = true;
             this.btnFileManager.Click += new System.EventHandler(this.btnFileManager_Click);
+            // 
+            // btnResetForm
+            // 
+            this.btnResetForm.Location = new System.Drawing.Point(407, 15);
+            this.btnResetForm.Margin = new System.Windows.Forms.Padding(4);
+            this.btnResetForm.Name = "btnResetForm";
+            this.btnResetForm.Size = new System.Drawing.Size(100, 26);
+            this.btnResetForm.TabIndex = 13;
+            this.btnResetForm.Text = "Reset Form";
+            this.btnResetForm.UseVisualStyleBackColor = true;
+            this.btnResetForm.Click += new System.EventHandler(this.btnResetForm_Click);
             // 
             // treeView1
             // 
@@ -161,11 +175,43 @@
             this.label1.TabIndex = 9;
             this.label1.Text = "Add to Modem:";
             // 
+            // chkRenameMain
+            // 
+            this.chkRenameMain.AutoSize = true;
+            this.chkRenameMain.Location = new System.Drawing.Point(35, 620);
+            this.chkRenameMain.Name = "chkRenameMain";
+            this.chkRenameMain.Size = new System.Drawing.Size(115, 19);
+            this.chkRenameMain.TabIndex = 11;
+            this.chkRenameMain.Text = "Rename Main to:";
+            this.chkRenameMain.UseVisualStyleBackColor = true;
+            // 
+            // txtRenameMainTo
+            // 
+            this.txtRenameMainTo.Enabled = false;
+            this.txtRenameMainTo.Location = new System.Drawing.Point(156, 618);
+            this.txtRenameMainTo.MaxLength = 16;
+            this.txtRenameMainTo.Name = "txtRenameMainTo";
+            this.txtRenameMainTo.Size = new System.Drawing.Size(135, 23);
+            this.txtRenameMainTo.TabIndex = 12;
+            // 
+            // chkRenameMain
+            // 
+            this.chkRenameMain.AutoSize = true;
+            this.chkRenameMain.Location = new System.Drawing.Point(35, 620);
+            this.chkRenameMain.Name = "chkRenameMain";
+            this.chkRenameMain.Size = new System.Drawing.Size(115, 19);
+            this.chkRenameMain.TabIndex = 11;
+            this.chkRenameMain.Text = "Rename Main to:";
+            this.chkRenameMain.UseVisualStyleBackColor = true;
+            this.chkRenameMain.CheckedChanged += new System.EventHandler(this.chkRenameMain_CheckedChanged);
+            // 
             // MergeForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1203, 674);
+            this.Controls.Add(this.txtRenameMainTo);
+            this.Controls.Add(this.chkRenameMain);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.txtTargetModem);
             this.Controls.Add(this.btnRemoveSelected);
@@ -174,12 +220,13 @@
             this.Controls.Add(this.btnAdd);
             this.Controls.Add(this.treeView2);
             this.Controls.Add(this.treeView1);
+            this.Controls.Add(this.btnResetForm);
             this.Controls.Add(this.btnFileManager);
             this.Controls.Add(this.btnGetModem);
             this.Controls.Add(this.txtModemNo);
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "MergeForm";
-            this.Text = "Merge from other modems";
+            this.Text = "ModemCopier 2.0";
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -190,6 +237,7 @@
         private System.Windows.Forms.TextBox txtModemNo;
         private System.Windows.Forms.Button btnGetModem;
         private System.Windows.Forms.Button btnFileManager;
+        private System.Windows.Forms.Button btnResetForm;
         private System.Windows.Forms.TreeView treeView1;
         private System.Windows.Forms.TreeView treeView2;
         private System.Windows.Forms.Button btnAdd;
@@ -198,5 +246,7 @@
         private System.Windows.Forms.Button btnRemoveSelected;
         private System.Windows.Forms.TextBox txtTargetModem;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.CheckBox chkRenameMain;
+        private System.Windows.Forms.TextBox txtRenameMainTo;
     }
 }

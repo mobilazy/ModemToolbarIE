@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("ModemMergerWinFormsApp")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("ModemCopier 2.0")]
+[assembly: AssemblyDescription("Halliburton Modem Data Copy Tool")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("ModemMergerWinFormsApp")]
+[assembly: AssemblyCompany("Halliburton")]
+[assembly: AssemblyProduct("ModemCopier 2.0")]
 [assembly: AssemblyCopyright("Copyright ©  2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

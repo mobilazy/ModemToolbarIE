@@ -262,3 +262,23 @@ __pycache__/
 # Temporary build files
 temp_*.txt
 *.net6backup
+
+# Obsolete project files and notes
+build events.txt
+DD BHA HTML.txt
+GP BHA HTML.txt
+LOOSE BHA HTML.txt
+original service model text in appconfig.txt
+output.config
+some codes.txt
+some cript.txt
+some oldedb codes.txt
+TestGantCopy.ps1
+Capture.JPG
+GetHeader.xlsx
+GP_DD_LOOSE_BHA_Properties.xlsx
+Requirement to debug Modem Toolbar.docx
+CPOL.zip
+WCFModemService.cs
+SvcUtil.exe
+BUILD.bat
