@@ -71,7 +71,6 @@ namespace ModemMergerWinFormsApp
             Cursor.Current = Cursors.WaitCursor;
             string modemNo;
             modemNo = txtModemNo.Text;
-            txtTargetModem.Text = modemNo;
 
             string modemViewUrl = HDocUtility.UrlModemView;
             string bhaEditViewUrl = HDocUtility.BhaEditUrlwMwdId;

@@ -94,6 +94,22 @@ namespace ModemWebUtility
             mObj.GpBhaPost.O_STATUS = newGp.GpBhaPosts.O_STATUS;
             mObj.GpBhaPost.O_SUB_CONF_ID = newGp.GpBhaPosts.O_SUB_CONF_ID;
             mObj.GpBhaPost.O_LOWHOUSEID = newGp.GpBhaPosts.O_LOWHOUSEID;
+            
+            // Update ALL O__o fields (original values for Oracle optimistic locking)
+            mObj.GpBhaPost.O_PRECON_ID_o = newGp.GpBhaPosts.O_PRECON_ID_o;
+            mObj.GpBhaPost.O_ABITYPE_ID_o = newGp.GpBhaPosts.O_ABITYPE_ID_o;
+            mObj.GpBhaPost.O_CONN_LOWER_ID_o = newGp.GpBhaPosts.O_CONN_LOWER_ID_o;
+            mObj.GpBhaPost.O_CONN_UPHOLE_ID_o = newGp.GpBhaPosts.O_CONN_UPHOLE_ID_o;
+            mObj.GpBhaPost.O_GPSIZE_ID_o = newGp.GpBhaPosts.O_GPSIZE_ID_o;
+            mObj.GpBhaPost.O_HOLESEC_ID_o = newGp.GpBhaPosts.O_HOLESEC_ID_o;
+            mObj.GpBhaPost.O_OILTYPE_ID_o = newGp.GpBhaPosts.O_OILTYPE_ID_o;
+            mObj.GpBhaPost.O_ORDER_ID_o = newGp.GpBhaPosts.O_ORDER_ID_o;
+            mObj.GpBhaPost.O_SW_DM_ID_o = newGp.GpBhaPosts.O_SW_DM_ID_o;
+            mObj.GpBhaPost.O_SW_GP_ID_o = newGp.GpBhaPosts.O_SW_GP_ID_o;
+            mObj.GpBhaPost.O_LWR_SLICK_HOUS_o = newGp.GpBhaPosts.O_LWR_SLICK_HOUS_o;
+            mObj.GpBhaPost.O_STATUS_o = newGp.GpBhaPosts.O_STATUS_o;
+            mObj.GpBhaPost.O_SUB_CONF_ID_o = newGp.GpBhaPosts.O_SUB_CONF_ID_o;
+            mObj.GpBhaPost.O_LOWHOUSEID_o = newGp.GpBhaPosts.O_LOWHOUSEID_o;
 
             existingGpId = mp.GpId;
             int lastItem = 0;
