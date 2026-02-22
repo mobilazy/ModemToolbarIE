@@ -49,19 +49,31 @@ namespace ModemWebUtility
 
             string headerResponse = mc.AddGpAndGetResponse();
            
+            // Check if InsertDefaultGP returned a valid response
+            if (string.IsNullOrEmpty(headerResponse))
+            {
+                throw new Exception($"Failed to create GP BHA on modem {mp.ModemNo}. InsertDefaultGP did not return a valid response.");
+            }
+            
             string pattern = @"QueryViewByKey\?P_GP_ID=([0-9]+)";
             string patternZchk = @"z_chk=([0-9]+)";
             string input = headerResponse;
             
             Regex rx = new Regex(pattern);
             Match match = rx.Match(input);
+            
+            if (!match.Success || match.Groups.Count < 2)
+            {
+                throw new Exception($"Failed to extract GP_ID from response for modem {mp.ModemNo}. Response: {headerResponse.Substring(0, Math.Min(200, headerResponse.Length))}");
+            }
+            
             GroupCollection gr = match.Groups;
-            string newGpId = gr[1].Value; // headerResponse.Substring(47, 5);
+            string newGpId = gr[1].Value;
 
             rx = new Regex(patternZchk);
             match = rx.Match(input);
             gr = match.Groups;
-            string z_chk = gr[1].Value; // headerResponse.Substring(47, 5);
+            string z_chk = gr[1].Value;
 
 
             ModemConnection mc2 = new ModemConnection(urlGpBhaEdit+newGpId);
