@@ -908,16 +908,16 @@ namespace ModemMergerWinFormsApp
         private string GetDocTypDescription(string docTyp)
         {
             if (string.IsNullOrWhiteSpace(docTyp))
-                return "Other (22)";
+                return "Other";
 
             switch (docTyp)
             {
-                case "1": return "WinPul (1)";
-                case "2": return "Shipping (2)";
-                case "3": return "BHA (3)";
-                case "4": return "Download (4)";
-                case "22": return "Other (22)";
-                default: return $"Unknown ({docTyp})";
+                case "1": return "WinPul";
+                case "2": return "Shipping";
+                case "3": return "BHA";
+                case "4": return "Download";
+                case "22": return "Other";
+                default: return "Unknown";
             }
         }
 
