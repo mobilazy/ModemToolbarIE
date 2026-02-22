@@ -94,22 +94,6 @@ namespace ModemWebUtility
             mObj.GpBhaPost.O_STATUS = newGp.GpBhaPosts.O_STATUS;
             mObj.GpBhaPost.O_SUB_CONF_ID = newGp.GpBhaPosts.O_SUB_CONF_ID;
             mObj.GpBhaPost.O_LOWHOUSEID = newGp.GpBhaPosts.O_LOWHOUSEID;
-            
-            // Update ALL O__o fields (original values for Oracle optimistic locking)
-            mObj.GpBhaPost.O_PRECON_ID_o = newGp.GpBhaPosts.O_PRECON_ID_o;
-            mObj.GpBhaPost.O_ABITYPE_ID_o = newGp.GpBhaPosts.O_ABITYPE_ID_o;
-            mObj.GpBhaPost.O_CONN_LOWER_ID_o = newGp.GpBhaPosts.O_CONN_LOWER_ID_o;
-            mObj.GpBhaPost.O_CONN_UPHOLE_ID_o = newGp.GpBhaPosts.O_CONN_UPHOLE_ID_o;
-            mObj.GpBhaPost.O_GPSIZE_ID_o = newGp.GpBhaPosts.O_GPSIZE_ID_o;
-            mObj.GpBhaPost.O_HOLESEC_ID_o = newGp.GpBhaPosts.O_HOLESEC_ID_o;
-            mObj.GpBhaPost.O_OILTYPE_ID_o = newGp.GpBhaPosts.O_OILTYPE_ID_o;
-            mObj.GpBhaPost.O_ORDER_ID_o = newGp.GpBhaPosts.O_ORDER_ID_o;
-            mObj.GpBhaPost.O_SW_DM_ID_o = newGp.GpBhaPosts.O_SW_DM_ID_o;
-            mObj.GpBhaPost.O_SW_GP_ID_o = newGp.GpBhaPosts.O_SW_GP_ID_o;
-            mObj.GpBhaPost.O_LWR_SLICK_HOUS_o = newGp.GpBhaPosts.O_LWR_SLICK_HOUS_o;
-            mObj.GpBhaPost.O_STATUS_o = newGp.GpBhaPosts.O_STATUS_o;
-            mObj.GpBhaPost.O_SUB_CONF_ID_o = newGp.GpBhaPosts.O_SUB_CONF_ID_o;
-            mObj.GpBhaPost.O_LOWHOUSEID_o = newGp.GpBhaPosts.O_LOWHOUSEID_o;
 
             existingGpId = mp.GpId;
             int lastItem = 0;
@@ -149,25 +133,56 @@ namespace ModemWebUtility
                 mObj.GpBhaPost.P_BIT_SN = Tuple.Create("P_BIT_SN", mObj.GpBhaPost.P_BIT_SN.Item2.Substring(0, 10));
             }
 
-            ModemDataPost mdp = new ModemDataPost(urlGpBhaInsert); // + ModemNumber
-
+            // Collect all post keys first
+            Dictionary<string, string> postData = new Dictionary<string, string>();
             foreach (var p in mObj.GpBhaPost.GetType()
                             .GetProperties(
                                     BindingFlags.Public
                                     | BindingFlags.Instance))
             {
-                
-
                 if (p.PropertyType == typeof(Tuple<string, string>))
                 {
                     Tuple<string, string> temp = (Tuple<string, string>)p.GetValue(mObj.GpBhaPost, null);
-
-                    mdp.AddPostKeys(temp.Item1, temp.Item2);
+                    postData[temp.Item1] = temp.Item2;
                 }
-
             }
 
-            mdp.PostData();
+            // Retry up to 5 times if database is overloaded (HTTP 200 instead of 302 redirect)
+            int maxRetries = 5;
+            int retryCount = 0;
+            bool success = false;
+            
+            while (retryCount < maxRetries && !success)
+            {
+                ModemDataPost mdp = new ModemDataPost(urlGpBhaInsert);
+                
+                // Add all post keys
+                foreach (var kvp in postData)
+                {
+                    mdp.AddPostKeys(kvp.Key, kvp.Value);
+                }
+                
+                mdp.PostData();
+                
+                // Check if we got 302 (success/redirect) or 200 (error - form returned with error message)
+                if (mdp.StatusCode == 302)
+                {
+                    success = true;
+                }
+                else if (mdp.StatusCode == 200)
+                {
+                    retryCount++;
+                    if (retryCount < maxRetries)
+                    {
+                        Thread.Sleep(500); // Wait 500ms before retry
+                    }
+                }
+                else
+                {
+                    // Some other status code - break out
+                    break;
+                }
+            }
 
             Thread.Sleep(2000);
             mp = new ModemParameters(new ModemConnection(HDocUtility.UrlModemView + mp.ModemNo).GetHtmlAsHdoc(), mp.ModemNo);

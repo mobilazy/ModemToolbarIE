@@ -18,6 +18,7 @@ namespace ModemWebUtility
         private readonly CookieContainer m_container = new CookieContainer();
         private WebResponse _response;
         private string _result;
+        public int StatusCode { get; private set; }
 
         public ModemDataPost(string _url)
         {
@@ -113,6 +114,7 @@ namespace ModemWebUtility
                 request.Method = "POST";
                 request.ContentType = "application/x-www-form-urlencoded";
                 request.CookieContainer = m_container;
+                request.AllowAutoRedirect = false; // Don't follow redirects automatically so we can detect 302
                 if (referer != "null")
                 {
                     request.Referer = referer;
@@ -126,6 +128,13 @@ namespace ModemWebUtility
                 dataStream.Close();
 
                 _response = request.GetResponse();
+                
+                // Capture HTTP status code
+                if (_response is HttpWebResponse httpResponse)
+                {
+                    StatusCode = (int)httpResponse.StatusCode;
+                }
+                
                 reader = new StreamReader(_response.GetResponseStream(), HDocUtility.CurrentEncoding);
                 //reader = new StreamReader(_response.GetResponseStream(), Encoding.UTF8);
                 _result = reader.ReadToEnd();
