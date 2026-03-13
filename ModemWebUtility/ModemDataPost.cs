@@ -18,6 +18,7 @@ namespace ModemWebUtility
         private readonly CookieContainer m_container = new CookieContainer();
         private WebResponse _response;
         private string _result;
+        public string Result { get { return _result; } }
 
         public ModemDataPost(string _url)
         {

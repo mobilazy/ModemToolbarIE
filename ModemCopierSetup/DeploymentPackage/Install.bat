@@ -30,7 +30,7 @@ if not exist "%INSTALL_DIR%" (
 
 :: Copy files
 echo Copying application files...
-xcopy /Y /Q ".\Release\*.*" "%INSTALL_DIR%\"
+xcopy /Y /Q "%~dp0Release\*.*" "%INSTALL_DIR%\"
 
 :: Rename executable
 if exist "%INSTALL_DIR%\ModemMergerWinFormsApp.exe" (

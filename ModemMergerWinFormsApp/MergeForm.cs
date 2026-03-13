@@ -1,14 +1,18 @@
 ﻿using ModemWebUtility;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 using Microsoft.ClearScript;
 using Microsoft.ClearScript.JavaScript;
 using Microsoft.ClearScript.V8;
@@ -31,6 +35,7 @@ namespace ModemMergerWinFormsApp
         private TreeNode targetLooseNode = new TreeNode(looseName);
 
         private FocusedTreeview lastFocused;
+        private bool _headerChecked = true;
 
 
 
@@ -41,8 +46,19 @@ namespace ModemMergerWinFormsApp
             UpdateTargetNodes(treeView2, "default");
             btnAdd.Enabled = false;
             btnGetModem.Enabled = false;
+            LoadKabalCredentials();
+            dgvKabal.CellPainting          += dgvKabal_CellPainting;
+            dgvKabal.ColumnHeaderMouseClick  += dgvKabal_ColumnHeaderMouseClick;
+            dgvKabal.CurrentCellDirtyStateChanged += dgvKabal_CurrentCellDirtyStateChanged;
+            RefreshModemAutoComplete();
+        }
 
-
+        private void RefreshModemAutoComplete()
+        {
+            var src = new AutoCompleteStringCollection();
+            src.AddRange(ModemHistory.GetHistory().ToArray());
+            txtModemNo.AutoCompleteCustomSource = src;
+            txtTargetModem.AutoCompleteCustomSource = src;
         }
 
         private void UpdateTargetNodes(TreeView treeview, string targetModemNo)
@@ -218,6 +234,8 @@ namespace ModemMergerWinFormsApp
             }
 
             treeView1.Nodes.Add(mainNode);
+            ModemHistory.Add(modemNo);
+            RefreshModemAutoComplete();
             Cursor.Current = Cursors.Default;
         }
 
@@ -440,6 +458,8 @@ namespace ModemMergerWinFormsApp
             CopyTreeNode(treeView1, treeView2, txtTargetModem.Text);
             TreeNode copiednode = treeView1.Nodes.Cast<TreeNode>().Where(n => n.Text == txtTargetModem.Text).FirstOrDefault();
             ColorNode(copiednode.Nodes, Color.Green);
+            ModemHistory.Add(txtTargetModem.Text);
+            RefreshModemAutoComplete();
             txtTargetModem.Text = "";
             treeView2.Nodes.Clear();
 
@@ -673,8 +693,632 @@ namespace ModemMergerWinFormsApp
 
         private void btnFileManager_Click(object sender, EventArgs e)
         {
-            AttachmentForm attachmentForm = new AttachmentForm();
+            AttachmentForm attachmentForm = new AttachmentForm(txtModemNo.Text.Trim());
             attachmentForm.ShowDialog();
+            RefreshModemAutoComplete();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  MODEM SHIFTER TAB — business logic
+        // ═══════════════════════════════════════════════════════════════════
+
+        private const string ModemViewUrlBase = "http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
+
+        // Rig → customer mapping & rig lists per customer
+        private static readonly Dictionary<string, string[]> _rigsByCustomer = new Dictionary<string, string[]>
+        {
+            { "AkerBP",         new[] { "SC8", "Integrator", "Invincible", "Deepsea Nordkap", "Stavanger" } },
+            { "ConocoPhillips", new[] { "West Linus", "Elara" } },
+            { "Equinor",        new[] { "Grane", "Prospector", "Promoter", "Enabler", "Heidrun", "Njord A", "Snorre A", "Snorre B" } },
+            { "Vår Energi",     new[] { "Ringhorne", "Pioneer", "Prospector" } }
+        };
+
+        // Abbreviation map for raw P_SHIPTO_1 text returned by HTTP fetch
+        private static readonly Dictionary<string, string> _shipToAbbr = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "KSU",          "KSU" },
+            { "Kristiansund", "KSU" },
+            { "Dusavik",      "DUS" },
+            { "ASCO",         "ASC" },
+            { "Sandnessjøen", "SSJ" },
+            { "Sandnesjøen",  "SSJ" },
+            { "Florø",        "FLO" },
+            { "Floro",        "FLO" },
+            { "Hammerfest",   "HMF" },
+        };
+
+        private string ConfigPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "kabal.config");
+
+        private List<GantModem> _loadedModems = new List<GantModem>();
+
+        // ── Credential persistence ───────────────────────────────────────
+
+        private void LoadKabalCredentials()
+        {
+            try
+            {
+                if (File.Exists(ConfigPath))
+                {
+                    var lines = File.ReadAllLines(ConfigPath);
+                    if (lines.Length >= 1) txtKabalUser.Text = lines[0];
+                    if (lines.Length >= 2)
+                    {
+                        var encBytes = Convert.FromBase64String(lines[1]);
+                        var plainBytes = System.Security.Cryptography.ProtectedData.Unprotect(
+                            encBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                        txtKabalPass.Text = Encoding.UTF8.GetString(plainBytes);
+                    }
+                }
+            }
+            catch { /* first run or corrupted config — ignore */ }
+        }
+
+        private void SaveKabalCredentials()
+        {
+            try
+            {
+                var plainBytes = Encoding.UTF8.GetBytes(txtKabalPass.Text);
+                var encBytes = System.Security.Cryptography.ProtectedData.Protect(
+                    plainBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                File.WriteAllLines(ConfigPath, new[] { txtKabalUser.Text, Convert.ToBase64String(encBytes) });
+            }
+            catch { /* non-critical */ }
+        }
+
+        private void MergeForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            SaveKabalCredentials();
+        }
+
+        // ── UI event handlers ────────────────────────────────────────────
+
+        private void cmbKabalCustomer_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            cmbKabalRig.Items.Clear();
+            cmbKabalRig.Items.Add("select rig");
+            var customer = cmbKabalCustomer.Text;
+            if (_rigsByCustomer.ContainsKey(customer))
+            {
+                foreach (var rig in _rigsByCustomer[customer])
+                    cmbKabalRig.Items.Add(rig);
+            }
+            cmbKabalRig.SelectedIndex = 0;
+        }
+
+        private void txtKabalShiftDays_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '-')
+                e.Handled = true;
+        }
+
+        private void dgvKabal_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex != -1 || !dgvKabal.Columns.Contains("Select") ||
+                e.ColumnIndex != dgvKabal.Columns["Select"].Index) return;
+
+            e.PaintBackground(e.ClipBounds, false);
+            var state = _headerChecked ? CheckBoxState.CheckedNormal : CheckBoxState.UncheckedNormal;
+            var sz = CheckBoxRenderer.GetGlyphSize(e.Graphics, state);
+            var pt = new System.Drawing.Point(
+                e.CellBounds.Left + (e.CellBounds.Width  - sz.Width)  / 2,
+                e.CellBounds.Top  + (e.CellBounds.Height - sz.Height) / 2);
+            CheckBoxRenderer.DrawCheckBox(e.Graphics, pt, state);
+            e.Handled = true;
+        }
+
+        private void dgvKabal_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (!dgvKabal.Columns.Contains("Select") ||
+                e.ColumnIndex != dgvKabal.Columns["Select"].Index) return;
+
+            _headerChecked = !_headerChecked;
+            foreach (DataGridViewRow row in dgvKabal.Rows)
+            {
+                if (row.Cells["Select"].ReadOnly) continue;  // skip Ready modems
+                row.Cells["Select"].Value = _headerChecked;
+            }
+            dgvKabal.RefreshEdit();
+            dgvKabal.InvalidateColumn(e.ColumnIndex);
+        }
+
+        private void dgvKabal_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (dgvKabal.CurrentCell is DataGridViewCheckBoxCell && !dgvKabal.CurrentCell.ReadOnly)
+                dgvKabal.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        }
+
+        private List<int> GetCheckedIds()
+        {
+            var ids = new List<int>();
+            if (!dgvKabal.Columns.Contains("Select")) return ids;
+            foreach (DataGridViewRow row in dgvKabal.Rows)
+            {
+                if (true.Equals(row.Cells["Select"].Value))
+                {
+                    int id;
+                    if (int.TryParse(row.Cells["MobId"].Value?.ToString(), out id))
+                        ids.Add(id);
+                }
+            }
+            return ids;
+        }
+
+        private void dgvKabal_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            // MobId link column
+            if (dgvKabal.Columns.Contains("MobId") &&
+                e.ColumnIndex == dgvKabal.Columns["MobId"].Index)
+            {
+                var modemId = dgvKabal.Rows[e.RowIndex].Cells["MobId"].Value?.ToString();
+                if (!string.IsNullOrEmpty(modemId))
+                    Process.Start(ModemViewUrlBase + modemId);
+            }
+        }
+
+        // ── Copy to Clipboard (HTML with links) ─────────────────────────
+
+        private void btnKabalCopyClipboard_Click(object sender, EventArgs e)
+        {
+            if (dgvKabal.Rows.Count == 0)
+            {
+                MessageBox.Show("No modems to copy.", "Copy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Build HTML table with linked MobIDs, font size 10
+            var html = new StringBuilder();
+            html.Append("<table style=\"font-size:10pt;border-collapse:collapse;\"><thead><tr>");
+            string[] headers = { "Mob ID", "Ship To", "Loadout Date", "Deliver To Customer", "Well Number", "Well Section", "BHA" };
+            foreach (var h in headers)
+                html.Append("<th style=\"font-size:10pt;\">").Append(HtmlEnc(h)).Append("</th>");
+            html.Append("</tr></thead><tbody>");
+
+            foreach (DataGridViewRow row in dgvKabal.Rows)
+            {
+                var gm = row.Tag as GantModem;
+                if (gm == null) continue;
+
+                html.Append("<tr>");
+
+                // Column 1: linked MobId
+                var modemUrl = ModemViewUrlBase + gm.Id;
+                html.Append("<td style=\"font-size:10pt;\"><a href=\"").Append(HtmlEnc(modemUrl)).Append("\">");
+                html.Append(HtmlEnc(gm.Id.ToString())).Append("</a></td>");
+
+                // Remaining columns
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["ShipTo"].Value?.ToString() ?? "")).Append("</td>");
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["Loadout"].Value?.ToString() ?? "")).Append("</td>");
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["Customer"].Value?.ToString() ?? "")).Append("</td>");
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["Well"].Value?.ToString() ?? "")).Append("</td>");
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["Section"].Value?.ToString() ?? "")).Append("</td>");
+                html.Append("<td style=\"font-size:10pt;\">").Append(HtmlEnc(row.Cells["Bha"].Value?.ToString() ?? "")).Append("</td>");
+
+                html.Append("</tr>");
+            }
+            html.Append("</tbody></table>");
+
+            // Build CF_HTML clipboard format
+            var htmlFragment = html.ToString();
+            var cfHtml = BuildCfHtml(htmlFragment);
+
+            var dataObj = new DataObject();
+            dataObj.SetData(DataFormats.Html, cfHtml);
+            // Plain text fallback (tab-delimited)
+            var plain = new StringBuilder();
+            plain.AppendLine(string.Join("\t", headers));
+            foreach (DataGridViewRow row in dgvKabal.Rows)
+            {
+                var gm = row.Tag as GantModem;
+                if (gm == null) continue;
+                plain.AppendLine(string.Join("\t",
+                    gm.Id.ToString(),
+                    row.Cells["ShipTo"].Value?.ToString() ?? "",
+                    row.Cells["Loadout"].Value?.ToString() ?? "",
+                    row.Cells["Customer"].Value?.ToString() ?? "",
+                    row.Cells["Well"].Value?.ToString() ?? "",
+                    row.Cells["Section"].Value?.ToString() ?? "",
+                    row.Cells["Bha"].Value?.ToString() ?? ""));
+            }
+            dataObj.SetData(DataFormats.UnicodeText, plain.ToString());
+            Clipboard.SetDataObject(dataObj, true);
+
+            lblKabalStatus.Text = $"Copied {dgvKabal.Rows.Count} modems to clipboard.";
+        }
+
+        private static string HtmlEnc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+        /// <summary>
+        /// Wraps an HTML fragment in the CF_HTML clipboard header format.
+        /// </summary>
+        private static string BuildCfHtml(string htmlFragment)
+        {
+            // CF_HTML requires UTF-8 byte offsets in the header
+            const string markerBegin = "<!--StartFragment-->";
+            const string markerEnd   = "<!--EndFragment-->";
+            string pre  = "<html><body>" + markerBegin;
+            string post = markerEnd + "</body></html>";
+
+            // Header template with placeholder lengths (10-digit zero-padded)
+            string header =
+                "Version:0.9\r\n" +
+                "StartHTML:{0:D10}\r\n" +
+                "EndHTML:{1:D10}\r\n" +
+                "StartFragment:{2:D10}\r\n" +
+                "EndFragment:{3:D10}\r\n";
+
+            int headerLen = string.Format(header, 0, 0, 0, 0).Length;
+            int startHtml = headerLen;
+            int startFragment = headerLen + Encoding.UTF8.GetByteCount(pre);
+            int endFragment = startFragment + Encoding.UTF8.GetByteCount(htmlFragment);
+            int endHtml = endFragment + Encoding.UTF8.GetByteCount(post);
+
+            return string.Format(header, startHtml, endHtml, startFragment, endFragment)
+                   + pre + htmlFragment + post;
+        }
+
+        // ── Date business rules ──────────────────────────────────────────
+
+        /// <summary>
+        /// Snap forward to the next Mon/Wed/Fri on or after the given date.
+        /// </summary>
+        private static DateTime SnapToBoatDayForward(DateTime date)
+        {
+            while (date.DayOfWeek != DayOfWeek.Monday &&
+                   date.DayOfWeek != DayOfWeek.Wednesday &&
+                   date.DayOfWeek != DayOfWeek.Friday)
+                date = date.AddDays(1);
+            return date;
+        }
+
+        private static DateTime AdvanceToNextBoatDay(DateTime date)
+        {
+            return SnapToBoatDayForward(date.AddDays(1));
+        }
+
+        /// <summary>
+        /// Find the earliest boat-day delivery where LoadoutDate >= today+7 days,
+        /// starting from the later of startDate and today.
+        /// </summary>
+        private static void CalcNextDelivery(DateTime startDate, string rigName,
+            out DateTime deliver, out DateTime loadout)
+        {
+            var minLoadout = DateTime.Today.AddDays(7);
+            var from = startDate > DateTime.Today ? startDate : DateTime.Today;
+            var d = SnapToBoatDayForward(from);
+
+            for (int i = 0; i < 104; i++)
+            {
+                var lo = CalcLoadoutDate(d, rigName);
+                if (lo >= minLoadout)
+                {
+                    deliver = d;
+                    loadout = lo;
+                    return;
+                }
+                d = AdvanceToNextBoatDay(d);
+            }
+
+            loadout = CalcLoadoutDate(d, rigName);
+            deliver = d;
+        }
+
+        /// <summary>
+        /// Calculate H_LOADOUT_DATE from H_DATE_ETA based on rig-specific rules.
+        /// ETA is already snapped to Mon/Wed/Fri at this point.
+        /// rigName may be the full Gant name (e.g. "COSL Promoter", "Transocean Enabler").
+        /// </summary>
+        private static DateTime CalcLoadoutDate(DateTime eta, string rigName)
+        {
+            var dow = eta.DayOfWeek;
+            var rig = rigName ?? "";
+
+            // Njord A, Heidrun: Mon→-3, Wed/Fri→-2
+            if (Contains(rig, "Njord") || Contains(rig, "Heidrun"))
+                return dow == DayOfWeek.Monday ? eta.AddDays(-3) : eta.AddDays(-2);
+
+            // Snorre A/B, Promoter: Mon→-3, Wed/Fri→-1
+            if (Contains(rig, "Snorre") || Contains(rig, "Promoter"))
+                return dow == DayOfWeek.Monday ? eta.AddDays(-3) : eta.AddDays(-1);
+
+            // Enabler, Prospector: always -7
+            if (Contains(rig, "Enabler") || Contains(rig, "Prospector"))
+                return eta.AddDays(-7);
+
+            // Default: Mon→-3, Wed/Fri→-2
+            return dow == DayOfWeek.Monday ? eta.AddDays(-3) : eta.AddDays(-2);
+        }
+
+        private static bool Contains(string source, string value)
+        {
+            return source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string FormatDateDMY_HM(DateTime d)
+        {
+            return d.ToString("dd.MM.yyyy") + " 10:00";
+        }
+
+        private static string FormatDateDMY(DateTime d)
+        {
+            return d.ToString("dd.MM.yyyy");
+        }
+
+        /// <summary>Strips time part from "DD.MM.YYYY HH:mm" for grid display.</summary>
+        private static string TruncateTime(string dateStr)
+        {
+            if (string.IsNullOrWhiteSpace(dateStr)) return "";
+            var sp = dateStr.IndexOf(' ');
+            return sp > 0 ? dateStr.Substring(0, sp) : dateStr;
+        }
+
+        private static string ShortenShipTo(string shipTo)
+        {
+            if (string.IsNullOrWhiteSpace(shipTo)) return "";
+            foreach (var kv in _shipToAbbr)
+                if (shipTo.IndexOf(kv.Key, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return kv.Value;
+            return shipTo; // already abbreviated or unknown — return as-is
+        }
+
+        // ── Load Modems button ───────────────────────────────────────────
+
+        private async void btnKabalLoadModems_Click(object sender, EventArgs e)
+        {
+            var customer = cmbKabalCustomer.Text;
+            var rig = cmbKabalRig.Text;
+            if (customer == "select customer")
+            {
+                MessageBox.Show("Please select a customer.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnKabalLoadModems.Enabled = false;
+            lblKabalStatus.Text = "Loading modems from Gant...";
+
+            try
+            {
+                var rigFilter = rig == "select rig" ? null : rig;
+                _loadedModems = await GantClient.FetchModemsAsync(customer, rigFilter, dtpKabalStartDate.Value);
+                BuildGrid();
+                lblKabalStatus.Text = $"Loaded {_loadedModems.Count} modems.";
+            }
+            catch (Exception ex)
+            {
+                lblKabalStatus.Text = "Error: " + ex.Message;
+                MessageBox.Show("Failed to load modems: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnKabalLoadModems.Enabled = true;
+            }
+        }
+
+        private void BuildGrid()
+        {
+            dgvKabal.Columns.Clear();
+            dgvKabal.Rows.Clear();
+
+            // Columns: Select, Mob ID, Ship To, Loadout Date, Deliver To Customer, Well Number, Well Section, BHA
+            var colSelect    = new DataGridViewCheckBoxColumn { Name = "Select",    HeaderText = "",                    Width = 34,  ReadOnly = false };
+            var colMobId     = new DataGridViewLinkColumn    { Name = "MobId",      HeaderText = "Mob ID",              Width = 80   };
+            var colShipTo    = new DataGridViewTextBoxColumn { Name = "ShipTo",     HeaderText = "Ship To",             Width = 130  };
+            var colLoadout   = new DataGridViewTextBoxColumn { Name = "Loadout",    HeaderText = "Loadout Date",        Width = 100  };
+            var colCustomer  = new DataGridViewTextBoxColumn { Name = "Customer",   HeaderText = "Deliver To Customer", Width = 160  };
+            var colWell      = new DataGridViewTextBoxColumn { Name = "Well",        HeaderText = "Well Number",         Width = 160  };
+            var colSection   = new DataGridViewTextBoxColumn { Name = "Section",    HeaderText = "Well Section",        Width = 100  };
+            var colBha       = new DataGridViewTextBoxColumn { Name = "Bha",        HeaderText = "BHA",                 Width = 220  };
+
+            _headerChecked = true;
+            dgvKabal.Columns.AddRange(new DataGridViewColumn[]
+                { colSelect, colMobId, colShipTo, colLoadout, colCustomer, colWell, colSection, colBha });
+
+            foreach (var m in _loadedModems)
+            {
+                bool isReady = !string.IsNullOrEmpty(m.ModemStatus) &&
+                    m.ModemStatus.IndexOf("Ready", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                var rowIdx = dgvKabal.Rows.Add(
+                    !isReady,
+                    m.Id.ToString(),
+                    ShortenShipTo(m.PShipTo1 ?? ""),
+                    TruncateTime(m.LoadoutDate),
+                    TruncateTime(m.DateEta),
+                    m.WellName ?? "",
+                    m.WellSection ?? "",
+                    m.GantText ?? ""
+                );
+
+                dgvKabal.Rows[rowIdx].Tag = m;  // store full GantModem for clipboard
+
+                if (isReady)
+                {
+                    dgvKabal.Rows[rowIdx].Cells["Select"].ReadOnly = true;
+                    dgvKabal.Rows[rowIdx].DefaultCellStyle.BackColor = Color.FromArgb(240, 240, 240);
+                    dgvKabal.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.Gray;
+                }
+            }
+        }
+
+        // ── Shift Dates button (batch shift by N days) ───────────────────
+
+        private async void btnKabalShiftDates_Click(object sender, EventArgs e)
+        {
+            int days;
+            if (!int.TryParse(txtKabalShiftDays.Text, out days) || days == 0)
+            {
+                MessageBox.Show("Enter a non-zero number of shift days.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var selected = GetCheckedIds();
+
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("No modems ticked.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Shift {selected.Count} modem(s) by {days} day(s)?",
+                "Confirm Shift", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes) return;
+
+            btnKabalShiftDates.Enabled = false;
+            lblKabalStatus.Text = "Shifting dates...";
+            int ok = 0, fail = 0;
+
+            foreach (var modemId in selected)
+            {
+                try
+                {
+                    var result = await GantClient.ShiftModemDatesAsync(modemId, days);
+                    if (result.Success)
+                    {
+                        ok++;
+                        // Update grid row with new dates and green checkmark
+                        foreach (DataGridViewRow row in dgvKabal.Rows)
+                        {
+                            if (row.Cells["MobId"].Value?.ToString() == modemId.ToString())
+                            {
+                                row.Cells["Loadout"].Value  = "\u2713 " + result.NewLoadoutDate;
+                                row.Cells["Customer"].Value = "\u2713 " + result.NewDateEta;
+                                row.Cells["Loadout"].Style.ForeColor  = Color.Green;
+                                row.Cells["Customer"].Style.ForeColor = Color.Green;
+                                row.DefaultCellStyle.BackColor = Color.FromArgb(232, 255, 232);
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        fail++;
+                        lblKabalStatus.Text = $"Failed #{modemId}: {result.Error}";
+                    }
+                }
+                catch (Exception ex) { fail++; lblKabalStatus.Text = $"Exception #{modemId}: {ex.Message}"; }
+
+                lblKabalStatus.Text = $"Shifting... {ok + fail}/{selected.Count}";
+            }
+
+            lblKabalStatus.Text = $"Shift complete. Success: {ok}, Failed: {fail}";
+            btnKabalShiftDates.Enabled = true;
+        }
+
+        // ── Sync with Kabal button ───────────────────────────────────────
+
+        private async void btnKabalSyncKabal_Click(object sender, EventArgs e)
+        {
+            var customer = cmbKabalCustomer.Text;
+            var rig = cmbKabalRig.Text;
+            if (customer == "select customer" || rig == "select rig")
+            {
+                MessageBox.Show("Please select a customer and rig.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(txtKabalUser.Text) || string.IsNullOrWhiteSpace(txtKabalPass.Text))
+            {
+                MessageBox.Show("Enter Kabal username and password.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Capture which modems are currently ticked
+            var checkedIds = GetCheckedIds();
+            if (checkedIds.Count == 0)
+            {
+                MessageBox.Show("No modems ticked — nothing to sync.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnKabalSyncKabal.Enabled = false;
+            lblKabalStatus.Text = "Checking scraper...";
+
+            // 1) Ensure scraper is running
+            bool scraperOk = await KabalScraperClient.IsRunningAsync();
+            if (!scraperOk)
+            {
+                lblKabalStatus.Text = "Starting scraper (node kabal-scraper.js)...";
+                try
+                {
+                    var scraperDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "scraper-local");
+                    if (!Directory.Exists(scraperDir))
+                        scraperDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\scraper-local"));
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "node",
+                        Arguments = "kabal-scraper.js",
+                        WorkingDirectory = scraperDir,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                    // Wait up to 15s for scraper to boot
+                    for (int i = 0; i < 15; i++)
+                    {
+                        await Task.Delay(1000);
+                        if (await KabalScraperClient.IsRunningAsync()) { scraperOk = true; break; }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lblKabalStatus.Text = "Failed to start scraper: " + ex.Message;
+                    btnKabalSyncKabal.Enabled = true;
+                    return;
+                }
+                if (!scraperOk)
+                {
+                    lblKabalStatus.Text = "Scraper did not start in time. Run 'node kabal-scraper.js' manually.";
+                    btnKabalSyncKabal.Enabled = true;
+                    return;
+                }
+            }
+
+            // 2) Scrape Kabal (dryRun=true — only read, don't push)
+            lblKabalStatus.Text = $"Scraping Kabal for {customer}...";
+            var result = await KabalScraperClient.ScrapeAsync(
+                customer, rig, txtKabalUser.Text, txtKabalPass.Text,
+                chkKabalHeadless.Checked, dryRun: true);
+
+            if (!result.Success)
+            {
+                lblKabalStatus.Text = "Scrape failed: " + result.Error;
+                MessageBox.Show("Scraping failed: " + result.Error, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                btnKabalSyncKabal.Enabled = true;
+                return;
+            }
+
+            lblKabalStatus.Text = $"Scraped {result.Modems.Count} modems from Kabal. Loading Gant data to compare...";
+
+            // 3) Load Gant modems for comparison
+            try
+            {
+                var rigFilter = rig == "select rig" ? null : rig;
+                _loadedModems = await GantClient.FetchModemsAsync(customer, rigFilter, dtpKabalStartDate.Value);
+            }
+            catch (Exception ex)
+            {
+                lblKabalStatus.Text = "Failed to load Gant data: " + ex.Message;
+                btnKabalSyncKabal.Enabled = true;
+                return;
+            }
+
+            // 4) Filter to only the ticked modems, then rebuild
+            _loadedModems = _loadedModems
+                .Where(m => checkedIds.Contains(m.Id))
+                .ToList();
+            BuildGrid();
+
+            // Highlight rows that have a matching Kabal shipping date
+            foreach (DataGridViewRow row in dgvKabal.Rows)
+            {
+                var modemId = row.Cells["MobId"].Value?.ToString();
+                var kabalMatch = result.Modems.FirstOrDefault(km =>
+                    km.ModemNumber == modemId || km.PackageName?.Contains(modemId) == true);
+                if (kabalMatch != null && !string.IsNullOrEmpty(kabalMatch.ShippingDate))
+                    row.Cells["Loadout"].Style.BackColor = Color.LightYellow;
+            }
+
+            lblKabalStatus.Text = $"Sync preview ready. {result.Modems.Count} Kabal modems matched against {_loadedModems.Count} TMUtils modems. Review and click Shift Dates to apply.";
+            btnKabalSyncKabal.Enabled = true;
         }
     }
 

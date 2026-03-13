@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using System.Windows.Forms;
 using HtmlAgilityPack;
 
@@ -37,6 +38,15 @@ namespace ModemWebUtility
         private static Encoding EncodingWesternEuropean = Encoding.GetEncoding("iso-8859-1");
 
         public static Encoding CurrentEncoding = EncodingWesternEuropean;
+
+        /// <summary>
+        /// URL-form-encodes a value using iso-8859-1, matching Oracle Forms expectations:
+        /// lowercase hex (%3a not %3A), spaces as +, etc.
+        /// </summary>
+        public static string FormUrlEncode(string value)
+        {
+            return HttpUtility.UrlEncode(value ?? "", CurrentEncoding);
+        }
 
         public static string ConvertMshtmlToString(mshtml.HTMLDocument htmlDocument)
         {

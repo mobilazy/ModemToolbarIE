@@ -32,6 +32,7 @@ namespace ModemMergerWinFormsApp
 
             InitializeComponent();
             SetupEventHandlers();
+            RefreshModemAutoComplete();
             
             if (!string.IsNullOrEmpty(modemNumber))
             {
@@ -45,7 +46,6 @@ namespace ModemMergerWinFormsApp
             this.lvAttachments = new ListView();
             this.btnDownloadSelected = new Button();
             this.btnDownloadAll = new Button();
-            this.btnRefresh = new Button();
             this.btnOpenFolder = new Button();
             this.txtDownloadPath = new TextBox();
             this.btnBrowse = new Button();
@@ -88,6 +88,8 @@ namespace ModemMergerWinFormsApp
             this.txtModemNumber.Location = new System.Drawing.Point(120, 42);
             this.txtModemNumber.Size = new System.Drawing.Size(120, 23);
             this.txtModemNumber.MaxLength = 7;
+            this.txtModemNumber.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            this.txtModemNumber.AutoCompleteSource = AutoCompleteSource.CustomSource;
 
             // 
             // btnLoadModem
@@ -187,17 +189,9 @@ namespace ModemMergerWinFormsApp
             this.btnDownloadAll.Click += BtnDownloadAll_Click;
 
             // 
-            // btnRefresh
-            // 
-            this.btnRefresh.Location = new System.Drawing.Point(294, 550);
-            this.btnRefresh.Size = new System.Drawing.Size(100, 30);
-            this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.Click += BtnRefresh_Click;
-
-            // 
             // btnOpenFolder
             // 
-            this.btnOpenFolder.Location = new System.Drawing.Point(400, 550);
+            this.btnOpenFolder.Location = new System.Drawing.Point(294, 550);
             this.btnOpenFolder.Size = new System.Drawing.Size(120, 30);
             this.btnOpenFolder.Text = "Open Folder";
             this.btnOpenFolder.Click += BtnOpenFolder_Click;
@@ -229,6 +223,8 @@ namespace ModemMergerWinFormsApp
             this.txtDestModem.Location = new System.Drawing.Point(630, 547);
             this.txtDestModem.Size = new System.Drawing.Size(100, 23);
             this.txtDestModem.MaxLength = 7;
+            this.txtDestModem.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            this.txtDestModem.AutoCompleteSource = AutoCompleteSource.CustomSource;
 
             // 
             // btnCopySelected
@@ -268,7 +264,6 @@ namespace ModemMergerWinFormsApp
             this.Controls.Add(this.btnBrowse);
             this.Controls.Add(this.btnDownloadSelected);
             this.Controls.Add(this.btnDownloadAll);
-            this.Controls.Add(this.btnRefresh);
             this.Controls.Add(this.btnOpenFolder);
             this.Controls.Add(this.lblDestModem);
             this.Controls.Add(this.txtDestModem);
@@ -285,6 +280,14 @@ namespace ModemMergerWinFormsApp
 
             this.ResumeLayout(false);
             this.PerformLayout();
+        }
+
+        private void RefreshModemAutoComplete()
+        {
+            var src = new AutoCompleteStringCollection();
+            src.AddRange(ModemHistory.GetHistory().ToArray());
+            txtModemNumber.AutoCompleteCustomSource = src;
+            txtDestModem.AutoCompleteCustomSource = src;
         }
 
         private void SetupEventHandlers()
@@ -325,6 +328,8 @@ namespace ModemMergerWinFormsApp
             }
 
             LoadAttachments();
+            ModemHistory.Add(modemNumber);
+            RefreshModemAutoComplete();
         }
 
         private void BtnCopyHeader_Click(object sender, EventArgs e)
@@ -375,6 +380,9 @@ namespace ModemMergerWinFormsApp
 
                 if (success)
                 {
+                    ModemHistory.Add(sourceModem);
+                    ModemHistory.Add(destModem);
+                    RefreshModemAutoComplete();
                     lblStatus.Text = $"Header successfully copied from modem {sourceModem} to {destModem}";
                     MessageBox.Show($"Header fields successfully copied from modem {sourceModem} to modem {destModem}.",
                         "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -615,14 +623,6 @@ namespace ModemMergerWinFormsApp
             }
         }
 
-        private void BtnRefresh_Click(object sender, EventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(modemNumber))
-            {
-                LoadAttachments();
-            }
-        }
-
         private void BtnOpenFolder_Click(object sender, EventArgs e)
         {
             var downloadPath = txtDownloadPath.Text;
@@ -752,6 +752,8 @@ namespace ModemMergerWinFormsApp
 
                 if (success)
                 {
+                    ModemHistory.Add(destModem);
+                    RefreshModemAutoComplete();
                     lblStatus.Text = $"Successfully copied Gant tools to modem {destModem}";
                     
                     // Prepare full log
@@ -921,6 +923,12 @@ namespace ModemMergerWinFormsApp
                 progressBar.Value = 100;
                 lblStatus.Text = $"Copy complete: {successCount} succeeded, {failCount} failed";
 
+                if (successCount > 0)
+                {
+                    ModemHistory.Add(destModem);
+                    RefreshModemAutoComplete();
+                }
+
                 MessageBox.Show($"Copied {successCount} attachment(s) to modem {destModem}.\n{failCount} failed.",
                     "Copy Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -953,7 +961,6 @@ namespace ModemMergerWinFormsApp
         {
             btnDownloadSelected.Enabled = enabled;
             btnDownloadAll.Enabled = enabled;
-            btnRefresh.Enabled = enabled;
             btnLoadModem.Enabled = enabled;
             btnCopySelected.Enabled = enabled;
             btnCopyAll.Enabled = enabled;
@@ -985,16 +992,16 @@ namespace ModemMergerWinFormsApp
         private string GetDocTypDescription(string docTyp)
         {
             if (string.IsNullOrWhiteSpace(docTyp))
-                return "Other (22)";
+                return "Other";
 
             switch (docTyp)
             {
-                case "1": return "WinPul (1)";
-                case "2": return "Shipping (2)";
-                case "3": return "BHA (3)";
-                case "4": return "Download (4)";
-                case "22": return "Other (22)";
-                default: return $"Unknown ({docTyp})";
+                case "1": return "WinPul";
+                case "2": return "Shipping";
+                case "3": return "BHA";
+                case "4": return "Download";
+                case "22": return "Other";
+                default: return "Unknown";
             }
         }
 
@@ -1016,7 +1023,6 @@ namespace ModemMergerWinFormsApp
         private ListView lvGantTools;
         private Button btnDownloadSelected;
         private Button btnDownloadAll;
-        private Button btnRefresh;
         private Button btnOpenFolder;
         private TextBox txtDownloadPath;
         private Button btnBrowse;
