@@ -147,11 +147,12 @@ namespace ModemMergerWinFormsApp
         {
             return await Task.Run(() =>
             {
-                OpenQA.Selenium.Edge.EdgeOptions options = null;
+                Microsoft.Edge.SeleniumTools.EdgeOptions options = null;
                 OpenQA.Selenium.IWebDriver driver = null;
                 try
                 {
-                    options = new OpenQA.Selenium.Edge.EdgeOptions();
+                    options = new Microsoft.Edge.SeleniumTools.EdgeOptions();
+                    options.UseChromium = true;
                     if (headless)
                     {
                         options.AddArgument("--headless");
@@ -164,14 +165,13 @@ namespace ModemMergerWinFormsApp
                     var driverDir = FindCachedEdgeDriver();
                     if (driverDir != null)
                     {
-                        var svc = OpenQA.Selenium.Edge.EdgeDriverService.CreateDefaultService(driverDir);
+                        var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
                         svc.HideCommandPromptWindow = true;
-                        driver = new OpenQA.Selenium.Edge.EdgeDriver(svc, options);
+                        driver = new Microsoft.Edge.SeleniumTools.EdgeDriver(svc, options);
                     }
                     else
                     {
-                        // Fallback: let Selenium Manager try
-                        driver = new OpenQA.Selenium.Edge.EdgeDriver(options);
+                        driver = new Microsoft.Edge.SeleniumTools.EdgeDriver(options);
                     }
                     driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
 
@@ -181,8 +181,7 @@ namespace ModemMergerWinFormsApp
                     System.Threading.Thread.Sleep(2000);
 
                     onStatus?.Invoke("Entering credentials...");
-                    var wait = new OpenQA.Selenium.Support.UI.WebDriverWait(driver, TimeSpan.FromSeconds(15));
-                    var usernameField = wait.Until(d =>
+                    var usernameField = WaitFor(driver, d =>
                     {
                         try
                         {
@@ -209,7 +208,7 @@ namespace ModemMergerWinFormsApp
                     try
                     {
                         onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
-                        var opLink = wait.Until(d =>
+                        var opLink = WaitFor(driver, d =>
                         {
                             try
                             {
@@ -261,6 +260,25 @@ namespace ModemMergerWinFormsApp
                     try { driver?.Quit(); } catch { }
                 }
             });
+        }
+
+        /// <summary>
+        /// Poll until <paramref name="condition"/> returns a non-null element or timeout elapses.
+        /// Replaces WebDriverWait (not available without Selenium.Support package).
+        /// </summary>
+        private static OpenQA.Selenium.IWebElement WaitFor(
+            OpenQA.Selenium.IWebDriver driver,
+            Func<OpenQA.Selenium.IWebDriver, OpenQA.Selenium.IWebElement> condition,
+            int timeoutSeconds = 15)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                var el = condition(driver);
+                if (el != null) return el;
+                System.Threading.Thread.Sleep(500);
+            }
+            throw new TimeoutException($"WaitFor timed out after {timeoutSeconds}s");
         }
 
         /// <summary>
@@ -355,8 +373,8 @@ namespace ModemMergerWinFormsApp
                     try
                     {
                         var nextBtn = driver.FindElement(OpenQA.Selenium.By.CssSelector(ns));
-                        var disabled = nextBtn.GetDomAttribute("disabled");
-                        var cls = nextBtn.GetDomProperty("className") ?? "";
+                        var disabled = nextBtn.GetAttribute("disabled");
+                        var cls = nextBtn.GetAttribute("class") ?? "";
                         if (disabled == null && !cls.Contains("is-disabled") && !cls.Contains("disabled"))
                         {
                             nextBtn.Click();
