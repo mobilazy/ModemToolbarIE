@@ -866,15 +866,36 @@ namespace ModemMergerWinFormsApp
                 return;
             }
 
-            // Build HTML table with linked MobIDs, font size 10
-            var html = new StringBuilder();
-            html.Append("<table style=\"font-size:10pt;border-collapse:collapse;\"><thead><tr>");
-            string[] headers = { "Mob ID", "Ship To", "Loadout Date", "Deliver To Customer", "Well Number", "Well Section", "BHA" };
-            foreach (var h in headers)
-                html.Append("<th style=\"font-size:10pt;\">").Append(HtmlEnc(h)).Append("</th>");
-            html.Append("</tr></thead><tbody>");
+            // Use highlighted (selected) rows; if all selected, include header
+            var selected = dgvKabal.SelectedRows;
+            bool allSelected = selected.Count >= dgvKabal.Rows.Count;
+            var rows = new List<DataGridViewRow>();
+            if (allSelected)
+            {
+                foreach (DataGridViewRow row in dgvKabal.Rows)
+                    rows.Add(row);
+            }
+            else
+            {
+                foreach (DataGridViewRow row in selected)
+                    rows.Add(row);
+                rows.Sort((a, b) => a.Index.CompareTo(b.Index));
+            }
 
-            foreach (DataGridViewRow row in dgvKabal.Rows)
+            // Build HTML table with linked MobIDs, font size 10
+            string[] headers = { "Mob ID", "Ship To", "Loadout Date", "Deliver To Customer", "Well Number", "Well Section", "BHA" };
+            var html = new StringBuilder();
+            html.Append("<table style=\"font-size:10pt;border-collapse:collapse;\">");
+            if (allSelected)
+            {
+                html.Append("<thead><tr>");
+                foreach (var h in headers)
+                    html.Append("<th style=\"font-size:10pt;\">").Append(HtmlEnc(h)).Append("</th>");
+                html.Append("</tr></thead>");
+            }
+            html.Append("<tbody>");
+
+            foreach (DataGridViewRow row in rows)
             {
                 var gm = row.Tag as GantModem;
                 if (gm == null) continue;
@@ -906,8 +927,9 @@ namespace ModemMergerWinFormsApp
             dataObj.SetData(DataFormats.Html, cfHtml);
             // Plain text fallback (tab-delimited)
             var plain = new StringBuilder();
-            plain.AppendLine(string.Join("\t", headers));
-            foreach (DataGridViewRow row in dgvKabal.Rows)
+            if (allSelected)
+                plain.AppendLine(string.Join("\t", headers));
+            foreach (DataGridViewRow row in rows)
             {
                 var gm = row.Tag as GantModem;
                 if (gm == null) continue;
@@ -923,7 +945,7 @@ namespace ModemMergerWinFormsApp
             dataObj.SetData(DataFormats.UnicodeText, plain.ToString());
             Clipboard.SetDataObject(dataObj, true);
 
-            lblKabalStatus.Text = $"Copied {dgvKabal.Rows.Count} modems to clipboard.";
+            lblKabalStatus.Text = $"Copied {rows.Count} modem(s) to clipboard.";
         }
 
         private static string HtmlEnc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");

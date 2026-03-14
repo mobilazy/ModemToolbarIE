@@ -20,6 +20,23 @@ namespace ModemWebUtility
             "P_SSORD_ID", "P_10"
         };
 
+        // Only these specific header fields get copied from source to target.
+        private static readonly HashSet<string> _copyFields = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // 3 dates
+            "P_DATE_LOAD", "P_LOADOUT_DATE", "P_DATE_ETA",
+            // Ship from 1-5
+            "P_SHIPFROM_1", "P_SHIPFROM_2", "P_SHIPFROM_3", "P_SHIPFROM_4", "P_SHIPFROM_5",
+            // Ship from location dropdown (Sperry Drilling Services)
+            "P_L_SHIPFROM_LOC2",
+            // Job duration
+            "P_MOB_DURATION",
+            // Well Section
+            "P_WELL_SECTION",
+            // Reason for shipment
+            "P_REASON_FOR_SHIPMENT"
+        };
+
         public ModemHeaderCopy(string sourceModemNo, string targetModemNo)
         {
             this.sourceModemNo = sourceModemNo;
@@ -81,7 +98,7 @@ namespace ModemWebUtility
                 formFields.Add(new KeyValuePair<string, string>(name, value));
             }
 
-            // 3) Override target P_ fields with source values (skip system fields)
+            // 3) Override only whitelisted header fields with source values
             for (int i = 0; i < formFields.Count; i++)
             {
                 var f = formFields[i];
@@ -92,7 +109,7 @@ namespace ModemWebUtility
                     continue;
                 }
 
-                if (f.Key.StartsWith("P_") && !_skipOverride.Contains(f.Key))
+                if (_copyFields.Contains(f.Key))
                 {
                     string srcVal;
                     if (sourceValues.TryGetValue(f.Key, out srcVal))
