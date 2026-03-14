@@ -108,67 +108,333 @@ namespace ModemMergerWinFormsApp
 
     public static class KabalScraperClient
     {
-        private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        private const string ScraperBaseUrl = "http://localhost:3000";
+        // Login entry point — triggers SSO and lands back on the APEX app after auth
+        private const string LoginUrl = "https://account01.kabal.com/w/web/r/wels/kabal-account/";
 
-        public static async Task<bool> IsRunningAsync()
+        // Each operator lives in a separate APEX application (different App ID).
+        // session=0 tells APEX to create a fresh session from active SSO cookies.
+        private static readonly Dictionary<string, string> OperatorAppUrls =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            try
-            {
-                var resp = await _http.GetAsync(ScraperBaseUrl + "/health");
-                return resp.IsSuccessStatusCode;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+            { "Equinor",        "https://app01.kabal.com/mws/f?p=16786:328:0::NO::P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout" },
+            { "Vår Energi",     "https://app01.kabal.com/mws/f?p=1364:328:0::NO::P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout" },
+            { "ConocoPhillips", "https://app01.kabal.com/mws/f?p=1267:328:0::NO::P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout" },
+            { "AkerBP",         "https://app01.kabal.com/mws/f?p=1276:328:0::NO::P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout" },
+        };
 
+        // Display name used when clicking the operator selector inside the APEX app
+        private static readonly Dictionary<string, string> OperatorMapping =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "AkerBP",         "AkerBP" },
+            { "ConocoPhillips", "ConocoPhillips - Operator (NO)" },
+            { "Equinor",        "Equinor Norge - Operator (NO)" },
+            { "Vår Energi",     "Vaar Energi - Operator (NO)" },
+        };
+
+        /// <summary>
+        /// Scrape the Kabal APEX Interactive Report directly via Selenium (Edge).
+        /// No Node.js dependency — runs the browser from .NET.
+        /// </summary>
         public static async Task<ScraperResult> ScrapeAsync(
             string operatorName,
             string rigName,
             string username,
             string password,
             bool headless = true,
-            bool dryRun = true)
+            bool dryRun = true,
+            Action<string> onStatus = null)
         {
-            var payload = new
+            return await Task.Run(() =>
             {
-                @operator = operatorName,
-                rigName = rigName,
-                username = username,
-                password = password,
-                headless = headless,
-                dryRun = dryRun
-            };
+                OpenQA.Selenium.Edge.EdgeOptions options = null;
+                OpenQA.Selenium.IWebDriver driver = null;
+                try
+                {
+                    options = new OpenQA.Selenium.Edge.EdgeOptions();
+                    if (headless)
+                    {
+                        options.AddArgument("--headless");
+                        options.AddArgument("--disable-gpu");
+                    }
+                    options.AddArgument("--no-sandbox");
+                    options.AddArgument("--disable-dev-shm-usage");
 
-            var json = JsonConvert.SerializeObject(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    // Find cached msedgedriver to bypass Selenium Manager (firewall blocks downloads)
+                    var driverDir = FindCachedEdgeDriver();
+                    if (driverDir != null)
+                    {
+                        var svc = OpenQA.Selenium.Edge.EdgeDriverService.CreateDefaultService(driverDir);
+                        svc.HideCommandPromptWindow = true;
+                        driver = new OpenQA.Selenium.Edge.EdgeDriver(svc, options);
+                    }
+                    else
+                    {
+                        // Fallback: let Selenium Manager try
+                        driver = new OpenQA.Selenium.Edge.EdgeDriver(options);
+                    }
+                    driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
 
-            HttpResponseMessage response;
-            try
+                    // ── Step 1: Login ──
+                    onStatus?.Invoke("Navigating to Kabal login...");
+                    driver.Navigate().GoToUrl(LoginUrl);
+                    System.Threading.Thread.Sleep(2000);
+
+                    onStatus?.Invoke("Entering credentials...");
+                    var wait = new OpenQA.Selenium.Support.UI.WebDriverWait(driver, TimeSpan.FromSeconds(15));
+                    var usernameField = wait.Until(d =>
+                    {
+                        try
+                        {
+                            var el = d.FindElement(OpenQA.Selenium.By.CssSelector("input[type='text'], input[type='email']"));
+                            return el.Displayed ? el : null;
+                        }
+                        catch { return null; }
+                    });
+                    usernameField.Clear();
+                    usernameField.SendKeys(username);
+
+                    var passwordField = driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='password']"));
+                    passwordField.Clear();
+                    passwordField.SendKeys(password);
+
+                    driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
+                    System.Threading.Thread.Sleep(3000);
+
+                    // ── Step 2: Operator selection (if present) ──
+                    string operatorDisplay;
+                    if (!OperatorMapping.TryGetValue(operatorName, out operatorDisplay))
+                        operatorDisplay = operatorName;
+
+                    try
+                    {
+                        onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
+                        var opLink = wait.Until(d =>
+                        {
+                            try
+                            {
+                                var el = d.FindElement(OpenQA.Selenium.By.XPath($"//*[contains(text(), '{operatorDisplay}')]"));
+                                return el.Displayed ? el : null;
+                            }
+                            catch { return null; }
+                        });
+                        opLink.Click();
+                        System.Threading.Thread.Sleep(3000);
+                    }
+                    catch { /* Operator selector not found — may already be in app context */ }
+
+                    // ── Step 3: Navigate to operator APEX app page ──
+                    string targetUrl;
+                    if (!OperatorAppUrls.TryGetValue(operatorName, out targetUrl))
+                        targetUrl = OperatorAppUrls["Equinor"];
+
+                    onStatus?.Invoke($"Navigating to {operatorName} loadout page...");
+                    driver.Navigate().GoToUrl(targetUrl);
+                    System.Threading.Thread.Sleep(3000);
+
+                    // Verify not redirected back to login
+                    if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
+                        return new ScraperResult { Success = false, Error = "Redirected back to login — credentials may be incorrect or SSO session expired." };
+
+                    // ── Step 4: Scrape APEX Interactive Report ──
+                    onStatus?.Invoke("Scraping APEX table...");
+                    var allRows = ScrapeApexIR(driver);
+
+                    // ── Step 5: Parse modem records ──
+                    var modems = ParseModems(allRows);
+                    onStatus?.Invoke($"Parsed {modems.Count} modem records from {allRows.Count} rows.");
+
+                    return new ScraperResult
+                    {
+                        Success = true,
+                        Scraped = modems.Count,
+                        DryRun = dryRun,
+                        Modems = modems
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ScraperResult { Success = false, Error = ex.Message };
+                }
+                finally
+                {
+                    try { driver?.Quit(); } catch { }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Find the cached msedgedriver directory under %USERPROFILE%\.cache\selenium\msedgedriver.
+        /// Returns the directory containing msedgedriver.exe, or null if not found.
+        /// </summary>
+        private static string FindCachedEdgeDriver()
+        {
+            var cacheRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".cache", "selenium", "msedgedriver", "win64");
+            if (!Directory.Exists(cacheRoot)) return null;
+
+            // Pick the newest version folder containing msedgedriver.exe
+            foreach (var dir in Directory.GetDirectories(cacheRoot)
+                         .OrderByDescending(d => d))
             {
-                response = await _http.PostAsync(ScraperBaseUrl + "/scrape", content);
+                if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
+                    return dir;
             }
-            catch (Exception ex)
+            return null;
+        }
+
+        /// <summary>
+        /// Extract all rows from an Oracle APEX Interactive Report, walking through pagination.
+        /// Returns a list of dictionaries (column header → cell value).
+        /// </summary>
+        private static List<Dictionary<string, string>> ScrapeApexIR(OpenQA.Selenium.IWebDriver driver)
+        {
+            var allRows = new List<Dictionary<string, string>>();
+
+            while (true)
             {
-                return new ScraperResult { Success = false, Error = "Cannot reach scraper at localhost:3000 — " + ex.Message };
+                System.Threading.Thread.Sleep(1500);
+
+                var headers = new List<string>();
+                bool tableFound = false;
+
+                string[] tableSelectors = {
+                    "table.a-IRR-table",
+                    "table[summary]",
+                    "table.uReportStandard",
+                };
+
+                foreach (var sel in tableSelectors)
+                {
+                    try
+                    {
+                        var tbl = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
+                        if (tbl == null) continue;
+
+                        // Collect headers
+                        var thEls = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " th"));
+                        headers = thEls.Select(th => th.Text.Trim()).Where(h => h.Length > 0).ToList();
+
+                        // Collect data rows
+                        var rows = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " tbody tr"));
+                        foreach (var row in rows)
+                        {
+                            try
+                            {
+                                var cells = row.FindElements(OpenQA.Selenium.By.CssSelector("td"));
+                                if (cells.Count == 0) continue;
+                                var obj = new Dictionary<string, string>();
+                                for (int i = 0; i < cells.Count; i++)
+                                {
+                                    var key = i < headers.Count ? headers[i] : $"col_{i}";
+                                    obj[key] = cells[i].Text.Trim();
+                                }
+                                allRows.Add(obj);
+                            }
+                            catch { /* skip malformed row */ }
+                        }
+                        tableFound = true;
+                        break;
+                    }
+                    catch { /* selector not found, try next */ }
+                }
+
+                if (!tableFound) break;
+
+                // Try to click Next pagination button
+                bool nextClicked = false;
+                string[] nextSelectors = {
+                    "button[title='Next']",
+                    "a[title='Next']",
+                    ".a-IRR-pagination-item--next:not(.is-disabled)",
+                    ".uButtonPaginationNext:not(:disabled)",
+                };
+                foreach (var ns in nextSelectors)
+                {
+                    try
+                    {
+                        var nextBtn = driver.FindElement(OpenQA.Selenium.By.CssSelector(ns));
+                        var disabled = nextBtn.GetDomAttribute("disabled");
+                        var cls = nextBtn.GetDomProperty("className") ?? "";
+                        if (disabled == null && !cls.Contains("is-disabled") && !cls.Contains("disabled"))
+                        {
+                            nextBtn.Click();
+                            nextClicked = true;
+                            break;
+                        }
+                    }
+                    catch { /* not found */ }
+                }
+
+                if (!nextClicked) break;
             }
 
-            var body = await response.Content.ReadAsStringAsync();
+            return allRows;
+        }
 
-            if (!response.IsSuccessStatusCode)
-                return new ScraperResult { Success = false, Error = $"Scraper returned {(int)response.StatusCode}: {body}" };
+        /// <summary>
+        /// Parse raw table rows into KabalModem objects.
+        /// </summary>
+        private static List<KabalModem> ParseModems(List<Dictionary<string, string>> rows)
+        {
+            var modems = new List<KabalModem>();
 
-            try
+            foreach (var row in rows)
             {
-                return JsonConvert.DeserializeObject<ScraperResult>(body)
-                       ?? new ScraperResult { Success = false, Error = "Empty response from scraper" };
+                // Normalise keys to lowercase
+                var lc = row.ToDictionary(kv => kv.Key.ToLowerInvariant(), kv => kv.Value);
+
+                string modemNumber = "", packageName = "", kabalId = "", shippingDate = "", supplier = "", destination = "";
+
+                foreach (var kv in lc)
+                {
+                    var val = kv.Value;
+                    if (string.IsNullOrEmpty(val)) continue;
+
+                    if (string.IsNullOrEmpty(kabalId) && Regex.IsMatch(val.Trim(), @"^[A-Z]{2,6}\d{4,10}$", RegexOptions.IgnoreCase))
+                        kabalId = val.Trim();
+
+                    if (string.IsNullOrEmpty(packageName) && (val.Contains("M-") || val.IndexOf("modem", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        packageName = val.Trim();
+                        var m = Regex.Match(val, @"M-(\d+)", RegexOptions.IgnoreCase);
+                        if (m.Success) modemNumber = m.Groups[1].Value;
+                    }
+
+                    if (string.IsNullOrEmpty(shippingDate) && Regex.IsMatch(val, @"\d{2}[-/\.]\d{2}[-/\.]\d{2,4}"))
+                        shippingDate = val.Trim();
+                    if (string.IsNullOrEmpty(shippingDate) && Regex.IsMatch(val, @"\d{4}-\d{2}-\d{2}"))
+                        shippingDate = val.Trim();
+
+                    if (string.IsNullOrEmpty(supplier) && Regex.IsMatch(val, @"HLB|Halliburton|Baker|Schlumberger|SLB", RegexOptions.IgnoreCase))
+                        supplier = val.Trim();
+
+                    if (string.IsNullOrEmpty(destination) && kv.Key.Contains("dest"))
+                        destination = val.Trim();
+                }
+
+                if (string.IsNullOrEmpty(modemNumber))
+                {
+                    var m = Regex.Match(packageName + " " + kabalId, @"\b(\d{6,8})\b");
+                    if (m.Success) modemNumber = m.Groups[1].Value;
+                }
+
+                if (!string.IsNullOrEmpty(modemNumber) || !string.IsNullOrEmpty(kabalId))
+                {
+                    modems.Add(new KabalModem
+                    {
+                        ModemNumber = modemNumber,
+                        ShippingDate = shippingDate,
+                        KabalId = kabalId,
+                        PackageName = packageName,
+                        Supplier = supplier,
+                        Destination = destination,
+                    });
+                }
             }
-            catch (Exception ex)
-            {
-                return new ScraperResult { Success = false, Error = "Failed to parse scraper response: " + ex.Message };
-            }
+
+            return modems;
         }
     }
 
@@ -559,7 +825,8 @@ namespace ModemMergerWinFormsApp
         /// Walks form elements in DOM order (like TMUtils) — each field once, first-wins dedup.
         /// POST with PreAuthenticate=false → 401 NTLM → 200.
         /// </summary>
-        public static async Task<ShiftResult> ShiftModemDatesAsync(int modemId, int days)
+        public static async Task<ShiftResult> ShiftModemDatesAsync(int modemId, int days,
+            bool shiftLoadout = true, bool shiftEta = true)
         {
             return await Task.Run(() =>
             {
@@ -631,13 +898,23 @@ namespace ModemMergerWinFormsApp
                             break;
                         case "P_LOADOUT_DATE":
                             oldLoadout = f.Value;
-                            newLoadout = ShiftDateField(f.Value, days);
-                            formFields[i] = new KeyValuePair<string, string>(f.Key, newLoadout);
+                            if (shiftLoadout)
+                            {
+                                newLoadout = ShiftDateField(f.Value, days);
+                                formFields[i] = new KeyValuePair<string, string>(f.Key, newLoadout);
+                            }
+                            else
+                                newLoadout = f.Value;
                             break;
                         case "P_DATE_ETA":
                             oldEta = f.Value;
-                            newEta = ShiftDateField(f.Value, days);
-                            formFields[i] = new KeyValuePair<string, string>(f.Key, newEta);
+                            if (shiftEta)
+                            {
+                                newEta = ShiftDateField(f.Value, days);
+                                formFields[i] = new KeyValuePair<string, string>(f.Key, newEta);
+                            }
+                            else
+                                newEta = f.Value;
                             break;
                         case "P_SSORD_ID":
                             formFields[i] = new KeyValuePair<string, string>(f.Key, modemId.ToString());
@@ -698,7 +975,9 @@ namespace ModemMergerWinFormsApp
                     verifyDoc.DocumentNode.SelectSingleNode("//input[@name='P_DATE_ETA']")
                         ?.GetAttributeValue("value", "") ?? "");
 
-                if (actualLoad == oldDateLoad && actualLoadout == oldLoadout && actualEta == oldEta)
+                if (actualLoad == oldDateLoad &&
+                    (!shiftLoadout || actualLoadout == oldLoadout) &&
+                    (!shiftEta || actualEta == oldEta))
                     throw new InvalidOperationException(
                         "POST returned 200 but dates unchanged — update had no effect");
 

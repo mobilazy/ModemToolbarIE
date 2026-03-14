@@ -36,6 +36,8 @@ namespace ModemMergerWinFormsApp
 
         private FocusedTreeview lastFocused;
         private bool _headerChecked = true;
+        private bool _loadoutLocked = false;
+        private bool _etaLocked = false;
 
 
 
@@ -793,32 +795,82 @@ namespace ModemMergerWinFormsApp
 
         private void dgvKabal_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex != -1 || !dgvKabal.Columns.Contains("Select") ||
-                e.ColumnIndex != dgvKabal.Columns["Select"].Index) return;
+            if (e.RowIndex != -1)
+            {
+                // Header row only
+                return;
+            }
 
-            e.PaintBackground(e.ClipBounds, false);
-            var state = _headerChecked ? CheckBoxState.CheckedNormal : CheckBoxState.UncheckedNormal;
-            var sz = CheckBoxRenderer.GetGlyphSize(e.Graphics, state);
-            var pt = new System.Drawing.Point(
-                e.CellBounds.Left + (e.CellBounds.Width  - sz.Width)  / 2,
-                e.CellBounds.Top  + (e.CellBounds.Height - sz.Height) / 2);
-            CheckBoxRenderer.DrawCheckBox(e.Graphics, pt, state);
-            e.Handled = true;
+            // Select column — draw checkbox
+            if (dgvKabal.Columns.Contains("Select") &&
+                e.ColumnIndex == dgvKabal.Columns["Select"].Index)
+            {
+                e.PaintBackground(e.ClipBounds, false);
+                var state = _headerChecked ? CheckBoxState.CheckedNormal : CheckBoxState.UncheckedNormal;
+                var sz = CheckBoxRenderer.GetGlyphSize(e.Graphics, state);
+                var pt = new System.Drawing.Point(
+                    e.CellBounds.Left + (e.CellBounds.Width  - sz.Width)  / 2,
+                    e.CellBounds.Top  + (e.CellBounds.Height - sz.Height) / 2);
+                CheckBoxRenderer.DrawCheckBox(e.Graphics, pt, state);
+                e.Handled = true;
+                return;
+            }
+
+            // Loadout / Customer columns — draw padlock icon in header
+            bool isLoadout  = dgvKabal.Columns.Contains("Loadout")  && e.ColumnIndex == dgvKabal.Columns["Loadout"].Index;
+            bool isCustomer = dgvKabal.Columns.Contains("Customer") && e.ColumnIndex == dgvKabal.Columns["Customer"].Index;
+            if (isLoadout || isCustomer)
+            {
+                bool locked = isLoadout ? _loadoutLocked : _etaLocked;
+                e.PaintBackground(e.ClipBounds, false);
+
+                string text = e.Value?.ToString() ?? "";
+                string icon = locked ? "\U0001F512 " : "\U0001F513 ";
+                var display = icon + text;
+
+                TextRenderer.DrawText(e.Graphics, display, e.CellStyle.Font,
+                    e.CellBounds, e.CellStyle.ForeColor,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                e.Handled = true;
+            }
         }
 
         private void dgvKabal_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            if (!dgvKabal.Columns.Contains("Select") ||
-                e.ColumnIndex != dgvKabal.Columns["Select"].Index) return;
-
-            _headerChecked = !_headerChecked;
-            foreach (DataGridViewRow row in dgvKabal.Rows)
+            // Select column — toggle all checkboxes
+            if (dgvKabal.Columns.Contains("Select") &&
+                e.ColumnIndex == dgvKabal.Columns["Select"].Index)
             {
-                if (row.Cells["Select"].ReadOnly) continue;  // skip Ready modems
-                row.Cells["Select"].Value = _headerChecked;
+                _headerChecked = !_headerChecked;
+                foreach (DataGridViewRow row in dgvKabal.Rows)
+                {
+                    if (row.Cells["Select"].ReadOnly) continue;
+                    row.Cells["Select"].Value = _headerChecked;
+                }
+                dgvKabal.RefreshEdit();
+                dgvKabal.InvalidateColumn(e.ColumnIndex);
+                return;
             }
-            dgvKabal.RefreshEdit();
-            dgvKabal.InvalidateColumn(e.ColumnIndex);
+
+            // Loadout column — toggle lock
+            if (dgvKabal.Columns.Contains("Loadout") &&
+                e.ColumnIndex == dgvKabal.Columns["Loadout"].Index)
+            {
+                _loadoutLocked = !_loadoutLocked;
+                dgvKabal.InvalidateColumn(e.ColumnIndex);
+                lblKabalStatus.Text = _loadoutLocked ? "Loadout Date locked" : "Loadout Date unlocked";
+                return;
+            }
+
+            // Customer (ETA) column — toggle lock
+            if (dgvKabal.Columns.Contains("Customer") &&
+                e.ColumnIndex == dgvKabal.Columns["Customer"].Index)
+            {
+                _etaLocked = !_etaLocked;
+                dgvKabal.InvalidateColumn(e.ColumnIndex);
+                lblKabalStatus.Text = _etaLocked ? "Deliver To Customer locked" : "Deliver To Customer unlocked";
+                return;
+            }
         }
 
         private void dgvKabal_CurrentCellDirtyStateChanged(object sender, EventArgs e)
@@ -1194,7 +1246,8 @@ namespace ModemMergerWinFormsApp
             {
                 try
                 {
-                    var result = await GantClient.ShiftModemDatesAsync(modemId, days);
+                    var result = await GantClient.ShiftModemDatesAsync(modemId, days,
+                        shiftLoadout: !_loadoutLocked, shiftEta: !_etaLocked);
                     if (result.Success)
                     {
                         ok++;
@@ -1203,10 +1256,16 @@ namespace ModemMergerWinFormsApp
                         {
                             if (row.Cells["MobId"].Value?.ToString() == modemId.ToString())
                             {
-                                row.Cells["Loadout"].Value  = "\u2713 " + result.NewLoadoutDate;
-                                row.Cells["Customer"].Value = "\u2713 " + result.NewDateEta;
-                                row.Cells["Loadout"].Style.ForeColor  = Color.Green;
-                                row.Cells["Customer"].Style.ForeColor = Color.Green;
+                                if (!_loadoutLocked)
+                                {
+                                    row.Cells["Loadout"].Value  = "\u2713 " + result.NewLoadoutDate;
+                                    row.Cells["Loadout"].Style.ForeColor  = Color.Green;
+                                }
+                                if (!_etaLocked)
+                                {
+                                    row.Cells["Customer"].Value = "\u2713 " + result.NewDateEta;
+                                    row.Cells["Customer"].Style.ForeColor = Color.Green;
+                                }
                                 row.DefaultCellStyle.BackColor = Color.FromArgb(232, 255, 232);
                                 break;
                             }
@@ -1253,52 +1312,13 @@ namespace ModemMergerWinFormsApp
             }
 
             btnKabalSyncKabal.Enabled = false;
-            lblKabalStatus.Text = "Checking scraper...";
+            lblKabalStatus.Text = "Starting Kabal scraper...";
 
-            // 1) Ensure scraper is running
-            bool scraperOk = await KabalScraperClient.IsRunningAsync();
-            if (!scraperOk)
-            {
-                lblKabalStatus.Text = "Starting scraper (node kabal-scraper.js)...";
-                try
-                {
-                    var scraperDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "scraper-local");
-                    if (!Directory.Exists(scraperDir))
-                        scraperDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\scraper-local"));
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "node",
-                        Arguments = "kabal-scraper.js",
-                        WorkingDirectory = scraperDir,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    });
-                    // Wait up to 15s for scraper to boot
-                    for (int i = 0; i < 15; i++)
-                    {
-                        await Task.Delay(1000);
-                        if (await KabalScraperClient.IsRunningAsync()) { scraperOk = true; break; }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lblKabalStatus.Text = "Failed to start scraper: " + ex.Message;
-                    btnKabalSyncKabal.Enabled = true;
-                    return;
-                }
-                if (!scraperOk)
-                {
-                    lblKabalStatus.Text = "Scraper did not start in time. Run 'node kabal-scraper.js' manually.";
-                    btnKabalSyncKabal.Enabled = true;
-                    return;
-                }
-            }
-
-            // 2) Scrape Kabal (dryRun=true — only read, don't push)
-            lblKabalStatus.Text = $"Scraping Kabal for {customer}...";
+            // Scrape Kabal directly using Selenium (no Node.js needed)
             var result = await KabalScraperClient.ScrapeAsync(
                 customer, rig, txtKabalUser.Text, txtKabalPass.Text,
-                chkKabalHeadless.Checked, dryRun: true);
+                chkKabalHeadless.Checked, dryRun: true,
+                onStatus: msg => BeginInvoke((Action)(() => lblKabalStatus.Text = msg)));
 
             if (!result.Success)
             {
