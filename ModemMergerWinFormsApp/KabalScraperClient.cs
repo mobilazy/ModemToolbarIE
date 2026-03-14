@@ -15,6 +15,74 @@ using System.Threading.Tasks;
 
 namespace ModemMergerWinFormsApp
 {
+    // ── Scraper Log ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Rolling file logger for the Kabal scraper. Writes timestamped entries to
+    /// %APPDATA%\ModemMerger\scraper-log.txt (keeps the last run only).
+    /// Call <see cref="Start"/> at the beginning of a scrape, then <see cref="Info"/>/<see cref="Warn"/>/<see cref="Error"/>
+    /// throughout. <see cref="SavePageSnapshot"/> captures URL + page-source excerpt + screenshot.
+    /// </summary>
+    public static class ScrapeLog
+    {
+        private static readonly object _lock = new object();
+        private static string _logDir;
+        private static string _logPath;
+
+        public static string LogPath => _logPath;
+
+        public static void Start()
+        {
+            _logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "ModemMerger");
+            Directory.CreateDirectory(_logDir);
+            _logPath = Path.Combine(_logDir, "scraper-log.txt");
+
+            // Overwrite previous run
+            File.WriteAllText(_logPath,
+                $"=== Kabal Scraper Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
+        }
+
+        public static void Info(string message)  => Write("INFO ", message);
+        public static void Warn(string message)  => Write("WARN ", message);
+        public static void Error(string message)  => Write("ERROR", message);
+
+        private static void Write(string level, string message)
+        {
+            if (_logPath == null) return;
+            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {level}  {message}{Environment.NewLine}";
+            lock (_lock) { File.AppendAllText(_logPath, line); }
+        }
+
+        /// <summary>
+        /// Dump current URL, page title, first 2000 chars of page source, and a screenshot.
+        /// </summary>
+        public static void SavePageSnapshot(OpenQA.Selenium.IWebDriver driver, string label)
+        {
+            try
+            {
+                Info($"[{label}] URL = {driver.Url}");
+                Info($"[{label}] Title = {driver.Title}");
+
+                var src = driver.PageSource ?? "";
+                if (src.Length > 2000) src = src.Substring(0, 2000) + "… (truncated)";
+                Info($"[{label}] PageSource ↓\n{src}");
+
+                // Save screenshot
+                var ss = driver as OpenQA.Selenium.ITakesScreenshot;
+                if (ss != null)
+                {
+                    var shot = ss.GetScreenshot();
+                    var shotPath = Path.Combine(_logDir, label.Replace(" ", "_") + ".png");
+                    shot.SaveAsFile(shotPath, OpenQA.Selenium.ScreenshotImageFormat.Png);
+                    Info($"[{label}] Screenshot → {shotPath}");
+                }
+            }
+            catch (Exception ex) { Warn($"[{label}] Snapshot failed: {ex.Message}"); }
+        }
+    }
+
     // ── Scraper DTOs ─────────────────────────────────────────────────────
 
     public class KabalModem
@@ -147,6 +215,9 @@ namespace ModemMergerWinFormsApp
         {
             return await Task.Run(() =>
             {
+                ScrapeLog.Start();
+                ScrapeLog.Info($"Operator={operatorName}, Rig={rigName}, Headless={headless}, DryRun={dryRun}");
+
                 Microsoft.Edge.SeleniumTools.EdgeOptions options = null;
                 OpenQA.Selenium.IWebDriver driver = null;
                 try
@@ -163,6 +234,7 @@ namespace ModemMergerWinFormsApp
 
                     // Find cached msedgedriver to bypass Selenium Manager (firewall blocks downloads)
                     var driverDir = FindCachedEdgeDriver();
+                    ScrapeLog.Info($"EdgeDriver dir = {driverDir ?? "(none — using default)"}");
                     if (driverDir != null)
                     {
                         var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
@@ -174,13 +246,17 @@ namespace ModemMergerWinFormsApp
                         driver = new Microsoft.Edge.SeleniumTools.EdgeDriver(options);
                     }
                     driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
+                    ScrapeLog.Info("EdgeDriver started OK.");
 
                     // ── Step 1: Login ──
                     onStatus?.Invoke("Navigating to Kabal login...");
+                    ScrapeLog.Info($"Navigating to {LoginUrl}");
                     driver.Navigate().GoToUrl(LoginUrl);
                     System.Threading.Thread.Sleep(2000);
+                    ScrapeLog.SavePageSnapshot(driver, "01_after_login_nav");
 
                     onStatus?.Invoke("Entering credentials...");
+                    ScrapeLog.Info("Looking for username field (input[type='text'], input[type='email'])...");
                     var usernameField = WaitFor(driver, d =>
                     {
                         try
@@ -190,6 +266,7 @@ namespace ModemMergerWinFormsApp
                         }
                         catch { return null; }
                     });
+                    ScrapeLog.Info("Username field found — entering credentials.");
                     usernameField.Clear();
                     usernameField.SendKeys(username);
 
@@ -197,8 +274,10 @@ namespace ModemMergerWinFormsApp
                     passwordField.Clear();
                     passwordField.SendKeys(password);
 
+                    ScrapeLog.Info("Clicking submit...");
                     driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
                     System.Threading.Thread.Sleep(3000);
+                    ScrapeLog.SavePageSnapshot(driver, "02_after_login_submit");
 
                     // ── Step 2: Operator selection (if present) ──
                     string operatorDisplay;
@@ -208,6 +287,7 @@ namespace ModemMergerWinFormsApp
                     try
                     {
                         onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
+                        ScrapeLog.Info($"Looking for operator link: '{operatorDisplay}'");
                         var opLink = WaitFor(driver, d =>
                         {
                             try
@@ -217,10 +297,15 @@ namespace ModemMergerWinFormsApp
                             }
                             catch { return null; }
                         });
+                        ScrapeLog.Info("Operator link found — clicking.");
                         opLink.Click();
                         System.Threading.Thread.Sleep(3000);
+                        ScrapeLog.SavePageSnapshot(driver, "03_after_operator_select");
                     }
-                    catch { /* Operator selector not found — may already be in app context */ }
+                    catch (Exception opEx)
+                    {
+                        ScrapeLog.Warn($"Operator selector not found (may already be in app): {opEx.Message}");
+                    }
 
                     // ── Step 3: Navigate to operator APEX app page ──
                     string targetUrl;
@@ -228,21 +313,32 @@ namespace ModemMergerWinFormsApp
                         targetUrl = OperatorAppUrls["Equinor"];
 
                     onStatus?.Invoke($"Navigating to {operatorName} loadout page...");
+                    ScrapeLog.Info($"Navigating to APEX app: {targetUrl}");
                     driver.Navigate().GoToUrl(targetUrl);
                     System.Threading.Thread.Sleep(3000);
+                    ScrapeLog.SavePageSnapshot(driver, "04_after_apex_nav");
 
                     // Verify not redirected back to login
                     if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
+                    {
+                        ScrapeLog.Error($"Redirected back to login. Current URL: {driver.Url}");
                         return new ScraperResult { Success = false, Error = "Redirected back to login — credentials may be incorrect or SSO session expired." };
+                    }
 
                     // ── Step 4: Scrape APEX Interactive Report ──
                     onStatus?.Invoke("Scraping APEX table...");
+                    ScrapeLog.Info("Starting APEX IR scrape...");
                     var allRows = ScrapeApexIR(driver);
+                    ScrapeLog.Info($"ScrapeApexIR returned {allRows.Count} rows.");
+                    if (allRows.Count > 0)
+                        ScrapeLog.Info($"First row keys: {string.Join(", ", allRows[0].Keys)}");
 
                     // ── Step 5: Parse modem records ──
                     var modems = ParseModems(allRows);
+                    ScrapeLog.Info($"ParseModems → {modems.Count} modems.");
                     onStatus?.Invoke($"Parsed {modems.Count} modem records from {allRows.Count} rows.");
 
+                    ScrapeLog.Info("Scrape completed successfully.");
                     return new ScraperResult
                     {
                         Success = true,
@@ -253,11 +349,15 @@ namespace ModemMergerWinFormsApp
                 }
                 catch (Exception ex)
                 {
+                    ScrapeLog.Error($"{ex.GetType().Name}: {ex.Message}");
+                    if (driver != null) ScrapeLog.SavePageSnapshot(driver, "XX_error");
+                    ScrapeLog.Error(ex.StackTrace);
                     return new ScraperResult { Success = false, Error = ex.Message };
                 }
                 finally
                 {
                     try { driver?.Quit(); } catch { }
+                    ScrapeLog.Info("Driver quit. Log closed.");
                 }
             });
         }
@@ -269,15 +369,24 @@ namespace ModemMergerWinFormsApp
         private static OpenQA.Selenium.IWebElement WaitFor(
             OpenQA.Selenium.IWebDriver driver,
             Func<OpenQA.Selenium.IWebDriver, OpenQA.Selenium.IWebElement> condition,
-            int timeoutSeconds = 15)
+            int timeoutSeconds = 15,
+            [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
         {
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            int attempts = 0;
             while (DateTime.UtcNow < deadline)
             {
+                attempts++;
                 var el = condition(driver);
-                if (el != null) return el;
+                if (el != null)
+                {
+                    ScrapeLog.Info($"WaitFor (line {callerLine}) succeeded after {attempts} attempts.");
+                    return el;
+                }
                 System.Threading.Thread.Sleep(500);
             }
+            ScrapeLog.Error($"WaitFor (line {callerLine}) timed out after {timeoutSeconds}s / {attempts} attempts.");
+            ScrapeLog.SavePageSnapshot(driver, $"WaitFor_timeout_L{callerLine}");
             throw new TimeoutException($"WaitFor timed out after {timeoutSeconds}s");
         }
 
@@ -309,9 +418,11 @@ namespace ModemMergerWinFormsApp
         private static List<Dictionary<string, string>> ScrapeApexIR(OpenQA.Selenium.IWebDriver driver)
         {
             var allRows = new List<Dictionary<string, string>>();
+            int pageNum = 0;
 
             while (true)
             {
+                pageNum++;
                 System.Threading.Thread.Sleep(1500);
 
                 var headers = new List<string>();
@@ -329,13 +440,16 @@ namespace ModemMergerWinFormsApp
                     {
                         var tbl = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
                         if (tbl == null) continue;
+                        ScrapeLog.Info($"[Page {pageNum}] Found table with selector '{sel}'");
 
                         // Collect headers
                         var thEls = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " th"));
                         headers = thEls.Select(th => th.Text.Trim()).Where(h => h.Length > 0).ToList();
+                        ScrapeLog.Info($"[Page {pageNum}] Headers ({headers.Count}): {string.Join(" | ", headers)}");
 
                         // Collect data rows
                         var rows = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " tbody tr"));
+                        int rowsBefore = allRows.Count;
                         foreach (var row in rows)
                         {
                             try
@@ -353,12 +467,18 @@ namespace ModemMergerWinFormsApp
                             catch { /* skip malformed row */ }
                         }
                         tableFound = true;
+                        ScrapeLog.Info($"[Page {pageNum}] Collected {allRows.Count - rowsBefore} rows (total: {allRows.Count}).");
                         break;
                     }
                     catch { /* selector not found, try next */ }
                 }
 
-                if (!tableFound) break;
+                if (!tableFound)
+                {
+                    ScrapeLog.Warn($"[Page {pageNum}] No table found with any selector. Stopping pagination.");
+                    if (allRows.Count == 0) ScrapeLog.SavePageSnapshot(driver, "05_no_table_found");
+                    break;
+                }
 
                 // Try to click Next pagination button
                 bool nextClicked = false;
@@ -385,7 +505,12 @@ namespace ModemMergerWinFormsApp
                     catch { /* not found */ }
                 }
 
-                if (!nextClicked) break;
+                if (!nextClicked)
+                {
+                    ScrapeLog.Info($"[Page {pageNum}] No next button — pagination complete.");
+                    break;
+                }
+                ScrapeLog.Info($"[Page {pageNum}] Next button clicked — loading next page...");
             }
 
             return allRows;

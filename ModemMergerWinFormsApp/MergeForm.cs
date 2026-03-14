@@ -1323,7 +1323,14 @@ namespace ModemMergerWinFormsApp
             if (!result.Success)
             {
                 lblKabalStatus.Text = "Scrape failed: " + result.Error;
-                MessageBox.Show("Scraping failed: " + result.Error, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var logPath = ScrapeLog.LogPath;
+                var msg = "Scraping failed: " + result.Error;
+                if (logPath != null)
+                    msg += $"\n\nFull log saved to:\n{logPath}\n\nOpen the log file?";
+                var btn = logPath != null ? MessageBoxButtons.YesNo : MessageBoxButtons.OK;
+                var dlg = MessageBox.Show(msg, "Error", btn, MessageBoxIcon.Error);
+                if (dlg == DialogResult.Yes && logPath != null)
+                    System.Diagnostics.Process.Start(logPath);
                 btnKabalSyncKabal.Enabled = true;
                 return;
             }
