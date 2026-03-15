@@ -226,11 +226,14 @@ namespace ModemMergerWinFormsApp
                     options.UseChromium = true;
                     if (headless)
                     {
-                        options.AddArgument("--headless");
+                        options.AddArgument("--headless=new");
                         options.AddArgument("--disable-gpu");
                     }
                     options.AddArgument("--no-sandbox");
                     options.AddArgument("--disable-dev-shm-usage");
+                    options.AddArgument("--disable-blink-features=AutomationControlled");
+                    options.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0");
+                    options.AddExcludedArgument("enable-automation");
 
                     // Find cached msedgedriver to bypass Selenium Manager (firewall blocks downloads)
                     var driverDir = FindCachedEdgeDriver();
