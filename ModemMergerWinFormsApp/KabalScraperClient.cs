@@ -273,14 +273,49 @@ namespace ModemMergerWinFormsApp
                     usernameField.Clear();
                     usernameField.SendKeys(username);
 
-                    var passwordField = driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='password']"));
+                    // Submit username (multi-step login: username first, then password)
+                    ScrapeLog.Info("Submitting username (step 1)...");
+                    try
+                    {
+                        driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
+                    }
+                    catch
+                    {
+                        // Some APEX forms use input[type=submit] or a regular button
+                        try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
+                        catch { usernameField.SendKeys(OpenQA.Selenium.Keys.Return); }
+                    }
+                    System.Threading.Thread.Sleep(2000);
+                    ScrapeLog.SavePageSnapshot(driver, "02_after_username_submit");
+
+                    // Wait for password field (may be on same page or new page)
+                    onStatus?.Invoke("Entering password...");
+                    ScrapeLog.Info("Waiting for password field...");
+                    var passwordField = WaitFor(driver, d =>
+                    {
+                        try
+                        {
+                            var el = d.FindElement(OpenQA.Selenium.By.CssSelector("input[type='password']"));
+                            return el.Displayed ? el : null;
+                        }
+                        catch { return null; }
+                    });
+                    ScrapeLog.Info("Password field found.");
                     passwordField.Clear();
                     passwordField.SendKeys(password);
 
-                    ScrapeLog.Info("Clicking submit...");
-                    driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
+                    ScrapeLog.Info("Submitting password (step 2)...");
+                    try
+                    {
+                        driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
+                    }
+                    catch
+                    {
+                        try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
+                        catch { passwordField.SendKeys(OpenQA.Selenium.Keys.Return); }
+                    }
                     System.Threading.Thread.Sleep(3000);
-                    ScrapeLog.SavePageSnapshot(driver, "02_after_login_submit");
+                    ScrapeLog.SavePageSnapshot(driver, "03_after_password_submit");
 
                     // ── Step 2: Operator selection (if present) ──
                     string operatorDisplay;
@@ -303,7 +338,7 @@ namespace ModemMergerWinFormsApp
                         ScrapeLog.Info("Operator link found — clicking.");
                         opLink.Click();
                         System.Threading.Thread.Sleep(3000);
-                        ScrapeLog.SavePageSnapshot(driver, "03_after_operator_select");
+                        ScrapeLog.SavePageSnapshot(driver, "04_after_operator_select");
                     }
                     catch (Exception opEx)
                     {
@@ -319,7 +354,7 @@ namespace ModemMergerWinFormsApp
                     ScrapeLog.Info($"Navigating to APEX app: {targetUrl}");
                     driver.Navigate().GoToUrl(targetUrl);
                     System.Threading.Thread.Sleep(3000);
-                    ScrapeLog.SavePageSnapshot(driver, "04_after_apex_nav");
+                    ScrapeLog.SavePageSnapshot(driver, "05_after_apex_nav");
 
                     // Verify not redirected back to login
                     if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
