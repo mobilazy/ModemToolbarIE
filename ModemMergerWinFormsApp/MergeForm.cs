@@ -852,24 +852,31 @@ namespace ModemMergerWinFormsApp
                 return;
             }
 
-            // Loadout column — toggle lock
-            if (dgvKabal.Columns.Contains("Loadout") &&
-                e.ColumnIndex == dgvKabal.Columns["Loadout"].Index)
+            // Loadout / Customer columns: click within the padlock icon zone (leftmost 22px)
+            // toggles the lock; clicking anywhere else lets the grid sort normally.
+            bool isLoadoutCol  = dgvKabal.Columns.Contains("Loadout")  && e.ColumnIndex == dgvKabal.Columns["Loadout"].Index;
+            bool isCustomerCol = dgvKabal.Columns.Contains("Customer") && e.ColumnIndex == dgvKabal.Columns["Customer"].Index;
+            if (isLoadoutCol || isCustomerCol)
             {
-                _loadoutLocked = !_loadoutLocked;
-                dgvKabal.InvalidateColumn(e.ColumnIndex);
-                lblKabalStatus.Text = _loadoutLocked ? "Loadout Date locked" : "Loadout Date unlocked";
-                return;
-            }
-
-            // Customer (ETA) column — toggle lock
-            if (dgvKabal.Columns.Contains("Customer") &&
-                e.ColumnIndex == dgvKabal.Columns["Customer"].Index)
-            {
-                _etaLocked = !_etaLocked;
-                dgvKabal.InvalidateColumn(e.ColumnIndex);
-                lblKabalStatus.Text = _etaLocked ? "Deliver To Customer locked" : "Deliver To Customer unlocked";
-                return;
+                if (e.X <= 22)  // within the padlock icon — toggle lock, suppress sort
+                {
+                    if (isLoadoutCol)
+                    {
+                        _loadoutLocked = !_loadoutLocked;
+                        dgvKabal.InvalidateColumn(e.ColumnIndex);
+                        lblKabalStatus.Text = _loadoutLocked ? "Loadout Date locked" : "Loadout Date unlocked";
+                    }
+                    else
+                    {
+                        _etaLocked = !_etaLocked;
+                        dgvKabal.InvalidateColumn(e.ColumnIndex);
+                        lblKabalStatus.Text = _etaLocked ? "Deliver To Customer locked" : "Deliver To Customer unlocked";
+                    }
+                    // Suppress the default sort by cancelling SortOrder on the column
+                    dgvKabal.Columns[e.ColumnIndex].SortMode = DataGridViewColumnSortMode.NotSortable;
+                    dgvKabal.Columns[e.ColumnIndex].SortMode = DataGridViewColumnSortMode.Automatic;
+                }
+                // else: fall through — grid handles sort naturally
             }
         }
 
@@ -1247,7 +1254,8 @@ namespace ModemMergerWinFormsApp
                 try
                 {
                     var result = await GantClient.ShiftModemDatesAsync(modemId, days,
-                        shiftLoadout: !_loadoutLocked, shiftEta: !_etaLocked);
+                        shiftLoadout: !_loadoutLocked, shiftEta: !_etaLocked,
+                        shiftDateLoad: !_loadoutLocked);
                     if (result.Success)
                     {
                         ok++;

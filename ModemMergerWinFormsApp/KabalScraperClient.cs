@@ -1042,7 +1042,7 @@ namespace ModemMergerWinFormsApp
         /// POST with PreAuthenticate=false → 401 NTLM → 200.
         /// </summary>
         public static async Task<ShiftResult> ShiftModemDatesAsync(int modemId, int days,
-            bool shiftLoadout = true, bool shiftEta = true)
+            bool shiftLoadout = true, bool shiftEta = true, bool shiftDateLoad = true)
         {
             return await Task.Run(() =>
             {
@@ -1109,8 +1109,13 @@ namespace ModemMergerWinFormsApp
                     {
                         case "P_DATE_LOAD":
                             oldDateLoad = f.Value;
-                            newDateLoad = ShiftDateField(f.Value, days);
-                            formFields[i] = new KeyValuePair<string, string>(f.Key, newDateLoad);
+                            if (shiftDateLoad)
+                            {
+                                newDateLoad = ShiftDateField(f.Value, days);
+                                formFields[i] = new KeyValuePair<string, string>(f.Key, newDateLoad);
+                            }
+                            else
+                                newDateLoad = f.Value;
                             break;
                         case "P_LOADOUT_DATE":
                             oldLoadout = f.Value;
@@ -1191,7 +1196,7 @@ namespace ModemMergerWinFormsApp
                     verifyDoc.DocumentNode.SelectSingleNode("//input[@name='P_DATE_ETA']")
                         ?.GetAttributeValue("value", "") ?? "");
 
-                if (actualLoad == oldDateLoad &&
+                if ((!shiftDateLoad || actualLoad == oldDateLoad) &&
                     (!shiftLoadout || actualLoadout == oldLoadout) &&
                     (!shiftEta || actualEta == oldEta))
                     throw new InvalidOperationException(
