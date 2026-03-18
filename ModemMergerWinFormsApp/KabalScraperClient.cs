@@ -65,9 +65,15 @@ namespace ModemMergerWinFormsApp
                 Info($"[{label}] URL = {driver.Url}");
                 Info($"[{label}] Title = {driver.Title}");
 
+                // Save FULL page source to an .html file (not truncated)
                 var src = driver.PageSource ?? "";
-                if (src.Length > 2000) src = src.Substring(0, 2000) + "… (truncated)";
-                Info($"[{label}] PageSource ↓\n{src}");
+                var htmlPath = Path.Combine(_logDir, label.Replace(" ", "_") + ".html");
+                File.WriteAllText(htmlPath, src, System.Text.Encoding.UTF8);
+                Info($"[{label}] Full HTML ({src.Length} chars) → {htmlPath}");
+
+                // Also log the first 3000 chars to the text log for quick scanning
+                var preview = src.Length > 3000 ? src.Substring(0, 3000) + "… (see .html file for full source)" : src;
+                Info($"[{label}] PageSource ↓\n{preview}");
 
                 // Save screenshot
                 var ss = driver as OpenQA.Selenium.ITakesScreenshot;
@@ -80,6 +86,33 @@ namespace ModemMergerWinFormsApp
                 }
             }
             catch (Exception ex) { Warn($"[{label}] Snapshot failed: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Scans all &lt;input&gt; elements on the page and logs their id, name, type, and visibility.
+        /// Call this when you need to discover what form fields are actually present.
+        /// </summary>
+        public static void LogAllInputs(OpenQA.Selenium.IWebDriver driver, string label)
+        {
+            try
+            {
+                var inputs = driver.FindElements(OpenQA.Selenium.By.TagName("input"));
+                Info($"[{label}] Found {inputs.Count} input elements:");
+                foreach (var inp in inputs)
+                {
+                    try
+                    {
+                        var id      = inp.GetAttribute("id")   ?? "";
+                        var name    = inp.GetAttribute("name") ?? "";
+                        var type    = inp.GetAttribute("type") ?? "(no type)";
+                        var visible = inp.Displayed;
+                        var enabled = inp.Enabled;
+                        Info($"[{label}]   id='{id}' name='{name}' type='{type}' displayed={visible} enabled={enabled}");
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex) { Warn($"[{label}] LogAllInputs failed: {ex.Message}"); }
         }
     }
 
@@ -257,6 +290,7 @@ namespace ModemMergerWinFormsApp
                     driver.Navigate().GoToUrl(LoginUrl);
                     System.Threading.Thread.Sleep(2000);
                     ScrapeLog.SavePageSnapshot(driver, "01_after_login_nav");
+                    ScrapeLog.LogAllInputs(driver, "01_after_login_nav");
 
                     onStatus?.Invoke("Entering credentials...");
                     ScrapeLog.Info("Looking for username field (input[type='text'], input[type='email'])...");
@@ -287,6 +321,7 @@ namespace ModemMergerWinFormsApp
                     }
                     System.Threading.Thread.Sleep(2000);
                     ScrapeLog.SavePageSnapshot(driver, "02_after_username_submit");
+                    ScrapeLog.LogAllInputs(driver, "02_after_username_submit");
 
                     // Wait for password field (may be on same page or new page)
                     onStatus?.Invoke("Entering password...");
