@@ -110,7 +110,7 @@ namespace ModemWebUtility
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(this.url);
                 request.Credentials = CredentialCache.DefaultNetworkCredentials;
-                request.PreAuthenticate = true;
+                request.PreAuthenticate = false;
                 request.Method = "POST";
                 request.ContentType = "application/x-www-form-urlencoded";
                 request.CookieContainer = m_container;

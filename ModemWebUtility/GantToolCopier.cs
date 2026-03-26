@@ -99,7 +99,8 @@ namespace ModemWebUtility
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "GET";
-            request.UseDefaultCredentials = true;
+            request.Credentials = CredentialCache.DefaultNetworkCredentials;
+            request.PreAuthenticate = true;
             request.CookieContainer = cookieContainer;
 
             using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())

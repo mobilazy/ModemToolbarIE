@@ -45,10 +45,28 @@ namespace ModemWebUtility
 
         public bool CopyHeaderFields()
         {
-            // 1) Walk SOURCE edit page in DOM order — same code as ShiftModemDatesAsync
+            // 1) Read SOURCE field values.
+            //    Primary:  edit URL — works for modems in Active/Planned status and returns a form
+            //              with real <input> elements that WalkFormFields can read.
+            //    Fallback: view URL — used for Ready/Shipped modems whose edit URL returns HTTP 200
+            //              with an Oracle error body ("Row deleted by another user") rather than a
+            //              proper edit form. The view page renders values as <td id="..."> cells
+            //              which ReadViewPageFields extracts via GetInputByName + GetInnerTextByTdId.
             var sourceConn = new ModemConnection(HDocUtility.UrlModemEdit + sourceModemNo);
             var sourceHDoc = sourceConn.GetHtmlAsHdoc();
-            var sourceValues = WalkFormFields(sourceHDoc);
+
+            Dictionary<string, string> sourceValues;
+            if (IsOracleErrorPage(sourceHDoc))
+            {
+                // Edit page is unavailable for this modem status — read from the view URL instead
+                var viewConn = new ModemConnection(HDocUtility.UrlModemView + sourceModemNo);
+                var viewHDoc = viewConn.GetHtmlAsHdoc();
+                sourceValues = ReadViewPageFields(viewHDoc);
+            }
+            else
+            {
+                sourceValues = WalkFormFields(sourceHDoc);
+            }
 
             // 2) Walk TARGET edit page in DOM order — build full form field list
             var targetConn = new ModemConnection(HDocUtility.UrlModemEdit + targetModemNo);
@@ -158,6 +176,19 @@ namespace ModemWebUtility
         }
 
         /// <summary>
+        /// Returns true when the Oracle page is an error screen rather than an editable form.
+        /// The edit URL for Ready/Shipped modems returns HTTP 200 with an error body like:
+        /// "Error! ... Row deleted by another user" instead of the actual form.
+        /// </summary>
+        private static bool IsOracleErrorPage(HtmlDocument hDoc)
+        {
+            string html = hDoc.DocumentNode.OuterHtml;
+            return html.IndexOf("Row deleted by another user", StringComparison.OrdinalIgnoreCase) >= 0
+                || (Regex.IsMatch(html, @"<i>Error!</i>", RegexOptions.IgnoreCase)
+                    && hDoc.DocumentNode.SelectSingleNode("//input[@name='P_SSORD_ID']") == null);
+        }
+
+        /// <summary>
         /// Walk all form elements in DOM order, first-wins dedup.
         /// Identical logic to ShiftModemDatesAsync — returns name→value dictionary.
         /// </summary>
@@ -205,6 +236,36 @@ namespace ModemWebUtility
             }
 
             return fields;
+        }
+
+        /// <summary>
+        /// Reads the whitelisted copy-field values from the READ-ONLY view page.
+        /// Oracle APEX / Oracle Forms view pages render each item either as a hidden
+        /// &lt;input name="..."&gt; (preserving the raw/internal value — important for LOV
+        /// dropdowns like P_L_SHIPFROM_LOC2) or as &lt;td id="..."&gt;displayed text&lt;/td&gt;.
+        /// We try the input approach first so LOV fields get their internal ID, and
+        /// fall back to the td text approach for plain display-only fields.
+        /// </summary>
+        private Dictionary<string, string> ReadViewPageFields(HtmlDocument hDoc)
+        {
+            var values = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (string fieldName in _copyFields)
+            {
+                // Hidden/visible input first — preserves the actual stored value (e.g. LOV IDs)
+                string val = HDocUtility.GetInputByName(fieldName, hDoc);
+
+                if (string.IsNullOrEmpty(val))
+                {
+                    // Fall back: Oracle view pages display field text inside <td id="FIELDNAME">
+                    val = HDocUtility.GetInnerTextByTdId(fieldName, hDoc);
+                }
+
+                if (!string.IsNullOrEmpty(val))
+                    values[fieldName] = val;
+            }
+
+            return values;
         }
     }
 }
