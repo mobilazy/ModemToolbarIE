@@ -253,7 +253,7 @@ namespace ModemMergerWinFormsApp
                     bool needsLogin = true;
                     onStatus?.Invoke("Checking existing session...");
                     driver.Navigate().GoToUrl(targetUrl);
-                    System.Threading.Thread.Sleep(2000);
+                    WaitForApexReady(driver);
 
                     if (driver.Url.Contains("app01.kabal.com") &&
                         !driver.Url.Contains("login") &&
@@ -272,7 +272,6 @@ namespace ModemMergerWinFormsApp
                     {
                     onStatus?.Invoke("Navigating to Kabal login...");
                     driver.Navigate().GoToUrl(LoginUrl);
-                    System.Threading.Thread.Sleep(500);
 
                     onStatus?.Invoke("Entering credentials...");
                     var usernameField = WaitFor(driver, d =>
@@ -298,7 +297,6 @@ namespace ModemMergerWinFormsApp
                         try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
                         catch { usernameField.SendKeys(OpenQA.Selenium.Keys.Return); }
                     }
-                    System.Threading.Thread.Sleep(500);
 
                     onStatus?.Invoke("Entering password...");
                     var passwordField = WaitFor(driver, d =>
@@ -322,7 +320,7 @@ namespace ModemMergerWinFormsApp
                         try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
                         catch { passwordField.SendKeys(OpenQA.Selenium.Keys.Return); }
                     }
-                    System.Threading.Thread.Sleep(2000);
+                    WaitForApexReady(driver);
 
                     // Operator selection (if present)
                     string operatorDisplay;
@@ -342,7 +340,7 @@ namespace ModemMergerWinFormsApp
                             catch { return null; }
                         });
                         opLink.Click();
-                        System.Threading.Thread.Sleep(1500);
+                        WaitForApexReady(driver);
                     }
                     catch (Exception opEx)
                     {
@@ -361,7 +359,7 @@ namespace ModemMergerWinFormsApp
                     }
                     onStatus?.Invoke($"Navigating to {operatorName} loadout page...");
                     driver.Navigate().GoToUrl(navUrl);
-                    System.Threading.Thread.Sleep(2000);
+                    WaitForApexReady(driver);
 
                     if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
                     {
@@ -379,7 +377,7 @@ namespace ModemMergerWinFormsApp
                             "P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout",
                             $"P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH,P328_FROM_DATE,P328_TO_DATE:loadout,,,cargo.operations.loadout,{df},{dt}");
                         driver.Navigate().GoToUrl(dateUrl);
-                        System.Threading.Thread.Sleep(2000);
+                        WaitForApexReady(driver);
                     }
 
                     // ── Apply APEX IR filters ──
@@ -431,11 +429,50 @@ namespace ModemMergerWinFormsApp
             {
                 var el = condition(driver);
                 if (el != null) return el;
-                System.Threading.Thread.Sleep(500);
+                Thread.Sleep(150);
             }
             ScrapeLog.Error($"WaitFor (line {callerLine}) timed out after {timeoutSeconds}s.");
             ScrapeLog.SaveErrorSnapshot(driver, $"WaitFor_timeout_L{callerLine}");
             throw new TimeoutException($"WaitFor timed out after {timeoutSeconds}s");
+        }
+
+        /// <summary>
+        /// Wait until APEX page is idle: document.readyState=complete and no jQuery AJAX in flight.
+        /// </summary>
+        private static void WaitForApexReady(OpenQA.Selenium.IWebDriver driver, int timeoutSeconds = 15)
+        {
+            var js = driver as OpenQA.Selenium.IJavaScriptExecutor;
+            if (js == null) { Thread.Sleep(500); return; }
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            // Brief initial pause to let navigation/click start
+            Thread.Sleep(100);
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    var done = js.ExecuteScript(
+                        "return document.readyState==='complete' && (typeof jQuery==='undefined' || jQuery.active===0)");
+                    if (done is bool && (bool)done) return;
+                }
+                catch { }
+                Thread.Sleep(150);
+            }
+        }
+
+        /// <summary>
+        /// Poll until at least one element matching <paramref name="cssSelector"/> exists and is displayed.
+        /// </summary>
+        private static System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement>
+            WaitForElements(OpenQA.Selenium.IWebDriver driver, string cssSelector, int timeoutSeconds = 10)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                var els = driver.FindElements(OpenQA.Selenium.By.CssSelector(cssSelector));
+                if (els.Count > 0) return els;
+                Thread.Sleep(150);
+            }
+            return driver.FindElements(OpenQA.Selenium.By.CssSelector(cssSelector));
         }
 
         /// <summary>
@@ -470,10 +507,10 @@ namespace ModemMergerWinFormsApp
             try
             {
                 ClickActionsMenuItem(driver, "Rows Per Page");
-                System.Threading.Thread.Sleep(800);
 
-                var menuItems = driver.FindElements(OpenQA.Selenium.By.CssSelector(
-                    "button[role='menuitemradio']"));
+                // Wait for submenu radio buttons to appear
+                var menuItems = WaitForElements(driver,
+                    "button[role='menuitemradio']", timeoutSeconds: 5);
                 OpenQA.Selenium.IWebElement bestOption = null;
                 int bestVal = 0;
                 foreach (var mi in menuItems)
@@ -489,7 +526,7 @@ namespace ModemMergerWinFormsApp
                 if (bestOption != null)
                 {
                     bestOption.Click();
-                    System.Threading.Thread.Sleep(3000);
+                    WaitForApexReady(driver);
                 }
             }
             catch (Exception ex)
@@ -502,7 +539,7 @@ namespace ModemMergerWinFormsApp
             {
                 driver.FindElement(OpenQA.Selenium.By.TagName("body"))
                     .SendKeys(OpenQA.Selenium.Keys.Escape);
-                System.Threading.Thread.Sleep(300);
+                Thread.Sleep(100);
             }
             catch { }
         }
@@ -543,10 +580,11 @@ namespace ModemMergerWinFormsApp
                 throw new InvalidOperationException("Actions button not found on APEX IR page.");
 
             actionsBtn.Click();
-            System.Threading.Thread.Sleep(600);
 
-            var items = driver.FindElements(OpenQA.Selenium.By.CssSelector(
-                ".a-Menu-content a, .a-Menu-label, ul.a-Menu li, [role='menuitem'], .a-IRR-actions-menu a"));
+            // Wait for menu items to appear
+            var items = WaitForElements(driver,
+                ".a-Menu-content a, .a-Menu-label, ul.a-Menu li, [role='menuitem'], .a-IRR-actions-menu a",
+                timeoutSeconds: 5);
             foreach (var item in items)
             {
                 try
@@ -591,7 +629,7 @@ namespace ModemMergerWinFormsApp
             while (true)
             {
                 pageNum++;
-                System.Threading.Thread.Sleep(1500);
+                WaitForApexReady(driver);
 
                 var headers = new List<string>();
                 bool tableFound = false;
