@@ -18,10 +18,8 @@ namespace ModemMergerWinFormsApp
     // ── Scraper Log ────────────────────────────────────────────────────
 
     /// <summary>
-    /// Rolling file logger for the Kabal scraper. Writes timestamped entries to
-    /// %APPDATA%\ModemMerger\scraper-log.txt (keeps the last run only).
-    /// Call <see cref="Start"/> at the beginning of a scrape, then <see cref="Info"/>/<see cref="Warn"/>/<see cref="Error"/>
-    /// throughout. <see cref="SavePageSnapshot"/> captures URL + page-source excerpt + screenshot.
+    /// Minimal file logger for the Kabal scraper. Writes to
+    /// %APPDATA%\ModemMerger\scraper-log.txt (last run only).
     /// </summary>
     public static class ScrapeLog
     {
@@ -38,81 +36,37 @@ namespace ModemMergerWinFormsApp
                 "ModemMerger");
             Directory.CreateDirectory(_logDir);
             _logPath = Path.Combine(_logDir, "scraper-log.txt");
-
-            // Overwrite previous run
             File.WriteAllText(_logPath,
                 $"=== Kabal Scraper Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
         }
 
         public static void Info(string message)  => Write("INFO ", message);
         public static void Warn(string message)  => Write("WARN ", message);
-        public static void Error(string message)  => Write("ERROR", message);
+        public static void Error(string message) => Write("ERROR", message);
 
         private static void Write(string level, string message)
         {
             if (_logPath == null) return;
-            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {level}  {message}{Environment.NewLine}";
+            var line = $"[{DateTime.Now:HH:mm:ss}] {level}  {message}{Environment.NewLine}";
             lock (_lock) { File.AppendAllText(_logPath, line); }
         }
 
-        /// <summary>
-        /// Dump current URL, page title, first 2000 chars of page source, and a screenshot.
-        /// </summary>
-        public static void SavePageSnapshot(OpenQA.Selenium.IWebDriver driver, string label)
+        /// <summary>Captures screenshot + URL on error only.</summary>
+        public static void SaveErrorSnapshot(OpenQA.Selenium.IWebDriver driver, string label)
         {
             try
             {
-                Info($"[{label}] URL = {driver.Url}");
-                Info($"[{label}] Title = {driver.Title}");
-
-                // Save FULL page source to an .html file (not truncated)
-                var src = driver.PageSource ?? "";
-                var htmlPath = Path.Combine(_logDir, label.Replace(" ", "_") + ".html");
-                File.WriteAllText(htmlPath, src, System.Text.Encoding.UTF8);
-                Info($"[{label}] Full HTML ({src.Length} chars) → {htmlPath}");
-
-                // Also log the first 3000 chars to the text log for quick scanning
-                var preview = src.Length > 3000 ? src.Substring(0, 3000) + "… (see .html file for full source)" : src;
-                Info($"[{label}] PageSource ↓\n{preview}");
-
-                // Save screenshot
+                Error($"[{label}] URL = {driver.Url}");
                 var ss = driver as OpenQA.Selenium.ITakesScreenshot;
                 if (ss != null)
                 {
                     var shot = ss.GetScreenshot();
                     var shotPath = Path.Combine(_logDir, label.Replace(" ", "_") + ".png");
                     shot.SaveAsFile(shotPath, OpenQA.Selenium.ScreenshotImageFormat.Png);
-                    Info($"[{label}] Screenshot → {shotPath}");
+                    Error($"[{label}] Screenshot → {shotPath}");
                 }
             }
-            catch (Exception ex) { Warn($"[{label}] Snapshot failed: {ex.Message}"); }
-        }
-
-        /// <summary>
-        /// Scans all &lt;input&gt; elements on the page and logs their id, name, type, and visibility.
-        /// Call this when you need to discover what form fields are actually present.
-        /// </summary>
-        public static void LogAllInputs(OpenQA.Selenium.IWebDriver driver, string label)
-        {
-            try
-            {
-                var inputs = driver.FindElements(OpenQA.Selenium.By.TagName("input"));
-                Info($"[{label}] Found {inputs.Count} input elements:");
-                foreach (var inp in inputs)
-                {
-                    try
-                    {
-                        var id      = inp.GetAttribute("id")   ?? "";
-                        var name    = inp.GetAttribute("name") ?? "";
-                        var type    = inp.GetAttribute("type") ?? "(no type)";
-                        var visible = inp.Displayed;
-                        var enabled = inp.Enabled;
-                        Info($"[{label}]   id='{id}' name='{name}' type='{type}' displayed={visible} enabled={enabled}");
-                    }
-                    catch { }
-                }
-            }
-            catch (Exception ex) { Warn($"[{label}] LogAllInputs failed: {ex.Message}"); }
+            catch { }
         }
     }
 
@@ -212,6 +166,11 @@ namespace ModemMergerWinFormsApp
         // Login entry point — triggers SSO and lands back on the APEX app after auth
         private const string LoginUrl = "https://account01.kabal.com/w/web/r/wels/kabal-account/";
 
+        // Persistent user-data-dir so SSO session cookies survive across scrapes
+        private static readonly string _userDataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModemMerger", "edge-profile");
+
         // Each operator lives in a separate APEX application (different App ID).
         // session=0 tells APEX to create a fresh session from active SSO cookies.
         private static readonly Dictionary<string, string> OperatorAppUrls =
@@ -244,12 +203,14 @@ namespace ModemMergerWinFormsApp
             string password,
             bool headless = true,
             bool dryRun = true,
-            Action<string> onStatus = null)
+            Action<string> onStatus = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null)
         {
             return await Task.Run(() =>
             {
                 ScrapeLog.Start();
-                ScrapeLog.Info($"Operator={operatorName}, Rig={rigName}, Headless={headless}, DryRun={dryRun}");
+                ScrapeLog.Info($"Operator={operatorName}, Rig={rigName}");
 
                 Microsoft.Edge.SeleniumTools.EdgeOptions options = null;
                 OpenQA.Selenium.IWebDriver driver = null;
@@ -267,10 +228,10 @@ namespace ModemMergerWinFormsApp
                     options.AddArgument("--disable-blink-features=AutomationControlled");
                     options.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0");
                     options.AddExcludedArgument("enable-automation");
+                    Directory.CreateDirectory(_userDataDir);
+                    options.AddArgument("--user-data-dir=" + _userDataDir);
 
-                    // Find cached msedgedriver to bypass Selenium Manager (firewall blocks downloads)
                     var driverDir = FindCachedEdgeDriver();
-                    ScrapeLog.Info($"EdgeDriver dir = {driverDir ?? "(none — using default)"}");
                     if (driverDir != null)
                     {
                         var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
@@ -282,18 +243,38 @@ namespace ModemMergerWinFormsApp
                         driver = new Microsoft.Edge.SeleniumTools.EdgeDriver(options);
                     }
                     driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
-                    ScrapeLog.Info("EdgeDriver started OK.");
 
-                    // ── Step 1: Login ──
-                    onStatus?.Invoke("Navigating to Kabal login...");
-                    ScrapeLog.Info($"Navigating to {LoginUrl}");
-                    driver.Navigate().GoToUrl(LoginUrl);
+                    // ── Resolve target APEX URL ──
+                    string targetUrl;
+                    if (!OperatorAppUrls.TryGetValue(operatorName, out targetUrl))
+                        targetUrl = OperatorAppUrls["Equinor"];
+
+                    // ── Try direct APEX navigation (session may still be valid) ──
+                    bool needsLogin = true;
+                    onStatus?.Invoke("Checking existing session...");
+                    driver.Navigate().GoToUrl(targetUrl);
                     System.Threading.Thread.Sleep(2000);
-                    ScrapeLog.SavePageSnapshot(driver, "01_after_login_nav");
-                    ScrapeLog.LogAllInputs(driver, "01_after_login_nav");
+
+                    if (driver.Url.Contains("app01.kabal.com") &&
+                        !driver.Url.Contains("login") &&
+                        !driver.Url.Contains("kabal-account"))
+                    {
+                        ScrapeLog.Info("Session reused — skipping login.");
+                        onStatus?.Invoke("Session valid — skipping login.");
+                        needsLogin = false;
+                    }
+                    else
+                    {
+                        ScrapeLog.Info("Session expired — full login required.");
+                    }
+
+                    if (needsLogin)
+                    {
+                    onStatus?.Invoke("Navigating to Kabal login...");
+                    driver.Navigate().GoToUrl(LoginUrl);
+                    System.Threading.Thread.Sleep(500);
 
                     onStatus?.Invoke("Entering credentials...");
-                    ScrapeLog.Info("Looking for username field (input[type='text'], input[type='email'])...");
                     var usernameField = WaitFor(driver, d =>
                     {
                         try
@@ -303,12 +284,10 @@ namespace ModemMergerWinFormsApp
                         }
                         catch { return null; }
                     });
-                    ScrapeLog.Info("Username field found — entering credentials.");
                     usernameField.Clear();
                     usernameField.SendKeys(username);
 
-                    // Submit username (multi-step login: username first, then password)
-                    ScrapeLog.Info("Submitting username (step 1)...");
+                    // Submit username
                     try
                     {
                         driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
@@ -319,13 +298,9 @@ namespace ModemMergerWinFormsApp
                         try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
                         catch { usernameField.SendKeys(OpenQA.Selenium.Keys.Return); }
                     }
-                    System.Threading.Thread.Sleep(2000);
-                    ScrapeLog.SavePageSnapshot(driver, "02_after_username_submit");
-                    ScrapeLog.LogAllInputs(driver, "02_after_username_submit");
+                    System.Threading.Thread.Sleep(500);
 
-                    // Wait for password field (may be on same page or new page)
                     onStatus?.Invoke("Entering password...");
-                    ScrapeLog.Info("Waiting for password field...");
                     var passwordField = WaitFor(driver, d =>
                     {
                         try
@@ -335,11 +310,9 @@ namespace ModemMergerWinFormsApp
                         }
                         catch { return null; }
                     });
-                    ScrapeLog.Info("Password field found.");
                     passwordField.Clear();
                     passwordField.SendKeys(password);
 
-                    ScrapeLog.Info("Submitting password (step 2)...");
                     try
                     {
                         driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
@@ -349,10 +322,9 @@ namespace ModemMergerWinFormsApp
                         try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
                         catch { passwordField.SendKeys(OpenQA.Selenium.Keys.Return); }
                     }
-                    System.Threading.Thread.Sleep(3000);
-                    ScrapeLog.SavePageSnapshot(driver, "03_after_password_submit");
+                    System.Threading.Thread.Sleep(2000);
 
-                    // ── Step 2: Operator selection (if present) ──
+                    // Operator selection (if present)
                     string operatorDisplay;
                     if (!OperatorMapping.TryGetValue(operatorName, out operatorDisplay))
                         operatorDisplay = operatorName;
@@ -360,7 +332,6 @@ namespace ModemMergerWinFormsApp
                     try
                     {
                         onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
-                        ScrapeLog.Info($"Looking for operator link: '{operatorDisplay}'");
                         var opLink = WaitFor(driver, d =>
                         {
                             try
@@ -370,48 +341,60 @@ namespace ModemMergerWinFormsApp
                             }
                             catch { return null; }
                         });
-                        ScrapeLog.Info("Operator link found — clicking.");
                         opLink.Click();
-                        System.Threading.Thread.Sleep(3000);
-                        ScrapeLog.SavePageSnapshot(driver, "04_after_operator_select");
+                        System.Threading.Thread.Sleep(1500);
                     }
                     catch (Exception opEx)
                     {
-                        ScrapeLog.Warn($"Operator selector not found (may already be in app): {opEx.Message}");
+                        ScrapeLog.Warn($"Operator selector skipped: {opEx.Message}");
                     }
 
-                    // ── Step 3: Navigate to operator APEX app page ──
-                    string targetUrl;
-                    if (!OperatorAppUrls.TryGetValue(operatorName, out targetUrl))
-                        targetUrl = OperatorAppUrls["Equinor"];
-
+                    // Navigate to operator APEX app page (with date range)
+                    var navUrl = targetUrl;
+                    if (dateFrom.HasValue && dateTo.HasValue)
+                    {
+                        var df = dateFrom.Value.ToString("dd.MM.yyyy");
+                        var dt = dateTo.Value.ToString("dd.MM.yyyy");
+                        navUrl = navUrl.Replace(
+                            "P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout",
+                            $"P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH,P328_FROM_DATE,P328_TO_DATE:loadout,,,cargo.operations.loadout,{df},{dt}");
+                    }
                     onStatus?.Invoke($"Navigating to {operatorName} loadout page...");
-                    ScrapeLog.Info($"Navigating to APEX app: {targetUrl}");
-                    driver.Navigate().GoToUrl(targetUrl);
-                    System.Threading.Thread.Sleep(3000);
-                    ScrapeLog.SavePageSnapshot(driver, "05_after_apex_nav");
+                    driver.Navigate().GoToUrl(navUrl);
+                    System.Threading.Thread.Sleep(2000);
 
-                    // Verify not redirected back to login
                     if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
                     {
-                        ScrapeLog.Error($"Redirected back to login. Current URL: {driver.Url}");
+                        ScrapeLog.Error($"Redirected to login: {driver.Url}");
                         return new ScraperResult { Success = false, Error = "Redirected back to login — credentials may be incorrect or SSO session expired." };
                     }
+                    } // end if (needsLogin)
 
-                    // ── Step 4: Scrape APEX Interactive Report ──
+                    // Session reuse path: re-navigate with dates
+                    if (!needsLogin && dateFrom.HasValue && dateTo.HasValue)
+                    {
+                        var df = dateFrom.Value.ToString("dd.MM.yyyy");
+                        var dt = dateTo.Value.ToString("dd.MM.yyyy");
+                        var dateUrl = targetUrl.Replace(
+                            "P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout",
+                            $"P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH,P328_FROM_DATE,P328_TO_DATE:loadout,,,cargo.operations.loadout,{df},{dt}");
+                        driver.Navigate().GoToUrl(dateUrl);
+                        System.Threading.Thread.Sleep(2000);
+                    }
+
+                    // ── Apply APEX IR filters ──
+                    onStatus?.Invoke("Configuring filters...");
+                    ConfigureApexIR(driver, dateFrom, dateTo);
+
+                    // ── Scrape APEX Interactive Report ──
                     onStatus?.Invoke("Scraping APEX table...");
-                    ScrapeLog.Info("Starting APEX IR scrape...");
                     var allRows = ScrapeApexIR(driver);
-                    ScrapeLog.Info($"ScrapeApexIR returned {allRows.Count} rows.");
-                    if (allRows.Count > 0)
-                        ScrapeLog.Info($"First row keys: {string.Join(", ", allRows[0].Keys)}");
 
-                    // ── Step 5: Parse modem records ──
                     var modems = ParseModems(allRows);
-                    ScrapeLog.Info($"ParseModems → {modems.Count} modems.");
+                    ScrapeLog.Info($"Scraped {allRows.Count} rows → {modems.Count} modems.");
                     onStatus?.Invoke($"Parsed {modems.Count} modem records from {allRows.Count} rows.");
 
-                    ScrapeLog.Info("Scrape completed successfully.");
+                    ScrapeLog.Info("Scrape OK.");
                     return new ScraperResult
                     {
                         Success = true,
@@ -423,14 +406,12 @@ namespace ModemMergerWinFormsApp
                 catch (Exception ex)
                 {
                     ScrapeLog.Error($"{ex.GetType().Name}: {ex.Message}");
-                    if (driver != null) ScrapeLog.SavePageSnapshot(driver, "XX_error");
-                    ScrapeLog.Error(ex.StackTrace);
+                    if (driver != null) ScrapeLog.SaveErrorSnapshot(driver, "error");
                     return new ScraperResult { Success = false, Error = ex.Message };
                 }
                 finally
                 {
                     try { driver?.Quit(); } catch { }
-                    ScrapeLog.Info("Driver quit. Log closed.");
                 }
             });
         }
@@ -446,20 +427,14 @@ namespace ModemMergerWinFormsApp
             [System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
         {
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-            int attempts = 0;
             while (DateTime.UtcNow < deadline)
             {
-                attempts++;
                 var el = condition(driver);
-                if (el != null)
-                {
-                    ScrapeLog.Info($"WaitFor (line {callerLine}) succeeded after {attempts} attempts.");
-                    return el;
-                }
+                if (el != null) return el;
                 System.Threading.Thread.Sleep(500);
             }
-            ScrapeLog.Error($"WaitFor (line {callerLine}) timed out after {timeoutSeconds}s / {attempts} attempts.");
-            ScrapeLog.SavePageSnapshot(driver, $"WaitFor_timeout_L{callerLine}");
+            ScrapeLog.Error($"WaitFor (line {callerLine}) timed out after {timeoutSeconds}s.");
+            ScrapeLog.SaveErrorSnapshot(driver, $"WaitFor_timeout_L{callerLine}");
             throw new TimeoutException($"WaitFor timed out after {timeoutSeconds}s");
         }
 
@@ -482,6 +457,126 @@ namespace ModemMergerWinFormsApp
                     return dir;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Configure the APEX Interactive Report: set rows per page to max.
+        /// Date range is already embedded in the navigation URL.
+        /// </summary>
+        private static void ConfigureApexIR(OpenQA.Selenium.IWebDriver driver,
+            DateTime? dateFrom, DateTime? dateTo)
+        {
+            // Set rows per page to maximum via APEX Actions menu
+            try
+            {
+                ClickActionsMenuItem(driver, "Rows Per Page");
+                System.Threading.Thread.Sleep(800);
+
+                var menuItems = driver.FindElements(OpenQA.Selenium.By.CssSelector(
+                    "button[role='menuitemradio']"));
+                OpenQA.Selenium.IWebElement bestOption = null;
+                int bestVal = 0;
+                foreach (var mi in menuItems)
+                {
+                    var txt = mi.Text.Trim();
+                    int val;
+                    if (int.TryParse(txt, out val) && val > bestVal)
+                    {
+                        bestVal = val;
+                        bestOption = mi;
+                    }
+                }
+                if (bestOption != null)
+                {
+                    bestOption.Click();
+                    System.Threading.Thread.Sleep(3000);
+                }
+            }
+            catch (Exception ex)
+            {
+                ScrapeLog.Warn($"Rows per page setup failed: {ex.Message}");
+            }
+
+            // Close any open menus
+            try
+            {
+                driver.FindElement(OpenQA.Selenium.By.TagName("body"))
+                    .SendKeys(OpenQA.Selenium.Keys.Escape);
+                System.Threading.Thread.Sleep(300);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Click an item in the APEX IR "Actions" dropdown menu.
+        /// </summary>
+        private static void ClickActionsMenuItem(OpenQA.Selenium.IWebDriver driver, string itemText)
+        {
+            // Find and click the Actions button
+            string[] actionsSelectors = {
+                "button.a-IRR-button--actions",
+                ".a-IRR-buttons button",
+                "button[data-action='show-ir-actions']",
+                "button[title='Actions']",
+            };
+            OpenQA.Selenium.IWebElement actionsBtn = null;
+            foreach (var sel in actionsSelectors)
+            {
+                try
+                {
+                    var el = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
+                    if (el.Displayed) { actionsBtn = el; break; }
+                }
+                catch { }
+            }
+            // Also try by text content
+            if (actionsBtn == null)
+            {
+                try
+                {
+                    actionsBtn = driver.FindElement(OpenQA.Selenium.By.XPath(
+                        "//button[contains(text(),'Actions') or contains(text(),'actions')]"));
+                }
+                catch { }
+            }
+            if (actionsBtn == null)
+                throw new InvalidOperationException("Actions button not found on APEX IR page.");
+
+            actionsBtn.Click();
+            System.Threading.Thread.Sleep(600);
+
+            var items = driver.FindElements(OpenQA.Selenium.By.CssSelector(
+                ".a-Menu-content a, .a-Menu-label, ul.a-Menu li, [role='menuitem'], .a-IRR-actions-menu a"));
+            foreach (var item in items)
+            {
+                try
+                {
+                    var txt = item.Text.Trim();
+                    if (txt.IndexOf(itemText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        item.Click();
+                        return;
+                    }
+                }
+                catch { }
+            }
+            throw new InvalidOperationException($"Menu item '{itemText}' not found in Actions menu.");
+        }
+
+        /// <summary>
+        /// Select an option in a &lt;select&gt; element by partial text match.
+        /// </summary>
+        private static void SelectOptionByPartialText(OpenQA.Selenium.IWebElement selectEl, string partialText)
+        {
+            var options = selectEl.FindElements(OpenQA.Selenium.By.TagName("option"));
+            foreach (var opt in options)
+            {
+                if (opt.Text.IndexOf(partialText, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    opt.Click();
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -513,16 +608,11 @@ namespace ModemMergerWinFormsApp
                     {
                         var tbl = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
                         if (tbl == null) continue;
-                        ScrapeLog.Info($"[Page {pageNum}] Found table with selector '{sel}'");
 
-                        // Collect headers
                         var thEls = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " th"));
                         headers = thEls.Select(th => th.Text.Trim()).Where(h => h.Length > 0).ToList();
-                        ScrapeLog.Info($"[Page {pageNum}] Headers ({headers.Count}): {string.Join(" | ", headers)}");
 
-                        // Collect data rows
                         var rows = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " tbody tr"));
-                        int rowsBefore = allRows.Count;
                         foreach (var row in rows)
                         {
                             try
@@ -540,7 +630,6 @@ namespace ModemMergerWinFormsApp
                             catch { /* skip malformed row */ }
                         }
                         tableFound = true;
-                        ScrapeLog.Info($"[Page {pageNum}] Collected {allRows.Count - rowsBefore} rows (total: {allRows.Count}).");
                         break;
                     }
                     catch { /* selector not found, try next */ }
@@ -548,8 +637,7 @@ namespace ModemMergerWinFormsApp
 
                 if (!tableFound)
                 {
-                    ScrapeLog.Warn($"[Page {pageNum}] No table found with any selector. Stopping pagination.");
-                    if (allRows.Count == 0) ScrapeLog.SavePageSnapshot(driver, "05_no_table_found");
+                    if (allRows.Count == 0) ScrapeLog.Warn("No APEX table found.");
                     break;
                 }
 
@@ -578,12 +666,7 @@ namespace ModemMergerWinFormsApp
                     catch { /* not found */ }
                 }
 
-                if (!nextClicked)
-                {
-                    ScrapeLog.Info($"[Page {pageNum}] No next button — pagination complete.");
-                    break;
-                }
-                ScrapeLog.Info($"[Page {pageNum}] Next button clicked — loading next page...");
+                if (!nextClicked) break;
             }
 
             return allRows;

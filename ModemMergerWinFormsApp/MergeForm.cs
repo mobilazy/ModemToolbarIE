@@ -6,10 +6,12 @@ using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
@@ -38,6 +40,13 @@ namespace ModemMergerWinFormsApp
         private bool _headerChecked = true;
         private bool _loadoutLocked = false;
         private bool _etaLocked = false;
+
+        // Kabal sync preview: stores date info per Customer cell
+        private class KabalDateInfo
+        {
+            public string KabalDate;
+            public bool Matches;
+        }
 
 
 
@@ -795,11 +804,47 @@ namespace ModemMergerWinFormsApp
 
         private void dgvKabal_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex != -1)
+            // ── Data cells: custom paint Customer column with Kabal date overlay ──
+            if (e.RowIndex >= 0)
             {
-                // Header row only
-                return;
+                if (dgvKabal.Columns.Contains("Customer") &&
+                    e.ColumnIndex == dgvKabal.Columns["Customer"].Index)
+                {
+                    var cell = dgvKabal.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                    var kabalInfo = cell.Tag as KabalDateInfo;
+                    if (kabalInfo != null)
+                    {
+                        e.PaintBackground(e.ClipBounds, true);
+
+                        var gantDate = cell.Value?.ToString() ?? "";
+                        var kabalDate = kabalInfo.KabalDate;
+                        var kabalColor = kabalInfo.Matches ? Color.Green : Color.DarkOrange;
+
+                        // Draw Gant date in normal color
+                        var gantDisplay = gantDate + "  ";
+                        var gantSize = TextRenderer.MeasureText(e.Graphics, gantDisplay, e.CellStyle.Font);
+                        TextRenderer.DrawText(e.Graphics, gantDisplay, e.CellStyle.Font,
+                            new Rectangle(e.CellBounds.Left + 2, e.CellBounds.Top, gantSize.Width, e.CellBounds.Height),
+                            e.CellStyle.ForeColor,
+                            TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+
+                        // Draw Kabal date in green (match) or orange (mismatch)
+                        using (var kabalFont = new Font(e.CellStyle.Font, FontStyle.Bold))
+                        {
+                            TextRenderer.DrawText(e.Graphics, kabalDate, kabalFont,
+                                new Rectangle(e.CellBounds.Left + 2 + gantSize.Width, e.CellBounds.Top,
+                                    e.CellBounds.Width - gantSize.Width - 4, e.CellBounds.Height),
+                                kabalColor,
+                                TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                        }
+
+                        e.Handled = true;
+                    }
+                }
+                return; // data cells handled (or default paint)
             }
+
+            // ── Header row (e.RowIndex == -1) ──
 
             // Select column — draw checkbox
             if (dgvKabal.Columns.Contains("Select") &&
@@ -1218,6 +1263,16 @@ namespace ModemMergerWinFormsApp
                     dgvKabal.Rows[rowIdx].DefaultCellStyle.BackColor = Color.FromArgb(240, 240, 240);
                     dgvKabal.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.Gray;
                 }
+
+                // Color code Mob ID column based on modem status
+                var status = m.ModemStatus ?? "";
+                if (!isReady && status.IndexOf("activated", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (status.IndexOf("not", StringComparison.OrdinalIgnoreCase) >= 0)
+                        dgvKabal.Rows[rowIdx].Cells["MobId"].Style.BackColor = Color.FromArgb(255, 200, 200); // Light red
+                    else
+                        dgvKabal.Rows[rowIdx].Cells["MobId"].Style.BackColor = Color.FromArgb(255, 255, 150); // Yellow
+                }
             }
         }
 
@@ -1296,6 +1351,22 @@ namespace ModemMergerWinFormsApp
 
         // ── Sync with Kabal button ───────────────────────────────────────
 
+        private static string NormalizeDate(string dateStr)
+        {
+            if (string.IsNullOrWhiteSpace(dateStr)) return "";
+            // Strip leading day-of-week prefix like "Wed ", "Mon ", "Fri " etc.
+            var cleaned = Regex.Replace(dateStr.Trim(), @"^[A-Za-z]{2,3}\s+", "");
+            DateTime dt;
+            string[] formats = {
+                "dd.MM.yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "dd-MM-yyyy",
+                "dd.MM.yyyy HH:mm",
+                "dd-MM-yy", "dd/MM/yy", "dd.MM.yy" // 2-digit year (Kabal uses e.g. 25-03-26)
+            };
+            if (DateTime.TryParseExact(cleaned, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+                return dt.ToString("dd.MM.yyyy");
+            return cleaned;
+        }
+
         private async void btnKabalSyncKabal_Click(object sender, EventArgs e)
         {
             var customer = cmbKabalCustomer.Text;
@@ -1310,23 +1381,34 @@ namespace ModemMergerWinFormsApp
                 MessageBox.Show("Enter Kabal username and password.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
-            // Capture which modems are currently ticked
-            var checkedIds = GetCheckedIds();
-            if (checkedIds.Count == 0)
+            if (dgvKabal.Rows.Count == 0)
             {
-                MessageBox.Show("No modems ticked — nothing to sync.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Load modems first before syncing with Kabal.", "Modem Shifter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             btnKabalSyncKabal.Enabled = false;
             lblKabalStatus.Text = "Starting Kabal scraper...";
 
+            // Compute date range from grid (earliest to latest Deliver To Customer)
+            DateTime? gridDateFrom = null, gridDateTo = null;
+            foreach (DataGridViewRow r in dgvKabal.Rows)
+            {
+                var dateStr = r.Cells["Customer"].Value?.ToString();
+                DateTime dt;
+                if (DateTime.TryParseExact(dateStr, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+                {
+                    if (gridDateFrom == null || dt < gridDateFrom) gridDateFrom = dt;
+                    if (gridDateTo == null || dt > gridDateTo) gridDateTo = dt;
+                }
+            }
+
             // Scrape Kabal directly using Selenium (no Node.js needed)
             var result = await KabalScraperClient.ScrapeAsync(
                 customer, rig, txtKabalUser.Text, txtKabalPass.Text,
                 chkKabalHeadless.Checked, dryRun: true,
-                onStatus: msg => BeginInvoke((Action)(() => lblKabalStatus.Text = msg)));
+                onStatus: msg => BeginInvoke((Action)(() => lblKabalStatus.Text = msg)),
+                dateFrom: gridDateFrom, dateTo: gridDateTo);
 
             if (!result.Success)
             {
@@ -1343,38 +1425,27 @@ namespace ModemMergerWinFormsApp
                 return;
             }
 
-            lblKabalStatus.Text = $"Scraped {result.Modems.Count} modems from Kabal. Loading Gant data to compare...";
-
-            // 3) Load Gant modems for comparison
-            try
-            {
-                var rigFilter = rig == "select rig" ? null : rig;
-                _loadedModems = await GantClient.FetchModemsAsync(customer, rigFilter, dtpKabalStartDate.Value);
-            }
-            catch (Exception ex)
-            {
-                lblKabalStatus.Text = "Failed to load Gant data: " + ex.Message;
-                btnKabalSyncKabal.Enabled = true;
-                return;
-            }
-
-            // 4) Filter to only the ticked modems, then rebuild
-            _loadedModems = _loadedModems
-                .Where(m => checkedIds.Contains(m.Id))
-                .ToList();
-            BuildGrid();
-
-            // Highlight rows that have a matching Kabal shipping date
+            // Annotate existing grid with Kabal dates
+            int matched = 0;
             foreach (DataGridViewRow row in dgvKabal.Rows)
             {
                 var modemId = row.Cells["MobId"].Value?.ToString();
                 var kabalMatch = result.Modems.FirstOrDefault(km =>
                     km.ModemNumber == modemId || km.PackageName?.Contains(modemId) == true);
+
                 if (kabalMatch != null && !string.IsNullOrEmpty(kabalMatch.ShippingDate))
-                    row.Cells["Loadout"].Style.BackColor = Color.LightYellow;
+                {
+                    matched++;
+                    var gantDate = row.Cells["Customer"].Value?.ToString()?.Trim() ?? "";
+                    var kabalDate = NormalizeDate(kabalMatch.ShippingDate);
+                    bool datesMatch = string.Equals(gantDate, kabalDate, StringComparison.OrdinalIgnoreCase);
+                    row.Cells["Customer"].Tag = new KabalDateInfo { KabalDate = kabalDate, Matches = datesMatch };
+                }
             }
 
-            lblKabalStatus.Text = $"Sync preview ready. {result.Modems.Count} Kabal modems matched against {_loadedModems.Count} TMUtils modems. Review and click Shift Dates to apply.";
+            dgvKabal.Refresh();
+
+            lblKabalStatus.Text = $"Sync done. {matched}/{dgvKabal.Rows.Count} matched ({result.Modems.Count} Kabal records).";
             btnKabalSyncKabal.Enabled = true;
         }
     }

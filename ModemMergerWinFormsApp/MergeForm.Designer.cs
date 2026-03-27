@@ -183,6 +183,7 @@
             //
             // treeView1
             //
+            this.treeView1.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.treeView1.Location = new System.Drawing.Point(35, 62);
             this.treeView1.Margin = new System.Windows.Forms.Padding(4);
             this.treeView1.Name = "treeView1";
@@ -194,6 +195,7 @@
             //
             // treeView2
             //
+            this.treeView2.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.treeView2.Location = new System.Drawing.Point(645, 62);
             this.treeView2.Margin = new System.Windows.Forms.Padding(4);
             this.treeView2.Name = "treeView2";
@@ -205,6 +207,7 @@
             //
             // btnAdd
             //
+            this.btnAdd.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.btnAdd.Location = new System.Drawing.Point(645, 615);
             this.btnAdd.Margin = new System.Windows.Forms.Padding(4);
             this.btnAdd.Name = "btnAdd";
@@ -216,6 +219,7 @@
             //
             // btnCancel
             //
+            this.btnCancel.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.btnCancel.Location = new System.Drawing.Point(767, 615);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
             this.btnCancel.Name = "btnCancel";
@@ -272,6 +276,7 @@
             //
             // chkRenameMain
             //
+            this.chkRenameMain.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.chkRenameMain.AutoSize = true;
             this.chkRenameMain.Location = new System.Drawing.Point(35, 620);
             this.chkRenameMain.Name = "chkRenameMain";
@@ -283,6 +288,7 @@
             //
             // txtRenameMainTo
             //
+            this.txtRenameMainTo.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.txtRenameMainTo.Enabled = false;
             this.txtRenameMainTo.Location = new System.Drawing.Point(156, 618);
             this.txtRenameMainTo.MaxLength = 16;
@@ -406,6 +412,7 @@
             //
             // lblKabalStatus
             //
+            this.lblKabalStatus.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.lblKabalStatus.AutoSize = false;
             this.lblKabalStatus.Location = new System.Drawing.Point(20, 322);
             this.lblKabalStatus.Name = "lblKabalStatus";
@@ -414,6 +421,7 @@
             //
             // dgvKabal
             //
+            this.dgvKabal.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.dgvKabal.AllowUserToAddRows = false;
             this.dgvKabal.AllowUserToDeleteRows = false;
             this.dgvKabal.ClipboardCopyMode = System.Windows.Forms.DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText;
@@ -430,6 +438,7 @@
             //
             // lblKabalUser
             //
+            this.lblKabalUser.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.lblKabalUser.AutoSize = true;
             this.lblKabalUser.Location = new System.Drawing.Point(20, 612);
             this.lblKabalUser.Name = "lblKabalUser";
@@ -437,6 +446,7 @@
             //
             // txtKabalUser
             //
+            this.txtKabalUser.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.txtKabalUser.Location = new System.Drawing.Point(20, 630);
             this.txtKabalUser.Name = "txtKabalUser";
             this.txtKabalUser.Size = new System.Drawing.Size(200, 23);
@@ -444,6 +454,7 @@
             //
             // lblKabalPass
             //
+            this.lblKabalPass.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.lblKabalPass.AutoSize = true;
             this.lblKabalPass.Location = new System.Drawing.Point(230, 612);
             this.lblKabalPass.Name = "lblKabalPass";
@@ -451,6 +462,7 @@
             //
             // txtKabalPass
             //
+            this.txtKabalPass.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.txtKabalPass.Location = new System.Drawing.Point(230, 630);
             this.txtKabalPass.Name = "txtKabalPass";
             this.txtKabalPass.PasswordChar = '*';
@@ -460,6 +472,7 @@
             //
             // chkKabalHeadless
             //
+            this.chkKabalHeadless.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             this.chkKabalHeadless.AutoSize = true;
             this.chkKabalHeadless.Checked = true;
             this.chkKabalHeadless.CheckState = System.Windows.Forms.CheckState.Checked;
