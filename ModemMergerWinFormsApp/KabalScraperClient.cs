@@ -231,9 +231,10 @@ namespace ModemMergerWinFormsApp
                     Directory.CreateDirectory(_userDataDir);
                     options.AddArgument("--user-data-dir=" + _userDataDir);
 
-                    var driverDir = FindCachedEdgeDriver();
+                    var driverDir = FindEdgeDriver();
                     if (driverDir != null)
                     {
+                        ScrapeLog.Info($"Using msedgedriver from: {driverDir}");
                         var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
                         svc.HideCommandPromptWindow = true;
                         driver = new Microsoft.Edge.SeleniumTools.EdgeDriver(svc, options);
@@ -253,7 +254,7 @@ namespace ModemMergerWinFormsApp
                     bool needsLogin = true;
                     onStatus?.Invoke("Checking existing session...");
                     driver.Navigate().GoToUrl(targetUrl);
-                    WaitForApexReady(driver);
+                    WaitForApexReady(driver, timeoutSeconds: 5); // Short timeout — just checking if we get redirected
 
                     if (driver.Url.Contains("app01.kabal.com") &&
                         !driver.Url.Contains("login") &&
@@ -270,8 +271,18 @@ namespace ModemMergerWinFormsApp
 
                     if (needsLogin)
                     {
-                    onStatus?.Invoke("Navigating to Kabal login...");
-                    driver.Navigate().GoToUrl(LoginUrl);
+                    // If session check redirected us to login already, skip redundant navigation
+                    bool alreadyOnLogin = driver.Url.Contains("kabal-account") || driver.Url.Contains("login");
+                    if (!alreadyOnLogin)
+                    {
+                        onStatus?.Invoke("Navigating to Kabal login...");
+                        driver.Navigate().GoToUrl(LoginUrl);
+                    }
+                    else
+                    {
+                        onStatus?.Invoke("Already on login page...");
+                        ScrapeLog.Info("Skipped LoginUrl navigation — already redirected to login.");
+                    }
 
                     onStatus?.Invoke("Entering credentials...");
                     var usernameField = WaitFor(driver, d =>
@@ -282,21 +293,12 @@ namespace ModemMergerWinFormsApp
                             return el.Displayed ? el : null;
                         }
                         catch { return null; }
-                    });
+                    }, timeoutSeconds: 5);
                     usernameField.Clear();
                     usernameField.SendKeys(username);
 
-                    // Submit username
-                    try
-                    {
-                        driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
-                    }
-                    catch
-                    {
-                        // Some APEX forms use input[type=submit] or a regular button
-                        try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
-                        catch { usernameField.SendKeys(OpenQA.Selenium.Keys.Return); }
-                    }
+                    // Submit username — use FindElements + no implicit wait to avoid 3s per failed selector
+                    ClickSubmitButton(driver, usernameField);
 
                     onStatus?.Invoke("Entering password...");
                     var passwordField = WaitFor(driver, d =>
@@ -307,20 +309,13 @@ namespace ModemMergerWinFormsApp
                             return el.Displayed ? el : null;
                         }
                         catch { return null; }
-                    });
+                    }, timeoutSeconds: 5);
                     passwordField.Clear();
                     passwordField.SendKeys(password);
 
-                    try
-                    {
-                        driver.FindElement(OpenQA.Selenium.By.CssSelector("button[type='submit']")).Click();
-                    }
-                    catch
-                    {
-                        try { driver.FindElement(OpenQA.Selenium.By.CssSelector("input[type='submit']")).Click(); }
-                        catch { passwordField.SendKeys(OpenQA.Selenium.Keys.Return); }
-                    }
-                    WaitForApexReady(driver);
+                    // Submit password
+                    ClickSubmitButton(driver, passwordField);
+                    WaitForApexReady(driver, timeoutSeconds: 10);
 
                     // Operator selection (if present)
                     string operatorDisplay;
@@ -338,9 +333,9 @@ namespace ModemMergerWinFormsApp
                                 return el.Displayed ? el : null;
                             }
                             catch { return null; }
-                        });
+                        }, timeoutSeconds: 5);
                         opLink.Click();
-                        WaitForApexReady(driver);
+                        WaitForApexReady(driver, timeoutSeconds: 10);
                     }
                     catch (Exception opEx)
                     {
@@ -437,15 +432,46 @@ namespace ModemMergerWinFormsApp
         }
 
         /// <summary>
+        /// Click a submit button on the page without wasting time on implicit waits.
+        /// Falls back to pressing Enter on the given field if no submit button is found.
+        /// </summary>
+        private static void ClickSubmitButton(OpenQA.Selenium.IWebDriver driver, OpenQA.Selenium.IWebElement fallbackField)
+        {
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
+            try
+            {
+                var btns = driver.FindElements(OpenQA.Selenium.By.CssSelector("button[type='submit']"));
+                if (btns.Count > 0) { btns[0].Click(); return; }
+
+                var inputs = driver.FindElements(OpenQA.Selenium.By.CssSelector("input[type='submit']"));
+                if (inputs.Count > 0) { inputs[0].Click(); return; }
+
+                fallbackField.SendKeys(OpenQA.Selenium.Keys.Return);
+            }
+            finally
+            {
+                driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
+            }
+        }
+
+        /// <summary>
         /// Wait until APEX page is idle: document.readyState=complete and no jQuery AJAX in flight.
         /// </summary>
         private static void WaitForApexReady(OpenQA.Selenium.IWebDriver driver, int timeoutSeconds = 15)
         {
             var js = driver as OpenQA.Selenium.IJavaScriptExecutor;
-            if (js == null) { Thread.Sleep(500); return; }
+            if (js == null) { Thread.Sleep(300); return; }
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-            // Brief initial pause to let navigation/click start
-            Thread.Sleep(100);
+            // Check immediately first — page may already be ready
+            try
+            {
+                var done = js.ExecuteScript(
+                    "return document.readyState==='complete' && (typeof jQuery==='undefined' || jQuery.active===0)");
+                if (done is bool && (bool)done) return;
+            }
+            catch { }
+            // Brief pause then poll
+            Thread.Sleep(50);
             while (DateTime.UtcNow < deadline)
             {
                 try
@@ -455,7 +481,7 @@ namespace ModemMergerWinFormsApp
                     if (done is bool && (bool)done) return;
                 }
                 catch { }
-                Thread.Sleep(150);
+                Thread.Sleep(100);
             }
         }
 
@@ -476,23 +502,35 @@ namespace ModemMergerWinFormsApp
         }
 
         /// <summary>
-        /// Find the cached msedgedriver directory under %USERPROFILE%\.cache\selenium\msedgedriver.
-        /// Returns the directory containing msedgedriver.exe, or null if not found.
+        /// Find msedgedriver.exe — first checks the application's own directory (for portable deployment),
+        /// then falls back to the Selenium cache under %USERPROFILE%\.cache.
         /// </summary>
-        private static string FindCachedEdgeDriver()
+        private static string FindEdgeDriver()
         {
+            // 1. Check app directory (same folder as the running .exe)
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            if (File.Exists(Path.Combine(appDir, "msedgedriver.exe")))
+                return appDir;
+
+            // 2. Check working directory
+            var cwd = Directory.GetCurrentDirectory();
+            if (File.Exists(Path.Combine(cwd, "msedgedriver.exe")))
+                return cwd;
+
+            // 3. Fallback: Selenium cache
             var cacheRoot = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".cache", "selenium", "msedgedriver", "win64");
-            if (!Directory.Exists(cacheRoot)) return null;
-
-            // Pick the newest version folder containing msedgedriver.exe
-            foreach (var dir in Directory.GetDirectories(cacheRoot)
-                         .OrderByDescending(d => d))
+            if (Directory.Exists(cacheRoot))
             {
-                if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
-                    return dir;
+                foreach (var dir in Directory.GetDirectories(cacheRoot)
+                             .OrderByDescending(d => d))
+                {
+                    if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
+                        return dir;
+                }
             }
+
             return null;
         }
 
@@ -549,7 +587,7 @@ namespace ModemMergerWinFormsApp
         /// </summary>
         private static void ClickActionsMenuItem(OpenQA.Selenium.IWebDriver driver, string itemText)
         {
-            // Find and click the Actions button
+            // Find and click the Actions button — use FindElements to avoid 3s implicit wait per miss
             string[] actionsSelectors = {
                 "button.a-IRR-button--actions",
                 ".a-IRR-buttons button",
@@ -557,24 +595,33 @@ namespace ModemMergerWinFormsApp
                 "button[title='Actions']",
             };
             OpenQA.Selenium.IWebElement actionsBtn = null;
-            foreach (var sel in actionsSelectors)
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
+            try
             {
-                try
+                foreach (var sel in actionsSelectors)
                 {
-                    var el = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
-                    if (el.Displayed) { actionsBtn = el; break; }
+                    try
+                    {
+                        var els = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel));
+                        if (els.Count > 0 && els[0].Displayed) { actionsBtn = els[0]; break; }
+                    }
+                    catch { }
                 }
-                catch { }
+                // Also try by text content
+                if (actionsBtn == null)
+                {
+                    try
+                    {
+                        var els = driver.FindElements(OpenQA.Selenium.By.XPath(
+                            "//button[contains(text(),'Actions') or contains(text(),'actions')]"));
+                        if (els.Count > 0) actionsBtn = els[0];
+                    }
+                    catch { }
+                }
             }
-            // Also try by text content
-            if (actionsBtn == null)
+            finally
             {
-                try
-                {
-                    actionsBtn = driver.FindElement(OpenQA.Selenium.By.XPath(
-                        "//button[contains(text(),'Actions') or contains(text(),'actions')]"));
-                }
-                catch { }
+                driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
             }
             if (actionsBtn == null)
                 throw new InvalidOperationException("Actions button not found on APEX IR page.");
@@ -620,57 +667,110 @@ namespace ModemMergerWinFormsApp
         /// <summary>
         /// Extract all rows from an Oracle APEX Interactive Report, walking through pagination.
         /// Returns a list of dictionaries (column header → cell value).
+        /// Uses JavaScript bulk extraction instead of per-cell Selenium calls for speed.
         /// </summary>
         private static List<Dictionary<string, string>> ScrapeApexIR(OpenQA.Selenium.IWebDriver driver)
         {
             var allRows = new List<Dictionary<string, string>>();
             int pageNum = 0;
+            var js = driver as OpenQA.Selenium.IJavaScriptExecutor;
+
+            // JavaScript that extracts all table data in one call (avoids hundreds of WebDriver round-trips)
+            const string extractTableJs = @"
+                var selectors = ['table.a-IRR-table', 'table[summary]', 'table.uReportStandard'];
+                for (var s = 0; s < selectors.length; s++) {
+                    var tbl = document.querySelector(selectors[s]);
+                    if (!tbl) continue;
+                    var headers = [];
+                    var ths = tbl.querySelectorAll('th');
+                    for (var i = 0; i < ths.length; i++) {
+                        var t = ths[i].innerText.trim();
+                        if (t.length > 0) headers.push(t);
+                    }
+                    var rows = tbl.querySelectorAll('tbody tr');
+                    var data = [];
+                    for (var r = 0; r < rows.length; r++) {
+                        var cells = rows[r].querySelectorAll('td');
+                        if (cells.length === 0) continue;
+                        var obj = {};
+                        for (var c = 0; c < cells.length; c++) {
+                            var key = c < headers.length ? headers[c] : 'col_' + c;
+                            obj[key] = cells[c].innerText.trim();
+                        }
+                        data.push(obj);
+                    }
+                    return JSON.stringify({found: true, rows: data});
+                }
+                return JSON.stringify({found: false, rows: []});
+            ";
 
             while (true)
             {
                 pageNum++;
                 WaitForApexReady(driver);
 
-                var headers = new List<string>();
+                // Extract all rows from current page in a single JS call
                 bool tableFound = false;
-
-                string[] tableSelectors = {
-                    "table.a-IRR-table",
-                    "table[summary]",
-                    "table.uReportStandard",
-                };
-
-                foreach (var sel in tableSelectors)
+                if (js != null)
                 {
                     try
                     {
-                        var tbl = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
-                        if (tbl == null) continue;
-
-                        var thEls = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " th"));
-                        headers = thEls.Select(th => th.Text.Trim()).Where(h => h.Length > 0).ToList();
-
-                        var rows = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " tbody tr"));
-                        foreach (var row in rows)
+                        var json = js.ExecuteScript(extractTableJs) as string;
+                        if (json != null)
                         {
-                            try
+                            var parsed = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                            tableFound = parsed.ContainsKey("found") && (bool)parsed["found"];
+                            if (tableFound)
                             {
-                                var cells = row.FindElements(OpenQA.Selenium.By.CssSelector("td"));
-                                if (cells.Count == 0) continue;
-                                var obj = new Dictionary<string, string>();
-                                for (int i = 0; i < cells.Count; i++)
-                                {
-                                    var key = i < headers.Count ? headers[i] : $"col_{i}";
-                                    obj[key] = cells[i].Text.Trim();
-                                }
-                                allRows.Add(obj);
+                                var rowsArray = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(parsed["rows"].ToString());
+                                allRows.AddRange(rowsArray);
                             }
-                            catch { /* skip malformed row */ }
                         }
-                        tableFound = true;
-                        break;
                     }
-                    catch { /* selector not found, try next */ }
+                    catch (Exception ex)
+                    {
+                        ScrapeLog.Warn($"JS table extraction failed on page {pageNum}: {ex.Message}");
+                    }
+                }
+
+                // Fallback to Selenium DOM walk if JS extraction failed
+                if (!tableFound && js == null)
+                {
+                    string[] tableSelectors = {
+                        "table.a-IRR-table",
+                        "table[summary]",
+                        "table.uReportStandard",
+                    };
+                    foreach (var sel in tableSelectors)
+                    {
+                        try
+                        {
+                            var tbl = driver.FindElement(OpenQA.Selenium.By.CssSelector(sel));
+                            if (tbl == null) continue;
+                            var thEls = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " th"));
+                            var headers = thEls.Select(th => th.Text.Trim()).Where(h => h.Length > 0).ToList();
+                            var rows = driver.FindElements(OpenQA.Selenium.By.CssSelector(sel + " tbody tr"));
+                            foreach (var row in rows)
+                            {
+                                try
+                                {
+                                    var cells = row.FindElements(OpenQA.Selenium.By.CssSelector("td"));
+                                    if (cells.Count == 0) continue;
+                                    var obj = new Dictionary<string, string>();
+                                    for (int i = 0; i < cells.Count; i++)
+                                    {
+                                        var key = i < headers.Count ? headers[i] : $"col_{i}";
+                                        obj[key] = cells[i].Text.Trim();
+                                    }
+                                    allRows.Add(obj);
+                                }
+                                catch { }
+                            }
+                            tableFound = true;
+                            break;
+                        }
+                        catch { }
+                    }
                 }
 
                 if (!tableFound)
@@ -679,29 +779,39 @@ namespace ModemMergerWinFormsApp
                     break;
                 }
 
-                // Try to click Next pagination button
+                // Try to click Next — disable implicit wait to avoid 3s×4 = 12s delay on last page
                 bool nextClicked = false;
-                string[] nextSelectors = {
-                    "button[title='Next']",
-                    "a[title='Next']",
-                    ".a-IRR-pagination-item--next:not(.is-disabled)",
-                    ".uButtonPaginationNext:not(:disabled)",
-                };
-                foreach (var ns in nextSelectors)
+                driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
+                try
                 {
-                    try
+                    string[] nextSelectors = {
+                        "button[title='Next']",
+                        "a[title='Next']",
+                        ".a-IRR-pagination-item--next:not(.is-disabled)",
+                        ".uButtonPaginationNext:not(:disabled)",
+                    };
+                    foreach (var ns in nextSelectors)
                     {
-                        var nextBtn = driver.FindElement(OpenQA.Selenium.By.CssSelector(ns));
-                        var disabled = nextBtn.GetAttribute("disabled");
-                        var cls = nextBtn.GetAttribute("class") ?? "";
-                        if (disabled == null && !cls.Contains("is-disabled") && !cls.Contains("disabled"))
+                        try
                         {
-                            nextBtn.Click();
-                            nextClicked = true;
-                            break;
+                            var found = driver.FindElements(OpenQA.Selenium.By.CssSelector(ns));
+                            if (found.Count == 0) continue;
+                            var nextBtn = found[0];
+                            var disabled = nextBtn.GetAttribute("disabled");
+                            var cls = nextBtn.GetAttribute("class") ?? "";
+                            if (disabled == null && !cls.Contains("is-disabled") && !cls.Contains("disabled"))
+                            {
+                                nextBtn.Click();
+                                nextClicked = true;
+                                break;
+                            }
                         }
+                        catch { }
                     }
-                    catch { /* not found */ }
+                }
+                finally
+                {
+                    driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
                 }
 
                 if (!nextClicked) break;

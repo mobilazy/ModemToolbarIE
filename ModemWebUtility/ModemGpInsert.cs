@@ -169,7 +169,22 @@ namespace ModemWebUtility
 
             mdp.PostData();
 
-            Thread.Sleep(2000);
+            // Poll for updated modem page instead of hard 2s sleep
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                Thread.Sleep(200);
+                try
+                {
+                    var testMp = new ModemParameters(new ModemConnection(HDocUtility.UrlModemView + mp.ModemNo).GetHtmlAsHdoc(), mp.ModemNo);
+                    if (testMp.GpId.Count > existingGpId.Count)
+                    {
+                        mp = testMp;
+                        return;
+                    }
+                }
+                catch { }
+            }
+            // Fallback — reload anyway
             mp = new ModemParameters(new ModemConnection(HDocUtility.UrlModemView + mp.ModemNo).GetHtmlAsHdoc(), mp.ModemNo);
             
         }
