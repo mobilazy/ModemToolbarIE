@@ -3,6 +3,7 @@ using ModemWebUtility;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -393,6 +394,19 @@ namespace ModemMergerWinFormsApp
                     }
                 }
 
+                // Kill orphan msedge processes that are still using our user-data-dir.
+                // These prevent a new browser from acquiring the profile lock.
+                KillOrphanEdgeProcesses();
+
+                // Remove stale lock / port files left by a previously crashed Edge process.
+                // Without this, "--user-data-dir" startup fails with "DevToolsActivePort doesn't exist".
+                Directory.CreateDirectory(_userDataDir);
+                foreach (var lockFile in new[] { "SingletonLock", "SingletonSocket", "SingletonCookie", ".parentlock", "DevToolsActivePort" })
+                {
+                    var lp = Path.Combine(_userDataDir, lockFile);
+                    try { if (File.Exists(lp)) File.Delete(lp); } catch { }
+                }
+
                 var options = new Microsoft.Edge.SeleniumTools.EdgeOptions();
                 options.UseChromium = true;
                 if (headless)
@@ -403,23 +417,42 @@ namespace ModemMergerWinFormsApp
                 options.AddArgument("--no-sandbox");
                 options.AddArgument("--disable-dev-shm-usage");
                 options.AddArgument("--disable-blink-features=AutomationControlled");
+                options.AddArgument("--disable-extensions");
+                options.AddArgument("--no-first-run");
+                options.AddArgument("--no-default-browser-check");
                 options.AddArgument("--window-size=1920,1080");
                 options.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0");
                 options.AddExcludedArgument("enable-automation");
-                Directory.CreateDirectory(_userDataDir);
                 options.AddArgument("--user-data-dir=" + _userDataDir);
 
                 var driverDir = FindEdgeDriver();
-                OpenQA.Selenium.IWebDriver d;
-                if (driverDir != null)
+
+                // Retry driver creation up to 2 times — first failure may be a
+                // transient crash caused by stale profile state.
+                const int maxAttempts = 2;
+                OpenQA.Selenium.IWebDriver d = null;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
-                    svc.HideCommandPromptWindow = true;
-                    d = new Microsoft.Edge.SeleniumTools.EdgeDriver(svc, options);
-                }
-                else
-                {
-                    d = new Microsoft.Edge.SeleniumTools.EdgeDriver(options);
+                    try
+                    {
+                        if (driverDir != null)
+                        {
+                            var svc = Microsoft.Edge.SeleniumTools.EdgeDriverService.CreateChromiumService(driverDir);
+                            svc.HideCommandPromptWindow = true;
+                            d = new Microsoft.Edge.SeleniumTools.EdgeDriver(svc, options);
+                        }
+                        else
+                        {
+                            d = new Microsoft.Edge.SeleniumTools.EdgeDriver(options);
+                        }
+                        break; // success
+                    }
+                    catch when (attempt < maxAttempts)
+                    {
+                        ScrapeLog.Warn($"Edge driver creation failed (attempt {attempt}/{maxAttempts}), retrying...");
+                        KillOrphanEdgeProcesses();
+                        Thread.Sleep(1500);
+                    }
                 }
                 d.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(3);
                 d.Manage().Window.Size = new System.Drawing.Size(1920, 1080);
@@ -1454,6 +1487,56 @@ namespace ModemMergerWinFormsApp
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Kill any orphan msedge.exe processes that were launched with our
+        /// custom user-data-dir. Without this, a crashed Edge keeps the profile
+        /// directory locked and the next driver launch fails immediately.
+        /// </summary>
+        private static void KillOrphanEdgeProcesses()
+        {
+            try
+            {
+                // Normalise the path for a reliable command-line comparison
+                var normalised = Path.GetFullPath(_userDataDir)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                foreach (var proc in Process.GetProcessesByName("msedge"))
+                {
+                    try
+                    {
+                        // Match on command-line via MainModule path as a fast filter,
+                        // then check if process uses our user-data-dir
+                        string cmdLine = null;
+                        try
+                        {
+                            using (var searcher = new System.Management.ManagementObjectSearcher(
+                                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {proc.Id}"))
+                            {
+                                foreach (var obj in searcher.Get())
+                                    cmdLine = obj["CommandLine"]?.ToString();
+                            }
+                        }
+                        catch { }
+
+                        if (cmdLine != null && cmdLine.IndexOf(normalised, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            proc.Kill();
+                            ScrapeLog.Warn($"Killed orphan msedge.exe PID {proc.Id}");
+                        }
+                    }
+                    catch { }
+                }
+
+                // Also kill orphan msedgedriver processes
+                foreach (var proc in Process.GetProcessesByName("msedgedriver"))
+                {
+                    try { proc.Kill(); ScrapeLog.Warn($"Killed orphan msedgedriver PID {proc.Id}"); }
+                    catch { }
+                }
+            }
+            catch { }
         }
 
         /// <summary>
