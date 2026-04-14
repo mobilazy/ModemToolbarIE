@@ -41,6 +41,9 @@ namespace ModemMergerWinFormsApp
         private bool _loadoutLocked = false;
         private bool _etaLocked = false;
 
+        // HTTP API server for the Modem Creator web UI
+        private CreatorApiServer _apiServer;
+
         // Kabal sync preview: stores date info per Customer cell
         private class KabalDateInfo
         {
@@ -62,6 +65,14 @@ namespace ModemMergerWinFormsApp
             dgvKabal.ColumnHeaderMouseClick  += dgvKabal_ColumnHeaderMouseClick;
             dgvKabal.CurrentCellDirtyStateChanged += dgvKabal_CurrentCellDirtyStateChanged;
             RefreshModemAutoComplete();
+
+            // Start HTTP API server for the Modem Creator web UI (localhost:9002)
+            try
+            {
+                _apiServer = new CreatorApiServer(() => _loadedModems);
+                _apiServer.Start();
+            }
+            catch { /* non-critical — web UI will show connection error */ }
         }
 
         private void RefreshModemAutoComplete()
@@ -779,6 +790,7 @@ namespace ModemMergerWinFormsApp
         private void MergeForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             SaveKabalCredentials();
+            try { _apiServer?.Dispose(); } catch { }
         }
 
         // ── UI event handlers ────────────────────────────────────────────

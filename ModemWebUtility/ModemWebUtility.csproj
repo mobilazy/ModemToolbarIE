@@ -224,6 +224,7 @@
   <ItemGroup>
     <Compile Include="AttachmentDownloader.cs" />
     <Compile Include="AttachmentUploader.cs" />
+    <Compile Include="BulkModemCreator.cs" />
     <Compile Include="DdBhaParameters.cs" />
     <Compile Include="GantParameters.cs" />
     <Compile Include="GantToolCopier.cs" />
