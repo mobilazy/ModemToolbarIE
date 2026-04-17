@@ -1,0 +1,14 @@
+{
+  "name": "kabal-scraper-local",
+  "version": "1.0.0",
+  "description": "Kabal scraper using local Edge browser",
+  "main": "kabal-scraper.js",
+  "scripts": {
+    "start": "node kabal-scraper.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "selenium-webdriver": "^4.16.0"
+  }
+}

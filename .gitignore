@@ -282,3 +282,18 @@ CPOL.zip
 WCFModemService.cs
 SvcUtil.exe
 BUILD.bat
+
+#  Automation Hub 
+# Node.js 20 zip (too large for git  downloaded by Build-Installer.ps1)
+AutomationHub/node20.zip
+AutomationHub/node20/
+
+# Build outputs and runtime logs
+AutomationHub/auto-start.log
+
+#  FullSetup build artifacts 
+FullSetup/staging/
+FullSetup/bin/
+FullSetup/obj/
+FullSetup/*-harvested.wxs
+FullSetup/*.wixobj

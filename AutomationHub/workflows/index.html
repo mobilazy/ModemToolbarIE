@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automation Hub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a3a4a 0%, #0d6e6e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 36px;
+    }
+    .header h1 { font-size: 32px; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .header p  { font-size: 15px; opacity: 0.75; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .tile {
+      background: white;
+      border-radius: 14px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .tile:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.35);
+      border-color: #0d6e6e;
+    }
+
+    .tile-icon { font-size: 36px; line-height: 1; }
+    .tile-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1a3a4a;
+    }
+    .tile-desc {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+    .tile-badge {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e0f2f1;
+      color: #0d6e6e;
+      width: fit-content;
+    }
+
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚙️ Automation Hub</h1>
+      <p>All workflows in one place</p>
+    </div>
+
+    <div class="grid">
+      <a class="tile" href="/morning-report-dashboard.html">
+        <div class="tile-icon">📊</div>
+        <div class="tile-title">Morning Report</div>
+        <div class="tile-desc">Dashboard: kits, certs, personnel, expiry tracking, crew change.</div>
+        <span class="tile-badge">Daily Report</span>
+      </a>
+
+      <a class="tile" href="/pjb-ui.html">
+        <div class="tile-icon">📑</div>
+        <div class="tile-title">PJB Generator</div>
+        <div class="tile-desc">AI-powered Pre-Job Brief from DOS &amp; lessons learned.</div>
+        <span class="tile-badge">AI • PowerPoint</span>
+      </a>
+
+
+
+      <a class="tile" href="/modem-creator.html">
+        <div class="tile-icon">🏭</div>
+        <div class="tile-title">Modem Creator</div>
+        <div class="tile-desc">Bulk create modems from Kabal timeplanner schedule.</div>
+        <span class="tile-badge">Kabal • Modem Copier 2.0</span>
+      </a>
+    </div>
+
+    <div class="footer" id="statusBar">Checking services…</div>
+  </div>
+
+<script>
+const services = [
+  { name: 'Morning Report', url: 'http://localhost:3001/healthz', link: null },
+  { name: 'Modem Copier', url: 'http://localhost:9002/api/health', link: null },
+];
+
+async function probe(url) {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(2000) });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function refreshStatus() {
+  const results = await Promise.all(services.map(async s => ({ ...s, up: await probe(s.url) })));
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = results.map(s => {
+    const dot   = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.up ? '#34d399' : '#f87171'};margin-right:5px;vertical-align:middle;"></span>`;
+    const label = s.link ? `<a href="${s.link}" target="_blank" style="color:rgba(255,255,255,0.7)">${s.name}</a>` : s.name;
+    return dot + label;
+  }).join('<span style="margin:0 12px;opacity:0.3">|</span>');
+}
+
+refreshStatus();
+setInterval(refreshStatus, 15000);
+</script>
+</body>
+</html>

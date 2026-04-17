@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morning Report Scraper</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a3a4a 0%, #0d6e6e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a3a4a 0%, #0d6e6e 100%);
+      color: white;
+      padding: 28px 32px;
+      text-align: center;
+    }
+    .header h1 { font-size: 24px; margin-bottom: 6px; letter-spacing: 0.3px; }
+    .header p  { font-size: 14px; opacity: 0.8; }
+
+    .body { padding: 32px; }
+
+    .instruction {
+      background: #f0f7ff;
+      border: 1px solid #c8dff5;
+      border-left: 4px solid #3b82f6;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: #1e3a5f;
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+    .instruction strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+    .btn-run {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #1a3a4a 0%, #0d6e6e 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s;
+      box-shadow: 0 4px 14px rgba(13,110,110,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-run:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(13,110,110,0.6);
+    }
+    .btn-run:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-box {
+      margin-top: 24px;
+      border-radius: 10px;
+      padding: 18px 20px;
+      font-size: 14px;
+      display: none;
+      line-height: 1.6;
+    }
+    .status-box.loading {
+      display: block;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+    }
+    .status-box.success {
+      display: block;
+      background: #ecfdf5;
+      border: 1px solid #6ee7b7;
+      color: #065f46;
+    }
+    .status-box.error {
+      display: block;
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .result-tile {
+      background: white;
+      border-radius: 8px;
+      padding: 12px 14px;
+      text-align: center;
+      border: 1px solid #d1fae5;
+    }
+    .result-tile .number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #065f46;
+    }
+    .result-tile .label {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+    .result-tile.warn .number { color: #b45309; }
+    .result-tile.warn { border-color: #fcd34d; }
+    .result-tile.danger .number { color: #dc2626; }
+    .result-tile.danger { border-color: #fca5a5; }
+
+    .file-path {
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: white;
+      border: 1px solid #d1fae5;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      color: #374151;
+      word-break: break-all;
+    }
+    .file-path span { color: #6b7280; display: block; margin-bottom: 2px; font-family: inherit; }
+
+    .error-detail {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: white;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>📊 Morning Report Scraper</h1>
+      <p>Kits on Board &amp; Equipment Certifications</p>
+    </div>
+
+    <div class="body">
+      <div class="instruction">
+        <strong>✅ Fully automatic</strong>
+        When a <b>Morning Report</b> email arrives in Outlook, the attachment is
+        auto-saved to <code>OneDrive - Halliburton\Documents\MorningReports\incoming\</code> by the
+        VBA macro. Click the button below to process the latest one.
+        Processed files move to <code>MorningReports\processed\</code> automatically.
+      </div>
+
+      <button class="btn-run" id="runBtn" onclick="runReport()">
+        <span id="btnIcon">▶</span>
+        <span id="btnText">Run Morning Report</span>
+      </button>
+
+      <div class="status-box" id="statusBox"></div>
+    </div>
+  </div>
+
+  <script>
+    const WEBHOOK_URL = 'http://localhost:3001/webhook/morning-report';
+
+    async function runReport() {
+      const btn    = document.getElementById('runBtn');
+      const icon   = document.getElementById('btnIcon');
+      const label  = document.getElementById('btnText');
+      const status = document.getElementById('statusBox');
+
+      // Loading state
+      btn.disabled = true;
+      icon.outerHTML = '<span id="btnIcon" class="spinner"></span>';
+      label.textContent = 'Processing…';
+      status.className  = 'status-box loading';
+      status.innerHTML  = '⏳ Reading MorningReport.xlsx and building report…';
+
+      try {
+        const res  = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ triggered: true })
+        });
+
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { success: false, message: text }; }
+
+        if (res.ok && data.success) {
+          const expiredClass     = data.expired     > 0 ? 'danger' : '';
+          const expiringSoonClass = data.expiringSoon > 0 ? 'warn'   : '';
+
+          status.className = 'status-box success';
+          status.innerHTML = `
+            <strong>✅ Report generated successfully</strong>
+            <div class="result-grid">
+              <div class="result-tile">
+                <div class="number">${data.kits ?? '-'}</div>
+                <div class="label">Kits on Board</div>
+              </div>
+              <div class="result-tile">
+                <div class="number">${data.certs ?? '-'}</div>
+                <div class="label">Equipment Certs</div>
+              </div>
+              <div class="result-tile ${expiredClass}">
+                <div class="number">${data.expired ?? 0}</div>
+                <div class="label">Expired</div>
+              </div>
+              <div class="result-tile ${expiringSoonClass}">
+                <div class="number">${data.expiringSoon ?? 0}</div>
+                <div class="label">Expiring ≤ 30 days</div>
+              </div>
+            </div>
+            <div class="file-path">
+              <span>Saved to:</span>
+              ${data.savedTo ?? data.fileName ?? 'Documents\\MorningReports\\'}
+            </div>`;
+        } else {
+          const msg = data.message || data.error || JSON.stringify(data, null, 2);
+          status.className = 'status-box error';
+          status.innerHTML = `<strong>❌ Error</strong>
+            <div class="error-detail">${escapeHtml(msg)}</div>`;
+        }
+      } catch (err) {
+        status.className = 'status-box error';
+        status.innerHTML = `
+          <strong>❌ Could not reach Morning Report server</strong>
+          <div class="error-detail">Make sure the morning-report server is running.\n\n${escapeHtml(err.message)}</div>`;
+      }
+
+      // Reset button
+      btn.disabled = false;
+      document.getElementById('btnIcon').outerHTML = '<span id="btnIcon">▶</span>';
+      label.textContent = 'Run Morning Report';
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g,  '&amp;')
+        .replace(/</g,  '&lt;')
+        .replace(/>/g,  '&gt;')
+        .replace(/"/g,  '&quot;');
+    }
+  </script>
+</body>
+</html>

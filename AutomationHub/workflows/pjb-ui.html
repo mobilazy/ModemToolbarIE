@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJB Generator - AI Assisted</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title .icon {
+            font-size: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .file-upload {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f9f9f9;
+            position: relative;
+            user-select: none;
+        }
+        
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .file-upload.has-file {
+            border-color: #4caf50;
+            background: #f1f8f4;
+        }
+        
+        .file-upload input[type="file"] {
+            display: none;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #666;
+            cursor: pointer;
+            pointer-events: none;
+        }
+        
+        .file-info.uploaded {
+            color: #4caf50;
+            font-weight: 600;
+        }
+        
+        .optional-badge {
+            display: inline-block;
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .btn-generate {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-generate:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status.loading {
+            display: block;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .preview {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .preview h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .preview-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .preview-section h4 {
+            font-size: 14px;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .preview-section p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .download-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📑 AI-Powered PJB Slide Copier</h1>
+            <p>Upload DOS & Lessons Learned - AI copies relevant slides to create PJB PowerPoint</p>
+        </div>
+        
+        <div class="content">
+            <form id="pjbForm">
+                <!-- Well Information -->
+                <div class="section">
+                    <div class="section-title">
+                        <span class="icon">📋</span>
+                        <span>Well Information</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="customer">Customer</label>
+                        <select id="customer" required>
+                            <option value="">Select Customer</option>
+                            <option value="AkerBP">Aker BP</option>
+                            <option value="ConocoPhillips">ConocoPhillips</option>
+                            <option value="Equinor">Equinor</option>
+                            <option value="VaarEnergy">Vår Energy</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wellName">Well Name</label>
+                        <input type="text" id="wellName" placeholder="e.g., West Linus A-15H" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="zobNumber">Job Number</label>
+                        <input type="text" id="zobNumber" placeholder="e.g., JOB-2025-001">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rigName">Rig Name</label>
+                        <input type="text" id="rigName" placeholder="e.g., Elara" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input type="text" id="date" placeholder="e.g., 24-Dec-2025">
+                    </div>
+                </div>
+                
+                <!-- Document Uploads -->
+                <div class="section">
+                    <div class="section-title">
+                        <span class="icon">📁</span>
+                        <span>Upload Documents</span>
+                    </div>
+                    
+                    <!-- DOS File -->
+                    <div class="form-group">
+                        <label for="dosFile">DOS (Daily Operations Summary) - PowerPoint</label>
+                        <div class="file-upload" id="dosUpload">
+                            <input type="file" id="dosFile" accept=".ppt,.pptx" required>
+                            <div class="file-info" id="dosInfo">
+                                <span>📎 DOS with: Well Objective, BHA, DAP, Value Moment, Well Details, Routine, Contacts</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lessons Learned -->
+                    <div class="form-group">
+                        <label for="lessonsFile">
+                            Lessons Learned / Safety Moments - PowerPoint
+                            <span class="optional-badge">OPTIONAL</span>
+                        </label>
+                        <div class="file-upload" id="lessonsUpload">
+                            <input type="file" id="lessonsFile" accept=".ppt,.pptx">
+                            <div class="file-info" id="lessonsInfo">
+                                <span>📎 Click to upload lessons learned (.pptx)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PJB Template -->
+                    <div class="form-group">
+                        <label for="templateFile">
+                            PJB Template (Optional - will create new if not provided)
+                            <span class="optional-badge">OPTIONAL</span>
+                        </label>
+                        <div class="file-upload" id="templateUpload">
+                            <input type="file" id="templateFile" accept=".ppt,.pptx">
+                            <div class="file-info" id="templateInfo">
+                                <span>📎 Click to upload PJB template (.pptx)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Generate Button -->
+                <button type="submit" class="btn-generate" id="generateBtn">
+                    � Copy Slides & Generate PJB
+                </button>
+            </form>
+            
+            <!-- Status Messages -->
+            <div id="status" class="status"></div>
+            
+            <!-- Preview -->
+            <div id="preview" class="preview"></div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const WEBHOOK_URL = 'http://localhost:5678/webhook/pjb-slide-copier';
+            
+            function setupFileUpload(uploadDivId, fileInputId, infoId) {
+                const uploadDiv = document.getElementById(uploadDivId);
+                const fileInput = document.getElementById(fileInputId);
+                const fileInfo = document.getElementById(infoId);
+                
+                if (!uploadDiv || !fileInput || !fileInfo) {
+                    console.error('Elements not found:', uploadDivId, fileInputId, infoId);
+                    return;
+                }
+                
+                console.log('Setup:', uploadDivId);
+                uploadDiv.onclick = function(e) {
+                    e.preventDefault();
+                    console.log('Clicked:', uploadDivId);
+                    fileInput.click();
+                };
+                
+                fileInput.onchange = function(e) {
+                    if (e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        fileInfo.innerHTML = '<span> ' + file.name + '</span>';
+                        fileInfo.classList.add('uploaded');
+                        uploadDiv.classList.add('has-file');
+                    }
+                };
+            }
+            
+            setupFileUpload('dosUpload', 'dosFile', 'dosInfo');
+            setupFileUpload('lessonsUpload', 'lessonsFile', 'lessonsInfo');
+            setupFileUpload('templateUpload', 'templateFile', 'templateInfo');
+            
+            document.getElementById('pjbForm').onsubmit = async function(e) {
+                e.preventDefault();
+                alert('Form submitted - workflow needs to be completed');
+            };
+        });
+    </script>
+</body>
+</html>

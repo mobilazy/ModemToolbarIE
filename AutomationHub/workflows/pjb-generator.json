@@ -1,0 +1,213 @@
+{
+  "name": "PJB Generator with AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pjb-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "pjb-generator"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract uploaded files from webhook\nconst body = $input.item.json.body;\n\nreturn {\n  json: {\n    dos_file: body.dos_file || null,\n    previous_pjb_file: body.previous_pjb_file || null,\n    lessons_learned: body.lessons_learned || null,\n    well_name: body.well_name || '',\n    rig_name: body.rig_name || '',\n    customer: body.customer || '',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "extract-files",
+      "name": "Extract Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 4096
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a Pre-Job Brief (PJB) generation assistant for oil & gas operations. Your task is to extract key information from uploaded documents and generate a comprehensive PJB.\n\nExtract and organize:\n1. WELL OBJECTIVE - Main goals and targets\n2. BHA OVERVIEW - Bottom Hole Assembly configuration\n3. DAILY ACTIVITY PLAN (DAP) - Planned operations\n4. VALUE MOMENTS - Efficiency improvements, cost savings\n5. SAFETY MOMENTS - Safety considerations and alerts\n6. RECENT INCIDENTS - From previous PJB or lessons learned\n\nFormat output as structured JSON with these sections."
+            },
+            {
+              "content": "=Generate a Pre-Job Brief from the following documents:\n\n**DOS (Daily Operations Summary):**\n{{ $json.dos_file }}\n\n**Previous PJB (if provided):**\n{{ $json.previous_pjb_file }}\n\n**Lessons Learned (if provided):**\n{{ $json.lessons_learned }}\n\n**Well Information:**\n- Well Name: {{ $json.well_name }}\n- Rig Name: {{ $json.rig_name }}\n- Customer: {{ $json.customer }}\n\nPlease extract and structure the information into a complete PJB document."
+            }
+          ]
+        }
+      },
+      "id": "ai-extract",
+      "name": "Claude AI Extract & Generate",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-credentials",
+          "name": "Anthropic Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and structure PJB data\nconst aiResponse = $input.item.json;\nconst wellInfo = $('Extract Files').item.json;\n\nlet pjbContent;\ntry {\n  // Try to parse if AI returned JSON\n  pjbContent = typeof aiResponse.response === 'string' \n    ? JSON.parse(aiResponse.response)\n    : aiResponse.response;\n} catch {\n  // If not JSON, structure the text response\n  pjbContent = {\n    raw_text: aiResponse.response || aiResponse.message?.content || 'No response'\n  };\n}\n\nreturn {\n  json: {\n    well_name: wellInfo.well_name,\n    rig_name: wellInfo.rig_name,\n    customer: wellInfo.customer,\n    date: new Date().toLocaleDateString('en-US'),\n    timestamp: wellInfo.timestamp,\n    pjb_content: pjbContent,\n    well_objective: pjbContent.well_objective || 'Not extracted',\n    bha_overview: pjbContent.bha_overview || 'Not extracted',\n    dap: pjbContent.daily_activity_plan || pjbContent.dap || 'Not extracted',\n    value_moments: pjbContent.value_moments || 'Not extracted',\n    safety_moments: pjbContent.safety_moments || 'Not extracted',\n    recent_incidents: pjbContent.recent_incidents || pjbContent.lessons_learned || 'Not extracted',\n    full_text: pjbContent.raw_text || JSON.stringify(pjbContent, null, 2)\n  }\n};"
+      },
+      "id": "structure-pjb",
+      "name": "Structure PJB Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentFormat": "docx",
+        "templateSource": "string",
+        "templateString": "=# PRE-JOB BRIEF (PJB)\n\n**Well:** {{ $json.well_name }}\n**Rig:** {{ $json.rig_name }}\n**Customer:** {{ $json.customer }}\n**Date:** {{ $json.date }}\n\n---\n\n## 1. WELL OBJECTIVE\n\n{{ $json.well_objective }}\n\n---\n\n## 2. BHA OVERVIEW\n\n{{ $json.bha_overview }}\n\n---\n\n## 3. DAILY ACTIVITY PLAN (DAP)\n\n{{ $json.dap }}\n\n---\n\n## 4. VALUE MOMENTS\n\n{{ $json.value_moments }}\n\n---\n\n## 5. SAFETY MOMENTS\n\n{{ $json.safety_moments }}\n\n---\n\n## 6. RECENT INCIDENTS / LESSONS LEARNED\n\n{{ $json.recent_incidents }}\n\n---\n\n*Generated: {{ $json.timestamp }}*\n*AI-Assisted PJB Generation System*",
+        "fileName": "=PJB_{{ $json.well_name.replace(/\\s+/g, '_') }}_{{ $json.date.replace(/\\//g, '') }}.docx"
+      },
+      "id": "generate-doc",
+      "name": "Generate Word Document",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "toBase64"
+      },
+      "id": "convert-base64",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"PJB generated successfully\",\n  \"pjb_data\": {\n    \"well_name\": \"{{ $('Structure PJB Data').item.json.well_name }}\",\n    \"rig_name\": \"{{ $('Structure PJB Data').item.json.rig_name }}\",\n    \"customer\": \"{{ $('Structure PJB Data').item.json.customer }}\",\n    \"date\": \"{{ $('Structure PJB Data').item.json.date }}\",\n    \"preview\": {\n      \"well_objective\": \"{{ $('Structure PJB Data').item.json.well_objective.substring(0, 200) }}...\",\n      \"bha_overview\": \"{{ $('Structure PJB Data').item.json.bha_overview.substring(0, 200) }}...\",\n      \"safety_moments\": \"{{ $('Structure PJB Data').item.json.safety_moments.substring(0, 200) }}...\"\n    }\n  },\n  \"download\": {\n    \"filename\": \"{{ $('Generate Word Document').item.json.fileName }}\",\n    \"content_base64\": \"{{ $('Convert to Base64').item.binary.data }}\",\n    \"mime_type\": \"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"\n  }\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.message || 'Error generating PJB' }}\",\n  \"details\": \"{{ $json.description || '' }}\"\n}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Files": {
+      "main": [
+        [
+          {
+            "node": "AI Extract & Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Extract & Generate": {
+      "main": [
+        [
+          {
+            "node": "Structure PJB Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure PJB Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Word Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Word Document": {
+      "main": [
+        [
+          {
+            "node": "Convert to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Base64": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-23T00:00:00.000Z",
+  "versionId": "1"
+}

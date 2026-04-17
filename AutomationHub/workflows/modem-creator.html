@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimePlanner Viewer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 { color: #333; margin-bottom: 6px; font-size: 24px; }
+        .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+
+        /* ── Form inputs ─────────────────────────────────── */
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .form-group { flex: 1; min-width: 160px; }
+        .form-group label {
+            display: block; margin-bottom: 6px; color: #444;
+            font-weight: 500; font-size: 13px;
+        }
+        select, input[type="text"], input[type="password"] {
+            width: 100%; padding: 10px 12px;
+            border: 2px solid #e1e8ed; border-radius: 8px;
+            font-size: 13px; transition: border-color 0.3s;
+        }
+        select:focus, input:focus { outline: none; border-color: #667eea; }
+
+        /* ── Buttons ─────────────────────────────────────── */
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        .btn-secondary { background: #e1e8ed; color: #333; }
+        .btn-secondary:hover:not(:disabled) { background: #d1d8dd; }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16,185,129,0.4);
+        }
+        .button-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+
+        /* ── Status log ──────────────────────────────────── */
+        #statusLog {
+            margin-top: 16px; padding: 12px 16px;
+            background: #f8f9fa; border-radius: 8px;
+            font-size: 13px; color: #333;
+            max-height: 120px; overflow-y: auto;
+            display: none;
+        }
+        #statusLog.show { display: block; }
+        .log-line { padding: 2px 0; }
+        .log-line.error { color: #dc2626; }
+
+        .spinner-inline {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid #f3f3f3; border-top: 2px solid #667eea;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            vertical-align: middle; margin-right: 6px;
+        }
+        @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+
+        /* ── Side-by-side tables ─────────────────────────── */
+        .tables-container {
+            display: flex; gap: 24px; margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .table-panel {
+            flex: 1; min-width: 400px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            overflow-x: auto; display: none;
+        }
+        .table-panel.show { display: block; }
+        .table-panel h3 {
+            padding: 10px 14px; margin: 0;
+            background: #f0f2f5; font-size: 14px; color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        table {
+            width: 100%; border-collapse: collapse;
+            font-size: 12px;
+        }
+        thead th {
+            background: #f8f9fa; text-align: left;
+            padding: 8px 10px; font-weight: 600;
+            color: #374151; border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        tbody td {
+            padding: 6px 10px; border-bottom: 1px solid #f0f2f5;
+            vertical-align: middle; white-space: nowrap;
+        }
+        tbody tr:hover { background: #f8f9ff; }
+        tbody tr.well-header {
+            background: #eef2ff; font-weight: 600;
+        }
+        tbody tr.well-header td { padding-top: 12px; color: #1e3a5f; }
+
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: 11px; font-weight: 600;
+        }
+        .badge-whipstock { background: #fef3c7; color: #92400e; }
+
+        a.link { color: #667eea; text-decoration: none; font-weight: 600; }
+        a.link:hover { text-decoration: underline; }
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width: 900px) {
+            .form-row { flex-direction: column; }
+            .form-group { min-width: 100%; }
+            .tables-container { flex-direction: column; }
+            .table-panel { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>&#128295; TimePlanner Viewer</h1>
+    <p class="subtitle">Kabal TimePlanner schedule &amp; Gant modem lookup</p>
+    <div id="apiStatus" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:16px;"></div>
+
+    <!-- ── Input form ────────────────────────────────────── -->
+    <div class="form-row">
+        <div class="form-group">
+            <label for="customer">Customer / Operator</label>
+            <select id="customer">
+                <option value="">Select operator…</option>
+                <option value="AkerBP">AkerBP</option>
+                <option value="ConocoPhillips">ConocoPhillips</option>
+                <option value="Equinor">Equinor</option>
+                <option value="Vår Energi">Vår Energi</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="rig">Rig</label>
+            <select id="rig">
+                <option value="">Select rig…</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label for="username">Kabal Username</label>
+            <input type="text" id="username" placeholder="first.last@halliburton.com">
+        </div>
+        <div class="form-group">
+            <label for="password">Kabal Password</label>
+            <input type="password" id="password" placeholder="••••••••">
+        </div>
+    </div>
+
+    <div class="button-row">
+        <button class="btn btn-primary" id="btnTimeplanner">Timeplanner</button>
+        <button class="btn btn-success" id="btnLoadModems" disabled>Load Modems</button>
+        <button class="btn btn-secondary" id="btnCopy" disabled>Copy Table</button>
+        <button class="btn" id="btnShowLog" style="background:#555;color:#fff;margin-left:auto">View Scraper Log</button>
+    </div>
+
+    <div id="statusLog"></div>
+
+    <div id="logPanel" style="display:none;margin:10px 0;border:1px solid #555;border-radius:4px;background:#1a1a1a">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#2a2a2a;border-radius:4px 4px 0 0">
+            <strong style="color:#ccc">Scraper Log</strong>
+            <button class="btn btn-secondary" id="btnRefreshLog" style="padding:2px 10px;font-size:12px">&#8635; Refresh</button>
+        </div>
+        <pre id="logContent" style="margin:0;padding:10px;max-height:400px;overflow:auto;font-size:11px;color:#9be;white-space:pre-wrap;word-break:break-all">(click Refresh)</pre>
+    </div>
+
+    <!-- ── Side-by-side tables ────────────────────────────── -->
+    <div class="tables-container">
+        <div class="table-panel" id="tpPanel">
+            <h3>&#128197; TimePlanner Schedule</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Operation</th>
+                        <th>Start (MU BHA)</th>
+                        <th>End (LD BHA)</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="tpBody"></tbody>
+            </table>
+        </div>
+        <div class="table-panel" id="modemPanel">
+            <h3>&#128230; Gant Modems</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mob ID</th>
+                        <th>Kabal ID</th>
+                        <th>Well Section</th>
+                        <th>Loadout Date</th>
+                        <th>Delivery Date</th>
+                        <th>Kabal Date</th>
+                    </tr>
+                </thead>
+                <tbody id="modemBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Constants ───────────────────────────────────────────────────────
+const API = 'http://localhost:9002';
+const MODEM_VIEW_URL = 'http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=';
+
+// Kabal cargo page per operator
+const KABAL_APP_IDS = {
+    'AkerBP': '1276', 'ConocoPhillips': '1267',
+    'Equinor': '16786', 'Vår Energi': '1364'
+};
+const KABAL_ID_PREFIXES = {
+    'AkerBP': 'LC', 'ConocoPhillips': 'CONOCOPHILLIPS',
+    'Equinor': 'EQNO', 'Vår Energi': 'VAAR'
+};
+
+function kabalCargoUrl(operator, sixDigits) {
+    const appId = KABAL_APP_IDS[operator] || '1276';
+    return 'https://app01.kabal.com/mws/f?p=' + appId + ':3523:0:ADDBACK:::P3523_CARGO_ID:' + sixDigits;
+}
+
+function extractKabalId(hRefno, operator) {
+    if (!hRefno) return null;
+    const prefix = KABAL_ID_PREFIXES[operator];
+    if (!prefix) return null;
+    const idx = hRefno.toUpperCase().indexOf(prefix.toUpperCase());
+    if (idx < 0) return null;
+    const after = hRefno.substring(idx + prefix.length).trim();
+    const m = after.match(/^(\d{4,8})/);
+    return m ? m[1] : null;
+}
+
+const rigsByCustomer = {
+    'AkerBP':          ['SC8','Integrator','Invincible','Deepsea Nordkap','Stavanger'],
+    'ConocoPhillips':  ['West Linus','Elara'],
+    'Equinor':         ['Grane','Prospector','Promoter','Enabler','Heidrun','Njord A','Snorre A','Snorre B'],
+    'Vår Energi':      ['Ringhorne','Pioneer','Prospector']
+};
+
+// ── Connection health check ─────────────────────────────────────────
+const apiStatusEl = document.getElementById('apiStatus');
+async function checkApiHealth() {
+    try {
+        const r = await fetch(API + '/api/health', { signal: AbortSignal.timeout(3000) });
+        if (r.ok) { apiStatusEl.style.display = 'none'; return true; }
+    } catch (_) {}
+    apiStatusEl.style.cssText = 'display:block;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:16px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;';
+    apiStatusEl.innerHTML = '⚠️ Modem Copier 2.0 is not running — start the desktop app first, then refresh this page.';
+    return false;
+}
+checkApiHealth();
+setInterval(checkApiHealth, 10000);
+
+// ── DOM refs ────────────────────────────────────────────────────────
+const customerSel    = document.getElementById('customer');
+const rigSel         = document.getElementById('rig');
+const userInput      = document.getElementById('username');
+const passInput      = document.getElementById('password');
+const btnTimeplanner = document.getElementById('btnTimeplanner');
+const btnLoadModems  = document.getElementById('btnLoadModems');
+const btnCopy        = document.getElementById('btnCopy');
+const statusLog      = document.getElementById('statusLog');
+const tpPanel        = document.getElementById('tpPanel');
+const tpBody         = document.getElementById('tpBody');
+const modemPanel     = document.getElementById('modemPanel');
+const modemBody      = document.getElementById('modemBody');
+
+// ── State ───────────────────────────────────────────────────────────
+let sections = [];  // TimePlannerSection[]
+let modems   = [];  // GantModem[]
+
+// ── Rig population ──────────────────────────────────────────────────
+customerSel.addEventListener('change', () => {
+    const rigs = rigsByCustomer[customerSel.value] || [];
+    rigSel.innerHTML = '<option value="">Select rig…</option>';
+    rigs.forEach(r => {
+        const o = document.createElement('option');
+        o.value = r; o.textContent = r;
+        rigSel.appendChild(o);
+    });
+});
+
+// ── Logging ─────────────────────────────────────────────────────────
+function log(msg, isError) {
+    statusLog.classList.add('show');
+    const d = document.createElement('div');
+    d.className = 'log-line' + (isError ? ' error' : '');
+    d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+    statusLog.appendChild(d);
+    statusLog.scrollTop = statusLog.scrollHeight;
+}
+
+// ── API helpers ─────────────────────────────────────────────────────
+async function apiPost(path, body) {
+    const res = await fetch(API + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || res.statusText);
+    }
+    return res.json();
+}
+
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function extractWellCode(name) {
+    if (!name) return null;
+    const m = name.match(/[A-Z]-\d+/i);
+    return m ? m[0].toUpperCase() : null;
+}
+
+// ── Timeplanner button ──────────────────────────────────────────────
+btnTimeplanner.addEventListener('click', async () => {
+    const customer = customerSel.value;
+    const rig      = rigSel.value;
+    const user     = userInput.value.trim();
+    const pass     = passInput.value;
+
+    if (!customer || !rig)  return alert('Select customer and rig.');
+    if (!user || !pass)     return alert('Enter Kabal credentials.');
+
+    btnTimeplanner.disabled = true;
+    btnTimeplanner.innerHTML = '<span class="spinner-inline"></span>Scraping…';
+    statusLog.innerHTML = '';
+    tpBody.innerHTML = '';
+    tpPanel.classList.remove('show');
+    modemBody.innerHTML = '';
+    modemPanel.classList.remove('show');
+    btnLoadModems.disabled = true;
+    btnCopy.disabled = true;
+
+    try {
+        const alive = await checkApiHealth();
+        if (!alive) { log('Cannot reach Modem Copier 2.0 on localhost:9002.', true); return; }
+
+        log('Scraping Kabal TimePlanner (this may take a minute)…');
+        const tp = await apiPost('/api/timeplanner', {
+            operator: customer,
+            rig: rig,
+            username: user,
+            password: pass,
+            headless: true
+        });
+
+        if (!tp.success) {
+            log('TimePlanner error: ' + (tp.error || 'unknown'), true);
+            return;
+        }
+
+        sections = tp.sections || [];
+        log('Found ' + sections.length + ' drilling sections.');
+
+        if (sections.length === 0) {
+            log('No sections found — check scraper log for diagnostics.', true);
+            return;
+        }
+
+        renderTimePlannerTable();
+        tpPanel.classList.add('show');
+        btnLoadModems.disabled = false;
+        btnCopy.disabled = false;
+    } catch (err) {
+        log('Error: ' + err.message, true);
+    } finally {
+        btnTimeplanner.disabled = false;
+        btnTimeplanner.textContent = 'Timeplanner';
+    }
+});
+
+// ── Render TimePlanner table (left side) ────────────────────────────
+function renderTimePlannerTable() {
+    tpBody.innerHTML = '';
+
+    const grouped = {};
+    sections.forEach(s => {
+        const key = s.wellName || s.planName || 'Unknown';
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(s);
+    });
+
+    for (const [well, secs] of Object.entries(grouped)) {
+        const hdr = document.createElement('tr');
+        hdr.className = 'well-header';
+        hdr.innerHTML = '<td colspan="4">' + esc(well) + ' (' + secs.length + ' sections)</td>';
+        tpBody.appendChild(hdr);
+
+        secs.forEach(sec => {
+            const tr = document.createElement('tr');
+            let nameHtml = esc(sec.sectionName || '—');
+            if (sec.sectionSize) nameHtml += ' <span style="color:#888">(' + esc(sec.sectionSize) + ')</span>';
+            if (sec.isWhipstock) nameHtml += ' <span class="badge badge-whipstock">Whipstock</span>';
+
+            tr.innerHTML =
+                '<td>' + nameHtml + '</td>' +
+                '<td>' + esc(sec.muBhaDateTime || '—') + '</td>' +
+                '<td>' + esc(sec.poohDateTime || '—') + '</td>' +
+                '<td>' + (sec.durationDays ? sec.durationDays.toFixed(1) + 'd' : '—') + '</td>';
+            tpBody.appendChild(tr);
+        });
+    }
+}
+
+// ── Load Modems button ──────────────────────────────────────────────
+btnLoadModems.addEventListener('click', async () => {
+    const customer = customerSel.value;
+    const rig      = rigSel.value;
+
+    if (!customer || !rig) return alert('Select customer and rig.');
+
+    btnLoadModems.disabled = true;
+    btnLoadModems.innerHTML = '<span class="spinner-inline"></span>Loading…';
+
+    try {
+        const alive = await checkApiHealth();
+        if (!alive) { log('Cannot reach Modem Copier 2.0.', true); return; }
+
+        log('Fetching modems from Gant…');
+        modems = await apiPost('/api/modems', { customer, rig });
+        if (!modems || modems.length === 0) {
+            log('No modems found for ' + customer + ' / ' + rig + '.', true);
+            return;
+        }
+        log('Got ' + modems.length + ' modems.');
+
+        renderModemTable();
+        modemPanel.classList.add('show');
+    } catch (err) {
+        log('Error: ' + err.message, true);
+    } finally {
+        btnLoadModems.disabled = false;
+        btnLoadModems.textContent = 'Load Modems';
+    }
+});
+
+// ── Render Modem table (right side) ─────────────────────────────────
+function renderModemTable() {
+    modemBody.innerHTML = '';
+    const customer = customerSel.value;
+
+    // Group modems by well name
+    const grouped = {};
+    modems.forEach(m => {
+        const key = m.WellName || 'Unknown';
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(m);
+    });
+
+    for (const [well, mods] of Object.entries(grouped)) {
+        const hdr = document.createElement('tr');
+        hdr.className = 'well-header';
+        hdr.innerHTML = '<td colspan="6">' + esc(well) + ' (' + mods.length + ' modems)</td>';
+        modemBody.appendChild(hdr);
+
+        mods.forEach(m => {
+            const tr = document.createElement('tr');
+
+            // Mob ID link
+            const mobLink = '<a class="link" href="' + MODEM_VIEW_URL + m.Id + '" target="_blank">' + m.Id + '</a>';
+
+            // Kabal ID link
+            let kabalHtml = '—';
+            const hRefno = m.HRefno || m.hRefno || '';
+            const kabalDigits = extractKabalId(hRefno, customer);
+            if (kabalDigits) {
+                const kUrl = kabalCargoUrl(customer, kabalDigits);
+                kabalHtml = '<a class="link" href="' + kUrl + '" target="_blank">' + kabalDigits + '</a>';
+            } else if (hRefno) {
+                kabalHtml = '<span style="color:#888">' + esc(hRefno) + '</span>';
+            }
+
+            tr.innerHTML =
+                '<td>' + mobLink + '</td>' +
+                '<td>' + kabalHtml + '</td>' +
+                '<td>' + esc(m.WellSection || '—') + '</td>' +
+                '<td>' + esc(m.LoadoutDate || m.loadoutDate || '—') + '</td>' +
+                '<td>' + esc(m.DateEta || m.dateEta || '—') + '</td>' +
+                '<td>' + esc(m.DateLoad || m.dateLoad || '—') + '</td>';
+            modemBody.appendChild(tr);
+        });
+    }
+}
+
+// ── Copy table to clipboard ─────────────────────────────────────────
+btnCopy.addEventListener('click', () => {
+    let text = '';
+    // TimePlanner
+    if (sections.length > 0) {
+        text += 'TIMEPLANNER\nWell\tOperation\tStart\tEnd\tDuration\n';
+        const grouped = {};
+        sections.forEach(s => {
+            const key = s.wellName || s.planName || 'Unknown';
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(s);
+        });
+        for (const [well, secs] of Object.entries(grouped)) {
+            secs.forEach(s => {
+                text += [well, s.sectionName || '', s.muBhaDateTime || '', s.poohDateTime || '',
+                         s.durationDays ? s.durationDays.toFixed(1) : ''].join('\t') + '\n';
+            });
+        }
+    }
+    // Modems
+    if (modems.length > 0) {
+        text += '\nMODEMS\nMob ID\tKabal ID\tWell\tSection\tLoadout\tDelivery\tKabal Date\n';
+        const customer = customerSel.value;
+        modems.forEach(m => {
+            const kid = extractKabalId(m.HRefno || m.hRefno || '', customer) || '';
+            text += [m.Id, kid, m.WellName || '', m.WellSection || '',
+                     m.LoadoutDate || m.loadoutDate || '',
+                     m.DateEta || m.dateEta || '',
+                     m.DateLoad || m.dateLoad || ''].join('\t') + '\n';
+        });
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btnCopy.textContent;
+        btnCopy.textContent = 'Copied!';
+        setTimeout(() => btnCopy.textContent = orig, 1500);
+    });
+});
+
+// ── Persist credentials in sessionStorage ───────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+    userInput.value = sessionStorage.getItem('mc_user') || '';
+    passInput.value = sessionStorage.getItem('mc_pass') || '';
+    const cust = sessionStorage.getItem('mc_cust');
+    if (cust) {
+        customerSel.value = cust;
+        customerSel.dispatchEvent(new Event('change'));
+        const r = sessionStorage.getItem('mc_rig');
+        if (r) setTimeout(() => rigSel.value = r, 0);
+    }
+});
+userInput.addEventListener('change', () => sessionStorage.setItem('mc_user', userInput.value));
+passInput.addEventListener('change', () => sessionStorage.setItem('mc_pass', passInput.value));
+customerSel.addEventListener('change', () => sessionStorage.setItem('mc_cust', customerSel.value));
+rigSel.addEventListener('change', () => sessionStorage.setItem('mc_rig', rigSel.value));
+
+// ── Scraper Log Viewer ───────────────────────────────────────────
+const logPanel      = document.getElementById('logPanel');
+const logContent    = document.getElementById('logContent');
+const btnShowLog    = document.getElementById('btnShowLog');
+const btnRefreshLog = document.getElementById('btnRefreshLog');
+
+async function loadLog() {
+    logContent.textContent = 'Loading…';
+    try {
+        const r = await fetch('http://localhost:9002/api/log');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const txt = await r.text();
+        logContent.textContent = txt;
+        logContent.scrollTop = logContent.scrollHeight;
+    } catch(e) {
+        logContent.textContent = '[Could not fetch log — is the desktop app running?]\n' + e;
+    }
+}
+
+btnShowLog.addEventListener('click', () => {
+    const hidden = logPanel.style.display === 'none';
+    logPanel.style.display = hidden ? 'block' : 'none';
+    btnShowLog.textContent  = hidden ? 'Hide Log' : 'View Scraper Log';
+    if (hidden) loadLog();
+});
+btnRefreshLog.addEventListener('click', loadLog);
+</script>
+</body>
+</html>

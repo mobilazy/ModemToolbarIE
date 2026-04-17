@@ -1,0 +1,218 @@
+{
+  "name": "Morning Report Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "morning-report",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "id": "a9f8e7d6-c5b4-a3f2-e1d0-c9b8a7f6e5d4",
+      "name": "Webhook Trigger",
+      "webhookId": "morning-report"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const fs   = require('fs');\nconst path = require('path');\n\nconst inputDir       = '/documents/MorningReports/incoming';\nconst processedDir   = '/documents/MorningReports/processed';\nconst skippedDir     = '/documents/MorningReports/skipped';\nconst masterXlsxFile = '/documents/MorningReports/morning-report-master.xlsx';\nconst allRigsFile    = '/documents/MorningReports/all-rigs-data.json';\n\n[processedDir, skippedDir].forEach(function(d) {\n  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });\n});\n\nif (!fs.existsSync(inputDir)) throw new Error('Incoming folder not found: ' + inputDir);\n\nvar XLSX_PATH = '/usr/local/lib/node_modules/n8n/node_modules/.pnpm/xlsx@https+++cdn.sheetjs.com+xlsx-0.20.2+xlsx-0.20.2.tgz/node_modules/xlsx';\nvar xlsx;\ntry { xlsx = require(XLSX_PATH); }\ncatch(e) { throw new Error('Could not load xlsx: ' + e.message); }\n\nvar today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nfunction getCol(r, i) { return String((r || [])[i] || '').trim(); }\n\n// Extract report date from filename.\n// Format 1: YYYY-MM-DD_HH-MM_<RigName> Morning Report DD.MM.YYYY.xls (trailing date wins)\n// Format 2: DD.MM.YYYY anywhere\n// Format 3: YYYY-MM-DD anywhere\nfunction extractReportDate(filename) {\n  var m = filename.match(/(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})/);\n  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);\n  var m2 = filename.match(/(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (m2) return new Date(+m2[1], +m2[2] - 1, +m2[3]);\n  return new Date(0);\n}\n\n// Extract rig name from filename.\n// Pattern: [YYYY-MM-DD_HH-MM_]<RIG NAME> Morning Report [date]\nfunction extractRigName(filename) {\n  var base = path.basename(filename, path.extname(filename));\n  // Remove leading timestamp like 2026-03-23_07-27_\n  base = base.replace(/^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}_/, '');\n  // Remove trailing date like \" 23.03.2026\" or \" 23 03 2026\"\n  base = base.replace(/\\s+\\d{1,2}[.\\s]\\d{1,2}[.\\s]\\d{4}$/, '');\n  var idx = base.toLowerCase().indexOf(' morning report');\n  if (idx >= 0) return base.substring(0, idx).trim();\n  return base.trim() || 'Unknown';\n}\n\nfunction mkDateStr(d) { return d.toISOString().split('T')[0]; }\nfunction mkDisplayDate(d) { return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }\n\nfunction parseExpiryDate(raw) {\n  if (!raw) return { str: '', days: '', status: 'OK' };\n  raw = String(raw).trim();\n  var exp;\n  var n = parseFloat(raw);\n  if (!isNaN(n) && n > 40000 && n < 100000 && raw.indexOf('/') === -1 && raw.indexOf('.') === -1) {\n    exp = new Date(Math.round((n - 25569) * 86400000));\n    raw = ('0'+exp.getUTCDate()).slice(-2)+'/'+('0'+(exp.getUTCMonth()+1)).slice(-2)+'/'+exp.getUTCFullYear();\n  }\n  var parts = raw.split('/');\n  if (parts.length === 3) exp = new Date(+parts[2], +parts[1]-1, +parts[0]);\n  if (!exp || isNaN(exp.getTime())) {\n    parts = raw.split('.');\n    if (parts.length === 3) {\n      var yr = parts[2].length === 2 ? 2000 + +parts[2] : +parts[2];\n      exp = new Date(yr, +parts[1]-1, +parts[0]);\n    }\n  }\n  if (!exp || isNaN(exp.getTime())) return { str: raw, days: '', status: '-' };\n  exp.setHours(0,0,0,0);\n  var days = Math.floor((exp - today) / 86400000);\n  return { str: raw, days: days, status: days < 0 ? 'EXPIRED' : days <= 30 ? 'EXPIRING SOON' : 'OK' };\n}\n\nfunction parseExcelFile(filePath) {\n  var wb  = xlsx.readFile(filePath);\n  var ws  = wb.Sheets[wb.SheetNames[0]];\n  var raw = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });\n\n  // Detect column offset: sheet may start at col A (offset=0) or col B (offset=1 in Excel but 0 in SheetJS array)\n  var wsRef = xlsx.utils.decode_range(ws['!ref'] || 'A1');\n  var B = wsRef.s.c; // array index that corresponds to Excel column B (or A if sheet starts at A)\n  // If sheet starts at B (wsRef.s.c === 1), SheetJS shifts: B→0, C→1, D→2 etc.\n  // Normalise: bCol = array index for what we call \"column B\" in the template\n  var bCol = (wsRef.s.c >= 1) ? 0 : 1;  // if sheet starts at B, B is at index 0; else B is at index 1\n  function bc(n) { return bCol + n; }    // bc(0)=B, bc(1)=C, bc(2)=D … relative to B\n\n  var kitsRow = -1, certsRow = -1, certsEndRow = -1, insiteRow = -1;\n  var ddRow = -1, mwdRow = -1;\n  var opsLast24Row = -1, opsNext24Row = -1;\n\n  for (var i = 0; i < raw.length; i++) {\n    var vb = getCol(raw[i], bc(0)).toLowerCase();\n    var vc = getCol(raw[i], bc(1)).toLowerCase();\n    if (vb === 'kits')                        kitsRow      = i;\n    if (vb.indexOf('equipment cert') === 0)   certsRow     = i;\n    if (vb.indexOf('dd personnel')  >= 0)     ddRow        = i;\n    if (vb.indexOf('mwd personnel') >= 0)     mwdRow       = i;\n    var rowText = raw[i].map(function(c){ return String(c||'').toLowerCase(); }).join(' ');\n    if (opsLast24Row === -1 && vb.indexOf('last 24') >= 0) opsLast24Row = i;\n    if (opsNext24Row === -1 && vb.indexOf('next 24') >= 0) opsNext24Row = i;\n    if (insiteRow === -1 && rowText.indexOf('insite machines') >= 0) insiteRow = i;\n    // Detect end of certs section: revision table or Insite Machines table\n    if (certsRow >= 0 && certsEndRow === -1 && i > certsRow + 2) {\n      var trigger = vb + ' ' + vc;\n      if (trigger.indexOf('date issued') >= 0 || trigger.indexOf('revision no') >= 0 ||\n          vb.indexOf('issued') >= 0 || vb === 'date' ||\n          rowText.indexOf('insite machines') >= 0) {\n        certsEndRow = i;\n      }\n    }\n  }\n  if (certsEndRow === -1) certsEndRow = raw.length;\n\n  function extractOpsText(labelRowIdx) {\n    if (labelRowIdx < 0) return '';\n    var lines = [];\n    // First: content is often in the SAME row as the label, in columns to the right\n    var sameRow = raw[labelRowIdx] || [];\n    for (var sc = bc(1); sc < sameRow.length; sc++) {\n      var sv = String(sameRow[sc] || '').trim();\n      if (sv && sv.length > 3) { lines.push(sv); break; }\n    }\n    if (lines.length > 0) return lines.join(' ');\n    // Fallback: content may be in rows below the label\n    for (var r = labelRowIdx + 1; r < Math.min(labelRowIdx + 5, raw.length); r++) {\n      var txt0 = getCol(raw[r], 0).toLowerCase();\n      var txtB = getCol(raw[r], bc(0)).toLowerCase();\n      var firstCell = txt0 + ' ' + txtB;\n      if (r > labelRowIdx + 1 && (firstCell.indexOf('next 24') >= 0 || firstCell.indexOf('last 24') >= 0)) break;\n      var txt = '';\n      for (var ci = bc(0); ci < raw[r].length; ci++) {\n        var v = String(raw[r][ci] || '').trim();\n        if (v && v.length > 3) { txt = v; break; }\n      }\n      if (txt) lines.push(txt);\n    }\n    return lines.join(' ');\n  }\n\n  var operations = {\n    last24: extractOpsText(opsLast24Row),\n    next24: extractOpsText(opsNext24Row)\n  };\n\n  function parsePersonnel(rowIdx) {\n    if (rowIdx < 0 || rowIdx + 1 >= raw.length) return { day:'', flex:'', night:'', crewChangeName:'', crewIn:'', crewOut:'' };\n    var hdr = raw[rowIdx];\n    var dat = raw[rowIdx + 1];\n    var dayCol=-1, flexCol=-1, nightCol=-1, crewChangeCol=-1, inCol=-1, outCol=-1;\n    for (var c = bc(0); c < hdr.length; c++) {\n      var h = String(hdr[c] || '').trim().toLowerCase();\n      if (h === 'day')                                         dayCol        = c;\n      if (h === 'flex')                                        flexCol       = c;\n      if (h === 'night' || h === 'nights')                     nightCol      = c;\n      if (h.indexOf('crew change') >= 0 && h.indexOf('name') >= 0) crewChangeCol = c;\n      if (h === 'in')                                          inCol         = c;\n      if (h === 'out')                                         outCol        = c;\n    }\n    return {\n      day:            dayCol        >= 0 ? getCol(dat, dayCol)        : '',\n      flex:           flexCol       >= 0 ? getCol(dat, flexCol)       : '',\n      night:          nightCol      >= 0 ? getCol(dat, nightCol)      : '',\n      crewChangeName: crewChangeCol >= 0 ? getCol(dat, crewChangeCol) : '',\n      crewIn:         inCol         >= 0 ? getCol(dat, inCol)         : '',\n      crewOut:        outCol        >= 0 ? getCol(dat, outCol)        : ''\n    };\n  }\n\n  var ddPersonnel  = parsePersonnel(ddRow);\n  var mwdPersonnel = parsePersonnel(mwdRow);\n\n  var kits = [];\n  if (kitsRow >= 0 && certsRow > kitsRow) {\n    for (var ki = kitsRow + 2; ki < certsRow; ki++) {\n      var sn = getCol(raw[ki], bc(0));\n      if (!sn || sn.toLowerCase() === 's/n' || sn.toLowerCase() === 'serial') continue;\n      kits.push({ sn: sn, kitName: getCol(raw[ki], bc(2)), location: getCol(raw[ki], bc(5)) });\n    }\n  }\n\n  var certs = [];\n  if (certsRow >= 0) {\n    for (var ci2 = certsRow + 2; ci2 < certsEndRow; ci2++) {\n      var equipment = getCol(raw[ci2], bc(0));\n      if (!equipment) continue;\n      var eqLow = equipment.toLowerCase();\n      if (eqLow === 'equipment' || eqLow.indexOf('date issued') >= 0 || eqLow.indexOf('revision') >= 0) continue;\n      var expiry = parseExpiryDate(getCol(raw[ci2], bc(2)));\n      certs.push({\n        equipment:     equipment,\n        expiryDate:    expiry.str,\n        description:   getCol(raw[ci2], bc(5)),\n        location:      getCol(raw[ci2], bc(14)),\n        daysRemaining: expiry.days,\n        status:        expiry.status\n      });\n    }\n  }\n\n  var insiteMachines = [];\n  if (insiteRow >= 0) {\n    var insiteHdr = raw[insiteRow + 1] || [];\n    var colCN=-1, colType=-1, colIV=-1, colDesig=-1, colAN=-1, colLoc=-1, colLic=-1, colMac=-1;\n    for (var c = bc(0); c < insiteHdr.length; c++) {\n      var h = String(insiteHdr[c] || '').trim().toLowerCase();\n      if (h === 'computer name')             colCN    = c;\n      if (h === 'type')                      colType  = c;\n      if (h.indexOf('insite version') >= 0)  colIV    = c;\n      if (h === 'designation')               colDesig = c;\n      if (h === 'asset name')                colAN    = c;\n      if (h === 'location')                  colLoc   = c;\n      if (h.indexOf('license') >= 0)         colLic   = c;\n      if (h.indexOf('mac') >= 0)             colMac   = c;\n    }\n    for (var ii = insiteRow + 2; ii < raw.length; ii++) {\n      var assetName = colAN >= 0 ? getCol(raw[ii], colAN) : '';\n      var compName  = colCN >= 0 ? getCol(raw[ii], colCN) : '';\n      if (!assetName && !compName) continue;\n      var rowTxt2 = raw[ii].map(function(c){ return String(c||'').toLowerCase(); }).join(' ');\n      if (rowTxt2.indexOf('revision') >= 0 || rowTxt2.indexOf('date issued') >= 0) break;\n      insiteMachines.push({\n        assetName:     assetName,\n        computerName:  compName,\n        type:          colType  >= 0 ? getCol(raw[ii], colType)  : '',\n        insiteVersion: colIV    >= 0 ? getCol(raw[ii], colIV)    : '',\n        designation:   colDesig >= 0 ? getCol(raw[ii], colDesig) : '',\n        location:      colLoc   >= 0 ? getCol(raw[ii], colLoc)   : '',\n        license:       colLic   >= 0 ? getCol(raw[ii], colLic)   : '',\n        mac:           colMac   >= 0 ? getCol(raw[ii], colMac)   : ''\n      });\n    }\n  }\n\n  var rigName  = getCol(raw[2] || [], bc(0)) || 'Unknown';\n  var wellName = getCol(raw[6] || [], bc(12)) || '';\n\n  return { rigName: rigName, wellName: wellName, operations: operations,\n           ddPersonnel: ddPersonnel, mwdPersonnel: mwdPersonnel, kits: kits, certs: certs,\n           insiteMachines: insiteMachines };\n}\n\n// ── Scan incoming folder, group by rig ────────────────────────────────────────\nvar allFiles = fs.readdirSync(inputDir)\n  .filter(function(f) { return /\\.(xlsx|xls)$/i.test(f) && f.toLowerCase().indexOf('morning report') !== -1; })\n  .map(function(f) { return { name: f, rigName: extractRigName(f), reportDate: extractReportDate(f) }; });\n\n// Move non-morning-report Excel files to skipped/\nfs.readdirSync(inputDir).forEach(function(f) {\n  if (!/\\.(xlsx|xls)$/i.test(f)) return;\n  if (f.toLowerCase().indexOf('morning report') === -1) {\n    try { fs.renameSync(path.join(inputDir, f), path.join(skippedDir, f)); } catch(e) {}\n  }\n});\n\nif (allFiles.length === 0) {\n  return [{ json: { success: false, message: 'No morning reports found in incoming folder.' } }];\n}\n\nvar rigGroups = {};\nallFiles.forEach(function(f) {\n  var r = f.rigName || 'Unknown';\n  if (!rigGroups[r]) rigGroups[r] = [];\n  rigGroups[r].push(f);\n});\n\n// Always start fresh — only rigs present in the incoming folder appear in the output\nvar allRigsData = {};\nvar processedCount = 0;\nvar rigList = [];\n\nObject.keys(rigGroups).forEach(function(rigName) {\n  var files = rigGroups[rigName].sort(function(a, b) { return b.reportDate - a.reportDate; });\n\n  // Files on or before today, sorted newest-first\n  var todayFiles = files.filter(function(f) { return f.reportDate <= today; });\n  var todayFile    = todayFiles[0] || null;   // latest (today's) report\n  var previousFile = todayFiles[1] || null;   // previous report for comparison\n\n  // Keep only the 2 newest files per rig; delete older ones\n  for (var di = 2; di < todayFiles.length; di++) {\n    try { fs.unlinkSync(path.join(inputDir, todayFiles[di].name)); } catch(e) {}\n  }\n\n  if (!todayFile) return;\n\n  var todayData = null;\n  try { todayData = parseExcelFile(path.join(inputDir, todayFile.name)); } catch(e) { todayData = null; }\n  if (!todayData) return;\n\n  var prevData = null;\n  if (previousFile) {\n    try { prevData = parseExcelFile(path.join(inputDir, previousFile.name)); } catch(e) { prevData = null; }\n  }\n\n  // ── Crew change resolution ────────────────────────────────────────────────\n  // Stated: crewChangeName col filled → person on rig leaving, incoming from \"In\" col\n  // Implicit: name changed between today & previous report\n  function resolveCrewChange(curP, prevP) {\n    var statedChange = !!curP.crewChangeName;\n    if (statedChange) {\n      return { statedChange: true,\n               currentDay: curP.day, currentFlex: curP.flex, currentNight: curP.night,\n               crewChangeName: curP.crewChangeName, incoming: curP.crewIn || '',\n               changed: true };\n    }\n    if (prevP) {\n      var dayChanged   = curP.day   && prevP.day   && curP.day   !== prevP.day;\n      var nightChanged = curP.night && prevP.night && curP.night !== prevP.night;\n      if (dayChanged || nightChanged) {\n        return { statedChange: false,\n                 currentDay: curP.day, currentFlex: curP.flex, currentNight: curP.night,\n                 prevDay: prevP.day, prevFlex: prevP.flex, prevNight: prevP.night,\n                 dayChanged: dayChanged, nightChanged: nightChanged,\n                 changed: true };\n      }\n    }\n    return { statedChange: false,\n             currentDay: curP.day, currentFlex: curP.flex, currentNight: curP.night,\n             changed: false };\n  }\n\n  var ddCrewChange  = resolveCrewChange(todayData.ddPersonnel,  prevData ? prevData.ddPersonnel  : null);\n  var mwdCrewChange = resolveCrewChange(todayData.mwdPersonnel, prevData ? prevData.mwdPersonnel : null);\n\n  // ── Kit diff ──────────────────────────────────────────────────────────────\n  var kits = todayData.kits.map(function(k) { return { sn:k.sn, kitName:k.kitName, location:k.location, missing:false }; });\n  if (prevData && prevData.kits) {\n    var currentSNs = {};\n    todayData.kits.forEach(function(k) { currentSNs[k.sn] = true; });\n    prevData.kits.forEach(function(prev) {\n      if (!currentSNs[prev.sn])\n        kits.push({ sn:prev.sn, kitName:prev.kitName, location:prev.location, missing:true, note:'(BL?)' });\n    });\n  }\n\n  // ── Cert diff ─────────────────────────────────────────────────────────────\n  var certsList = todayData.certs.map(function(c) {\n    var prevExpiry = '';\n    if (prevData && prevData.certs) {\n      for (var pi = 0; pi < prevData.certs.length; pi++) {\n        var p = prevData.certs[pi];\n        if (p.equipment === c.equipment && p.expiryDate && p.expiryDate !== c.expiryDate) { prevExpiry = p.expiryDate; break; }\n      }\n    }\n    return { equipment:c.equipment, expiryDate:c.expiryDate, description:c.description,\n             location:c.location, daysRemaining:c.daysRemaining, status:c.status,\n             prevExpiry:prevExpiry, missing:false };\n  });\n  if (prevData && prevData.certs) {\n    var currentEquip = {};\n    todayData.certs.forEach(function(c) { currentEquip[c.equipment] = true; });\n    prevData.certs.forEach(function(prev) {\n      if (!currentEquip[prev.equipment])\n        certsList.push({ equipment:prev.equipment, expiryDate:prev.expiryDate, description:prev.description,\n          location:prev.location, daysRemaining:prev.daysRemaining, status:prev.status,\n          prevExpiry:'', missing:true, note:'(BL?)' });\n    });\n  }\n\n  var summary = {\n    kitsTotal:    todayData.kits.length,\n    kitsMissing:  kits.filter(function(k) { return k.missing; }).length,\n    certsTotal:   todayData.certs.length,\n    expired:      certsList.filter(function(c) { return !c.missing && c.status === 'EXPIRED'; }).length,\n    expiringSoon: certsList.filter(function(c) { return !c.missing && c.status === 'EXPIRING SOON'; }).length,\n    certsMissing: certsList.filter(function(c) { return c.missing; }).length\n  };\n\n  var rptDate = todayFile.reportDate;\n  allRigsData[rigName] = {\n    reportDate:     mkDateStr(rptDate),\n    displayDate:    mkDisplayDate(rptDate),\n    prevReportDate: previousFile ? mkDateStr(previousFile.reportDate) : null,\n    processedAt:    new Date().toISOString(),\n    sourceFile:     todayFile.name,\n    prevSourceFile: previousFile ? previousFile.name : null,\n    rig:            todayData.rigName,\n    well:           todayData.wellName,\n    operations:     todayData.operations,\n    ddCrewChange:   ddCrewChange,\n    mwdCrewChange:  mwdCrewChange,\n    kits:           kits,\n    certs:          certsList,\n    insiteMachines: todayData.insiteMachines || [],\n    summary:        summary\n  };\n  rigList.push(rigName);\n  processedCount++;\n});\n\nfs.writeFileSync(allRigsFile, JSON.stringify(allRigsData, null, 2));\n\n// Update master Excel - one tab per rig\nvar masterWb;\ntry { masterWb = fs.existsSync(masterXlsxFile) ? xlsx.readFile(masterXlsxFile) : xlsx.utils.book_new(); }\ncatch(e) { masterWb = xlsx.utils.book_new(); }\n\nrigList.forEach(function(rigName) {\n  var d = allRigsData[rigName];\n  if (!d) return;\n  var sheetName = rigName.substring(0, 31);\n  var dd  = d.ddCrewChange  || {};\n  var mwd = d.mwdCrewChange || {};\n  var sheetData = [\n    ['MORNING REPORT', '', '', '', '', '', ''],\n    ['Date', d.displayDate, '', 'Rig', rigName, 'Well', d.well],\n    [''],\n    ['OPERATIONS'],\n    ['Last 24 hours', (d.operations && d.operations.last24) || ''],\n    ['Next 24 hours', (d.operations && d.operations.next24) || ''],\n    [''],\n    ['PERSONNEL', 'Day', 'Flex', 'Night', 'Crew Change'],\n    ['DD',  dd.currentDay||'', dd.currentFlex||'', dd.currentNight||'',\n      dd.statedChange ? dd.crewChangeName+' <=> '+(dd.incoming||'?') : (dd.changed ? '(prev: '+dd.prevDay+')' : '')],\n    ['MWD', mwd.currentDay||'', mwd.currentFlex||'', mwd.currentNight||'',\n      mwd.statedChange ? mwd.crewChangeName+' <=> '+(mwd.incoming||'?') : (mwd.changed ? '(prev: '+mwd.prevDay+')' : '')],\n    [''],\n    ['KITS ON BOARD', '', '', ''],\n    ['S/N', 'Kit Name', 'Location', 'Flag']\n  ];\n  d.kits.forEach(function(k) { sheetData.push([k.sn, k.kitName, k.location, k.missing ? 'MISSING (BL?)' : '']); });\n  sheetData.push(['']);\n  sheetData.push(['EQUIPMENT CERTIFICATIONS', '', '', '', '', '']);\n  sheetData.push(['Equipment', 'Expiry Date', 'Description', 'Location', 'Days Remaining', 'Status']);\n  d.certs.forEach(function(c) {\n    var statusOut = c.missing ? 'MISSING (BL?)' : (c.status + (c.prevExpiry ? ' [was: '+c.prevExpiry+']' : ''));\n    sheetData.push([c.equipment, c.expiryDate, c.description, c.location, c.daysRemaining, statusOut]);\n  });\n  var wsNew = xlsx.utils.aoa_to_sheet(sheetData);\n  if (masterWb.SheetNames.indexOf(sheetName) >= 0) {\n    delete masterWb.Sheets[sheetName];\n    masterWb.SheetNames.splice(masterWb.SheetNames.indexOf(sheetName), 1);\n  }\n  xlsx.utils.book_append_sheet(masterWb, wsNew, sheetName);\n});\n\nif (rigList.length > 0) xlsx.writeFile(masterWb, masterXlsxFile);\n\nreturn [{ json: {\n  success: true,\n  message: 'Processed ' + processedCount + ' rig(s): ' + rigList.join(', '),\n  rigs: rigList,\n  processedCount: processedCount\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "id": "b8e7d6c5-b4a3-f2e1-d0c9-b8a7f6e5d4c3",
+      "name": "Process Morning Report"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "id": "c7d6e5f4-a3b2-c1d0-e9f8-a7b6c5d4e3f2",
+      "name": "Respond"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "morning-report-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        500
+      ],
+      "id": "d6e5f4a3-b2c1-d0e9-f8a7-b6c5d4e3f2a1",
+      "name": "Data Webhook",
+      "webhookId": "morning-report-data"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const fs = require('fs');\nconst f  = '/documents/MorningReports/all-rigs-data.json';\nif (!fs.existsSync(f)) {\n  return [{ json: { error: 'No report processed yet. Run the morning report first.' } }];\n}\nconst allRigs = JSON.parse(fs.readFileSync(f, 'utf8'));\nconst qs = $input.first().json || {};\nconst rig = qs.rig || '';\nif (rig && allRigs[rig]) {\n  return [{ json: allRigs[rig] }];\n}\n// Return all rigs + list for dropdown\nconst rigList = Object.keys(allRigs);\nreturn [{ json: { allRigs: allRigs, rigList: rigList, defaultRig: rigList[0] || '' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        500
+      ],
+      "id": "e5f4a3b2-c1d0-e9f8-a7b6-c5d4e3f2a1b0",
+      "name": "Read Report Data"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        680,
+        500
+      ],
+      "id": "f4a3b2c1-d0e9-f8a7-b6c5-d4e3f2a1b0c9",
+      "name": "Respond Data"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "morning-report-export",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        700
+      ],
+      "id": "a3b2c1d0-e9f8-a7b6-c5d4-e3f2a1b0c9d8",
+      "name": "Export Webhook",
+      "webhookId": "morning-report-export"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const fs = require('fs');\r\nconst f  = '/documents/MorningReports/morning-report-master.xlsx';\r\nif (!fs.existsSync(f)) {\r\n  return [{ json: { error: 'No master Excel file found. Process a report first.' } }];\r\n}\r\nconst buf = fs.readFileSync(f);\r\nreturn [{ json: { base64: buf.toString('base64'), filename: 'morning-report-master.xlsx' } }];\r\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        700
+      ],
+      "id": "b2c1d0e9-f8a7-b6c5-d4e3-f2a1b0c9d8e7",
+      "name": "Export Excel"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        680,
+        700
+      ],
+      "id": "c1d0e9f8-a7b6-c5d4-e3f2-a1b0c9d8e7f6",
+      "name": "Respond Export"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Morning Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Morning Report": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Report Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Report Data": {
+      "main": [
+        [
+          {
+            "node": "Respond Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Webhook": {
+      "main": [
+        [
+          {
+            "node": "Export Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Excel": {
+      "main": [
+        [
+          {
+            "node": "Respond Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-03-19T00:00:00.000Z",
+  "versionId": "3",
+  "active": true
+}

@@ -1,0 +1,73 @@
+{
+  "name": "PJB Slide Copier - AI Smart Replace",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pjb-slide-copier",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "pjb-slide-copier"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body;\nreturn {\n  json: {\n    dos_file: body.dos_file || null,\n    lessons_learned_file: body.lessons_learned_file || null,\n    pjb_template_file: body.pjb_template_file || null,\n    well_name: body.well_name || '',\n    well_number: body.well_number || '',\n    zob_number: body.zob_number || '',\n    rig_name: body.rig_name || '',\n    date: body.date || new Date().toLocaleDateString('en-GB'),\n    customer: body.customer || ''\n  }\n};"
+      },
+      "id": "extract",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 8000
+        },
+        "text": "=Analyze this DOS PowerPoint.\n\nTASK 1: Find slide numbers for:\n- Well Objective\n- BHA Overview\n- DAP\n- Value Moment\n- Well Details\n- Mandatory Routine\n- Contact List\n\nTASK 2: Find current values that need replacing:\n- Look for well names (e.g., \"West Linus A-12H\")\n- Look for rig names (e.g., \"Deepsea Bergen\")\n- Look for dates\n- Look for well numbers\n- Look for ZOB numbers\n\nNew values to use:\nWell: {{ $json.well_name }}\nWell#: {{ $json.well_number }}\nZOB: {{ $json.zob_number }}\nRig: {{ $json.rig_name }}\nDate: {{ $json.date }}\n\nReturn JSON:\n{\n  \"slides\": {\n    \"well_objective\": [1, 2],\n    \"bha_overview\": [3],\n    \"dap\": [4, 5]\n  },\n  \"replacements\": [\n    {\"old\": \"West Linus A-12H\", \"new\": \"{{ $json.well_name }}\"},\n    {\"old\": \"Deepsea Bergen\", \"new\": \"{{ $json.rig_name }}\"}\n  ]\n}"
+      },
+      "id": "ai",
+      "name": "Claude AI Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Extract Data"}]]
+    },
+    "Extract Data": {
+      "main": [[{"node": "Claude AI Analysis"}]]
+    },
+    "Claude AI Analysis": {
+      "main": [[{"node": "Respond"}]]
+    }
+  }
+}

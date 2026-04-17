@@ -1,0 +1,462 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morning Report Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 14px; }
+  .topbar {
+    background: linear-gradient(135deg, #c00 0%, #900 100%);
+    color: #fff; padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3); flex-wrap: wrap; gap: 8px;
+  }
+  .topbar h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+  .topbar .meta { font-size: 12px; opacity: .85; margin-top: 2px; }
+  .btn { padding: 7px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-white  { background: #fff; color: #900; }
+  .btn-green  { background: #28a745; color: #fff; }
+  .btn-blue   { background: #0066cc; color: #fff; }
+  .btn-orange { background: #e67e00; color: #fff; }
+  .btn-row    { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .rig-select-wrap { display: flex; align-items: center; gap: 8px; }
+  .rig-select-wrap label { font-size: 13px; font-weight: 600; color: #fff; opacity: .9; }
+  #rig-select {
+    padding: 6px 30px 6px 10px; border-radius: 5px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    background: rgba(255,255,255,0.18); color: #fff;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fff' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; min-width: 160px;
+  }
+  #rig-select option { background: #800; color: #fff; }
+  #rig-select:focus { outline: 2px solid rgba(255,255,255,.5); }
+  .page { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.1); text-align: center; }
+  .card-num  { font-size: 32px; font-weight: 700; line-height: 1; }
+  .card-lbl  { font-size: 11px; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .card.ok      .card-num { color: #28a745; }
+  .card.warn    .card-num { color: #e67e00; }
+  .card.danger  .card-num { color: #c00; }
+  .card.neutral .card-num { color: #333; }
+  .section { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .section-title { font-size: 15px; font-weight: 700; color: #900; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ops-box { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+  .ops-box-head { background: #3a3a3a; color: #fff; padding: 6px 12px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+  .ops-box-body { padding: 10px 12px; font-size: 13px; line-height: 1.6; color: #333; min-height: 48px; }
+  .ops-box-body.empty { color: #aaa; font-style: italic; }
+  .insite-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .insite-table thead tr { background:#1a1a2e; color:#fff; }
+  .insite-table th { padding:7px 10px; text-align:left; font-weight:600; font-size:12px; white-space:nowrap; }
+  .insite-table td { padding:6px 10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+  .insite-table tbody tr:hover { background:#f7f7fb; }
+  .insite-table .col-asset { font-weight:700; color:#1a1a2e; }
+  .insite-table .col-mac { font-family:monospace; font-size:11px; color:#555; }
+  .person-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .person-card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+  .person-card-head { background: #900; color: #fff; padding: 6px 12px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+  .person-table { width: 100%; border-collapse: collapse; }
+  .person-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .person-table td:first-child { font-weight: 600; color: #555; width: 90px; }
+  .crew-row td { background: #fff8e1 !important; }
+  .crew-change-stated {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff3cd; border: 1px solid #ffc107; color: #856404;
+    border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+  }
+  .crew-change-stated .arrow { font-size: 16px; color: #e67e00; }
+  .crew-change-implicit {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #e8f4fd; border: 1px solid #90caf9; color: #0d47a1;
+    border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+  }
+  .crew-change-implicit .arrow { font-size: 16px; color: #1976d2; }
+  .crew-change-implicit .old-name { text-decoration: line-through; color: #888; font-weight: 400; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { background: #3a3a3a; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; position: sticky; top: 0; }
+  .data-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(0,0,0,.03); }
+  .row-missing td { background: #fff3cd !important; }
+  .row-expired td { background: #f8d7da !important; }
+  .row-expiring td { background: #ffe5cc !important; }
+  .row-changed td { background: #e8f4fd !important; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge-ok      { background: #d4edda; color: #155724; }
+  .badge-warn    { background: #ffe5cc; color: #8a4a00; }
+  .badge-danger  { background: #f8d7da; color: #721c24; }
+  .badge-missing { background: #fff3cd; color: #856404; }
+  .badge-neutral { background: #e9ecef; color: #495057; }
+  .table-scroll { overflow-x: auto; }
+  #status-bar { padding: 8px 0; color: #666; font-size: 12px; margin-bottom: 8px; }
+  #status-bar.error   { color: #c00; }
+  #status-bar.loading { color: #0066cc; }
+  .empty-state { text-align: center; padding: 40px; color: #aaa; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 8px; }
+  @media (max-width: 640px) {
+    .person-grid, .ops-grid { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar h1" id="hdr-rig">Morning Report Dashboard</div>
+    <div class="meta" id="hdr-meta">Loading...</div>
+  </div>
+  <div class="btn-row">
+    <div class="rig-select-wrap">
+      <label for="rig-select">Rig:</label>
+      <select id="rig-select" onchange="onRigChange()">
+        <option value=""> select rig </option>
+      </select>
+    </div>
+    <button class="btn btn-green"  onclick="runReport()">&#9654; Run Report</button>
+    <button class="btn btn-white"  onclick="loadData()">&#8635; Refresh</button>
+    <button class="btn btn-blue"   onclick="exportExcel()">&#8595; Export Excel</button>
+    <a class="btn btn-orange" href="index.html">&#8592; Hub</a>
+  </div>
+</div>
+
+<div class="page">
+  <div id="status-bar">Click <strong>Refresh</strong> to load latest report, or <strong>Run Report</strong> to process new files.</div>
+
+  <div class="summary-grid" id="summary-grid" style="display:none">
+    <div class="card neutral"><div class="card-num" id="s-kits">-</div><div class="card-lbl">Kits on Board</div></div>
+    <div class="card danger" ><div class="card-num" id="s-missing-kits">-</div><div class="card-lbl">Missing Kits (BL?)</div></div>
+    <div class="card neutral"><div class="card-num" id="s-certs">-</div><div class="card-lbl">Certifications</div></div>
+    <div class="card danger" id="card-expired" ><div class="card-num" id="s-expired">-</div><div class="card-lbl">Expired</div></div>
+    <div class="card warn"   id="card-expiring"><div class="card-num" id="s-expiring">-</div><div class="card-lbl">Expiring &le;30d</div></div>
+    <div class="card danger" ><div class="card-num" id="s-missing-certs">-</div><div class="card-lbl">Missing Certs (BL?)</div></div>
+  </div>
+
+  <div class="section" id="sec-ops" style="display:none">
+    <div class="section-title">&#128203; Operations</div>
+    <div class="ops-grid">
+      <div class="ops-box">
+        <div class="ops-box-head">Last 24 Hours</div>
+        <div class="ops-box-body" id="ops-last24"></div>
+      </div>
+      <div class="ops-box">
+        <div class="ops-box-head">Next 24 Hours</div>
+        <div class="ops-box-body" id="ops-next24"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-personnel" style="display:none">
+    <div class="section-title">&#128101; Personnel</div>
+    <div class="person-grid" id="person-grid"></div>
+  </div>
+
+  <div class="section" id="sec-insite" style="display:none">
+    <div class="section-title">&#128187; Insite Machines and Computers</div>
+    <div class="table-scroll">
+      <table class="insite-table">
+        <thead><tr><th>Asset Name</th><th>Type</th><th>Insite Version</th><th>Designation</th><th>Location</th><th>License</th><th>Mac Address</th></tr></thead>
+        <tbody id="insite-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-kits" style="display:none">
+    <div class="section-title">
+      &#128230; Kits on Board
+      <span style="font-size:11px;font-weight:400;color:#888">&mdash; <span style="background:#fff3cd;padding:1px 6px;border-radius:3px;">Yellow</span> = missing since previous report <strong>(BL?)</strong></span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr><th>S/N</th><th>Kit Name</th><th>Location</th><th>Flag</th></tr></thead>
+        <tbody id="kits-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-certs" style="display:none">
+    <div class="section-title">
+      &#128203; Equipment Certifications
+      <span style="font-size:11px;font-weight:400;color:#888">
+        &nbsp;<span style="background:#f8d7da;padding:1px 6px;border-radius:3px;">Red</span>=Expired
+        &nbsp;<span style="background:#ffe5cc;padding:1px 6px;border-radius:3px;">Orange</span>=&le;30d
+        &nbsp;<span style="background:#fff3cd;padding:1px 6px;border-radius:3px;">Yellow</span>=(BL?)
+        &nbsp;<span style="background:#e8f4fd;padding:1px 6px;border-radius:3px;">Blue</span>=Date changed vs prev report
+      </span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr><th>Equipment</th><th>Expiry Date</th><th>Days Left</th><th>Description</th><th>Location</th><th>Status</th></tr></thead>
+        <tbody id="certs-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="empty-state" class="empty-state" style="display:none">
+    <div class="icon">&#128196;</div>
+    <div>No report data found. Drop morning report files in <code>incoming/</code> and click <strong>Run Report</strong>.</div>
+  </div>
+</div>
+
+<script>
+const N8N = 'http://localhost:3001';
+var _allRigs   = {};
+var _rigList   = [];
+var _activeRig = '';
+
+function setStatus(msg, cls) {
+  var el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+function populateRigDropdown(rigList, selected) {
+  var sel = document.getElementById('rig-select');
+  sel.innerHTML = '';
+  rigList.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    if (r === selected) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function onRigChange() {
+  var sel = document.getElementById('rig-select');
+  _activeRig = sel.value;
+  if (_allRigs[_activeRig]) render(_allRigs[_activeRig]);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function crewChangeHtml(cc) {
+  if (!cc || !cc.changed) return '';
+  if (cc.statedChange) {
+    return '<span class="crew-change-stated">' +
+      esc(cc.crewChangeName) +
+      '<span class="arrow">&#8596;</span>' +
+      esc(cc.incoming || '?') +
+      '</span>';
+  }
+  var parts = [];
+  if (cc.dayChanged) {
+    parts.push('<span class="crew-change-implicit">' +
+      '<span title="Current day tour">' + esc(cc.currentDay) + '</span>' +
+      '<span class="arrow">&#8596;</span>' +
+      '<span class="old-name" title="Previous day tour">' + esc(cc.prevDay) + '</span>' +
+      '</span>');
+  }
+  if (cc.nightChanged) {
+    parts.push('<span class="crew-change-implicit">' +
+      '<span title="Current night tour">' + esc(cc.currentNight) + '</span>' +
+      '<span class="arrow">&#8596;</span>' +
+      '<span class="old-name" title="Previous night tour">' + esc(cc.prevNight) + '</span>' +
+      '</span>');
+  }
+  return parts.join(' ');
+}
+
+function personCard(title, color, cc) {
+  var crewHtml = crewChangeHtml(cc);
+  var flexVal  = cc ? (cc.currentFlex || '') : '';
+  var crewRow  = crewHtml ? '<tr class="crew-row"><td>Crew Change</td><td>' + crewHtml + '</td></tr>' : '';
+  var flexRow  = flexVal  ? '<tr><td>Flex</td><td>' + esc(flexVal) + '</td></tr>' : '';
+  return '<div class="person-card">' +
+    '<div class="person-card-head" style="background:' + color + '">' + esc(title) + '</div>' +
+    '<table class="person-table">' +
+    '<tr><td>Day</td><td>'   + esc((cc && cc.currentDay)   || '\u2014') + '</td></tr>' +
+    flexRow +
+    '<tr><td>Night</td><td>' + esc((cc && cc.currentNight) || '\u2014') + '</td></tr>' +
+    crewRow +
+    '</table></div>';
+}
+
+function badge(status, missing) {
+  if (missing) return '<span class="badge badge-missing">(BL?) MISSING</span>';
+  if (status === 'EXPIRED')       return '<span class="badge badge-danger">EXPIRED</span>';
+  if (status === 'EXPIRING SOON') return '<span class="badge badge-warn">EXPIRING SOON</span>';
+  if (status === 'OK')            return '<span class="badge badge-ok">OK</span>';
+  return '<span class="badge badge-neutral">' + esc(status || '-') + '</span>';
+}
+
+function render(d) {
+  document.getElementById('hdr-rig').textContent = d.rig || 'Morning Report Dashboard';
+  var prevInfo = d.prevReportDate ? '  |  vs prev: ' + d.prevReportDate : ' (no previous file for comparison)';
+  document.getElementById('hdr-meta').textContent =
+    'Well: ' + (d.well || '\u2014') +
+    '  |  Report: ' + (d.displayDate || d.reportDate || '\u2014') +
+    prevInfo +
+    '  |  Processed: ' + (d.processedAt ? new Date(d.processedAt).toLocaleString() : '\u2014');
+
+  var s = d.summary || {};
+  document.getElementById('s-kits').textContent          = s.kitsTotal    || 0;
+  document.getElementById('s-missing-kits').textContent  = s.kitsMissing  || 0;
+  document.getElementById('s-certs').textContent         = s.certsTotal   || 0;
+  document.getElementById('s-expired').textContent       = s.expired      || 0;
+  document.getElementById('s-expiring').textContent      = s.expiringSoon || 0;
+  document.getElementById('s-missing-certs').textContent = s.certsMissing || 0;
+  document.getElementById('summary-grid').style.display  = '';
+  document.getElementById('card-expired').className  = 'card ' + (s.expired      > 0 ? 'danger' : 'ok');
+  document.getElementById('card-expiring').className = 'card ' + (s.expiringSoon > 0 ? 'warn'   : 'ok');
+
+  var ops   = d.operations || {};
+  var last24 = (ops.last24 || '').trim();
+  var next24 = (ops.next24 || '').trim();
+  if (last24 || next24) {
+    var el24 = document.getElementById('ops-last24');
+    el24.innerHTML  = last24 ? esc(last24) : '<em></em>';
+    el24.className  = 'ops-box-body' + (last24 ? '' : ' empty');
+    var elN24 = document.getElementById('ops-next24');
+    elN24.innerHTML = next24 ? esc(next24) : '<em></em>';
+    elN24.className = 'ops-box-body' + (next24 ? '' : ' empty');
+    document.getElementById('sec-ops').style.display = '';
+  } else {
+    document.getElementById('sec-ops').style.display = 'none';
+  }
+
+  var pg = document.getElementById('person-grid');
+  pg.innerHTML =
+    personCard('DD Personnel',  '#900', d.ddCrewChange  || null) +
+    personCard('MWD Personnel', '#555', d.mwdCrewChange || null);
+  document.getElementById('sec-personnel').style.display = '';
+
+  var ib = document.getElementById('insite-body');
+  if (d.insiteMachines && d.insiteMachines.length) {
+    ib.innerHTML = d.insiteMachines.map(function(m) {
+      return '<tr>' +
+        '<td class="col-asset">' + esc(m.assetName || m.computerName || '\u2014') + '</td>' +
+        '<td>' + esc(m.type) + '</td>' +
+        '<td>' + esc(m.insiteVersion) + '</td>' +
+        '<td>' + esc(m.designation) + '</td>' +
+        '<td>' + esc(m.location) + '</td>' +
+        '<td>' + esc(m.license) + '</td>' +
+        '<td class="col-mac">' + esc(m.mac) + '</td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('sec-insite').style.display = '';
+  } else {
+    document.getElementById('sec-insite').style.display = 'none';
+  }
+
+  var kb = document.getElementById('kits-body');
+  if (d.kits && d.kits.length) {
+    kb.innerHTML = d.kits.map(function(k) {
+      var cls  = k.missing ? 'row-missing' : '';
+      var flag = k.missing
+        ? '<span class="badge badge-missing">(BL?) MISSING</span>'
+        : '<span class="badge badge-ok">&#10003;</span>';
+      return '<tr class="' + cls + '"><td>' + esc(k.sn) + '</td><td>' +
+             esc(k.kitName) + '</td><td>' + esc(k.location) + '</td><td>' + flag + '</td></tr>';
+    }).join('');
+    document.getElementById('sec-kits').style.display = '';
+  }
+
+  var cb = document.getElementById('certs-body');
+  if (d.certs && d.certs.length) {
+    cb.innerHTML = d.certs.map(function(c) {
+      var cls = c.missing          ? 'row-missing'  :
+                c.status === 'EXPIRED'       ? 'row-expired'  :
+                c.status === 'EXPIRING SOON' ? 'row-expiring' :
+                c.prevExpiry       ? 'row-changed'  : '';
+      var daysHtml = c.missing ? '\u2014' : (c.daysRemaining !== '' ? c.daysRemaining : '\u2014');
+      var expHtml  = esc(c.expiryDate || '\u2014');
+      if (c.prevExpiry)
+        expHtml += ' <small style="color:#888;text-decoration:line-through" title="Previous value">' + esc(c.prevExpiry) + '</small>';
+      return '<tr class="' + cls + '">' +
+        '<td>' + esc(c.equipment) + (c.note ? ' <strong>' + esc(c.note) + '</strong>' : '') + '</td>' +
+        '<td>' + expHtml + '</td>' +
+        '<td style="text-align:center">' + daysHtml + '</td>' +
+        '<td>' + esc(c.description) + '</td>' +
+        '<td>' + esc(c.location) + '</td>' +
+        '<td>' + badge(c.status, c.missing) + '</td></tr>';
+    }).join('');
+    document.getElementById('sec-certs').style.display = '';
+  }
+
+  document.getElementById('empty-state').style.display = 'none';
+}
+
+async function loadData() {
+  setStatus('Loading...', 'loading');
+  try {
+    var res  = await fetch(N8N + '/webhook/morning-report-data');
+    var data = await res.json();
+    if (data.error) {
+      setStatus(data.error);
+      document.getElementById('empty-state').style.display = '';
+      return;
+    }
+    if (data.allRigs && data.rigList) {
+      _allRigs  = data.allRigs;
+      _rigList  = data.rigList;
+      _activeRig = data.defaultRig || _rigList[0] || '';
+      populateRigDropdown(_rigList, _activeRig);
+      if (_allRigs[_activeRig]) render(_allRigs[_activeRig]);
+    } else {
+      _allRigs = {};
+      _allRigs[data.rig || 'Rig'] = data;
+      _rigList  = [data.rig || 'Rig'];
+      _activeRig = _rigList[0];
+      populateRigDropdown(_rigList, _activeRig);
+      render(data);
+    }
+    setStatus('Last loaded: ' + new Date().toLocaleTimeString());
+  } catch(e) {
+    setStatus('Could not reach Morning Report server. Is it running? Error: ' + e.message, 'error');
+  }
+}
+
+async function runReport() {
+  setStatus('Processing...', 'loading');
+  try {
+    var res  = await fetch(N8N + '/webhook/morning-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    var data = await res.json();
+    if (data.success === false) {
+      setStatus(data.message || 'No new reports to process.');
+      return;
+    }
+    var msg = data.message || ('Processed ' + (data.processedCount || 0) + ' rig(s)');
+    setStatus(msg);
+    await loadData();
+  } catch(e) {
+    setStatus('Error running report: ' + e.message, 'error');
+  }
+}
+
+async function exportExcel() {
+  setStatus('Preparing Excel download...', 'loading');
+  try {
+    var res  = await fetch(N8N + '/webhook/morning-report-export');
+    var data = await res.json();
+    if (data.error) { setStatus(data.error, 'error'); return; }
+    var bytes = atob(data.base64);
+    var arr   = new Uint8Array(bytes.length);
+    for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    var blob  = new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var url   = URL.createObjectURL(blob);
+    var a     = document.createElement('a');
+    a.href    = url; a.download = data.filename || 'morning-report-master.xlsx';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    setStatus('Downloaded: ' + (data.filename || 'morning-report-master.xlsx'));
+  } catch(e) {
+    setStatus('Export failed: ' + e.message, 'error');
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

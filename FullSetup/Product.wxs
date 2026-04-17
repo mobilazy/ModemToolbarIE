@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       Halliburton Automation Hub — Unified MSI Installer
+       Installs: ModemCopier .NET app + Node.js 20 runtime + PM2 +
+                 Hub / Scraper / MorningReport services + Workflow UIs + VBA
+       Per-user install to %LOCALAPPDATA%\Halliburton\AutomationHub
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <Product Id="*"
+           Name="Halliburton Automation Hub"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="Halliburton"
+           UpgradeCode="A1E3F7B2-9C4D-4E6A-B8D1-3F5A7C9E2B4D">
+
+    <Package InstallerVersion="405"
+             Compressed="yes"
+             InstallScope="perUser"
+             Description="Halliburton Automation Hub — ModemCopier, Node.js services, and workflow dashboards"
+             Comments="Per-user installer (no administrator required)" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- ─── Icon ──────────────────────────────────────────────────────── -->
+    <Icon Id="AppIcon.ico" SourceFile="$(var.StagingDir)\ModemCopier\ModemMergerWinFormsApp.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <!-- ─── Install directory ─────────────────────────────────────────── -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         FEATURES  (user can select/deselect in the UI)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <Feature Id="ModemCopier" Title="ModemCopier 2.0" Description="Desktop application for modem data management" Level="1">
+      <ComponentGroupRef Id="ModemCopierFiles" />
+      <ComponentRef Id="ModemCopierShortcut" />
+    </Feature>
+
+    <Feature Id="AutomationServices" Title="Automation Services" Description="Node.js runtime, PM2 process manager, and background services (hub, scraper, morning-report)" Level="1">
+      <ComponentGroupRef Id="NodeRuntime" />
+      <ComponentRef Id="ServiceFiles" />
+      <ComponentGroupRef Id="ScraperLocalFiles" />
+      <ComponentGroupRef Id="MorningReportFiles" />
+      <ComponentRef Id="SetupScripts" />
+    </Feature>
+
+    <Feature Id="WorkflowUI" Title="Workflow Dashboards" Description="HTML dashboards for morning reports, modem creator, and PJB" Level="1">
+      <ComponentGroupRef Id="WorkflowFiles" />
+    </Feature>
+
+    <Feature Id="VBAMacro" Title="Outlook VBA Macro" Description="Morning report auto-save macro for Outlook (requires manual import)" Level="1">
+      <ComponentRef Id="VBAFile" />
+    </Feature>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         UI
+         ═══════════════════════════════════════════════════════════════════ -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
+      <!-- Launch service configuration on Finish -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchSetup">
+        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed
+      </Publish>
+    </UI>
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Configure Automation Hub services (recommended)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+
+    <!-- Launch Setup-Services.cmd from Finish dialog -->
+    <Property Id="WixShellExecTarget" Value="[#SetupServicesCmdFile]" />
+    <CustomAction Id="LaunchSetup" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+
+    <!-- ─── Pre-uninstall cleanup ─────────────────────────────────────── -->
+    <CustomAction Id="PreUninstall"
+                  FileKey="RemoveServicesCmdFile"
+                  ExeCommand=""
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="PreUninstall" Before="RemoveFiles">
+        (REMOVE="ALL") AND NOT UPGRADINGPRODUCTCODE
+      </Custom>
+    </InstallExecuteSequence>
+
+  </Product>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DIRECTORY STRUCTURE
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="CompanyFolder" Name="Halliburton">
+          <Directory Id="INSTALLFOLDER" Name="AutomationHub">
+            <Directory Id="MODEMCOPIERDIR" Name="ModemCopier" />
+            <Directory Id="NODEDIR" Name="node" />
+            <Directory Id="SCRAPERLOCALDIR" Name="scraper-local" />
+            <Directory Id="MORNINGREPORTDIR" Name="morning-report" />
+            <Directory Id="WORKFLOWSDIR" Name="workflows" />
+            <Directory Id="VBADIR" Name="vba" />
+          </Directory>
+        </Directory>
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppMenuFolder" Name="Halliburton Automation Hub" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       MANUALLY-DEFINED COMPONENTS
+       (heat.exe auto-generates: ModemCopierFiles, NodeRuntime,
+        ScraperLocalFiles, MorningReportFiles, WorkflowFiles)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <Fragment>
+
+    <!-- ─── Desktop / Start Menu shortcuts for ModemCopier ────────────── -->
+    <ComponentGroup Id="ModemCopierShortcutGroup" Directory="INSTALLFOLDER">
+      <Component Id="ModemCopierShortcut" Guid="E4A1B2C3-D5E6-4F7A-8B9C-0D1E2F3A4B5C">
+        <Shortcut Id="DesktopModemCopier"
+                  Directory="DesktopFolder"
+                  Name="ModemCopier 2.0"
+                  Target="[MODEMCOPIERDIR]ModemCopier.exe"
+                  WorkingDirectory="MODEMCOPIERDIR"
+                  Icon="AppIcon.ico" IconIndex="0" />
+        <Shortcut Id="MenuModemCopier"
+                  Directory="AppMenuFolder"
+                  Name="ModemCopier 2.0"
+                  Target="[MODEMCOPIERDIR]ModemCopier.exe"
+                  WorkingDirectory="MODEMCOPIERDIR"
+                  Icon="AppIcon.ico" IconIndex="0" />
+        <Shortcut Id="DesktopHub"
+                  Directory="DesktopFolder"
+                  Name="Automation Hub"
+                  Target="[SystemFolder]cmd.exe"
+                  Arguments='/c start http://localhost:8080'
+                  Description="Open Automation Hub in browser" />
+        <Shortcut Id="MenuHub"
+                  Directory="AppMenuFolder"
+                  Name="Automation Hub"
+                  Target="[SystemFolder]cmd.exe"
+                  Arguments='/c start http://localhost:8080'
+                  Description="Open Automation Hub in browser" />
+        <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Halliburton\AutomationHub"
+                       Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ─── Top-level service files (hub-server, ecosystem, etc.) ─────── -->
+    <ComponentGroup Id="ServiceFilesGroup" Directory="INSTALLFOLDER">
+      <Component Id="ServiceFiles" Guid="F5B2C3D4-E6F7-4A8B-9C0D-1E2F3A4B5C6D">
+        <File Id="HubServerJs" Source="$(var.StagingDir)\hub-server.js" />
+        <File Id="EcosystemConfigJs" Source="$(var.StagingDir)\ecosystem.config.js" KeyPath="yes" />
+        <File Id="ProcessCodeJs" Source="$(var.StagingDir)\process-code.js" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ─── Setup / teardown scripts ──────────────────────────────────── -->
+    <ComponentGroup Id="SetupScriptsGroup" Directory="INSTALLFOLDER">
+      <Component Id="SetupScripts" Guid="A6C3D4E5-F7A8-4B9C-0D1E-2F3A4B5C6D7E">
+        <File Id="SetupServicesCmdFile" Source="$(var.StagingDir)\Setup-Services.cmd" />
+        <File Id="RemoveServicesCmdFile" Source="$(var.StagingDir)\Remove-Services.cmd" />
+        <File Id="PostInstallPs1" Source="$(var.StagingDir)\PostInstall.ps1" KeyPath="yes" />
+        <File Id="PreUninstallPs1" Source="$(var.StagingDir)\PreUninstall.ps1" />
+        <File Id="StartPs1" Source="$(var.StagingDir)\start.ps1" />
+        <File Id="AutoStartPs1" Source="$(var.StagingDir)\auto-start.ps1" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ─── Outlook VBA macro ─────────────────────────────────────────── -->
+    <ComponentGroup Id="VBAFileGroup" Directory="VBADIR">
+      <Component Id="VBAFile" Guid="B7D4E5F6-A8B9-4C0D-1E2F-3A4B5C6D7E8F">
+        <File Id="OutlookMorningReportBas" Source="$(var.StagingDir)\vba\outlook-morning-report.bas" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+  </Fragment>
+
+</Wix>
