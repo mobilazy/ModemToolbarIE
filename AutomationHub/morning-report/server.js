@@ -105,20 +105,13 @@ function parseExcelFile(filePath, today) {
 
   function extractOpsText(labelRowIdx) {
     if (labelRowIdx < 0) return '';
-    var lines = [];
-    for (var r = labelRowIdx + 1; r < Math.min(labelRowIdx + 5, raw.length); r++) {
-      var txt0 = getCol(raw[r], 0).toLowerCase();
-      var txtB = getCol(raw[r], bc(0)).toLowerCase();
-      var firstCell = txt0 + ' ' + txtB;
-      if (r > labelRowIdx + 1 && (firstCell.indexOf('next 24') >= 0 || firstCell.indexOf('last 24') >= 0)) break;
-      var txt = '';
-      for (var ci = bc(0); ci < raw[r].length; ci++) {
-        var v = String(raw[r][ci] || '').trim();
-        if (v && v.length > 3) { txt = v; break; }
-      }
-      if (txt) lines.push(txt);
+    // Activity text lives on the SAME row as the label, in a column to the right
+    var row = raw[labelRowIdx];
+    for (var ci = bc(0) + 1; ci < row.length; ci++) {
+      var v = String(row[ci] || '').trim();
+      if (v && v.length > 5) return v;
     }
-    return lines.join(' ');
+    return '';
   }
 
   var operations = {
