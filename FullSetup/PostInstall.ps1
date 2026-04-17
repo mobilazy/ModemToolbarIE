@@ -22,11 +22,11 @@ $pm2Cmd     = Join-Path $nodeDir "pm2.cmd"
 $ecoConfig  = Join-Path $InstallDir "ecosystem.config.js"
 
 Write-Host ""
-Write-Host "  Halliburton Automation Hub — Post-Install Setup" -ForegroundColor Cyan
+Write-Host "  Halliburton Automation Hub -- Post-Install Setup" -ForegroundColor Cyan
 Write-Host "  ================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── 1. Add bundled Node.js to user PATH ──────────────────────────────────────
+# -- 1. Add bundled Node.js to user PATH --------------------------------------
 Write-Host "  [1/4] Adding Node.js to user PATH..." -ForegroundColor Yellow
 
 $currentPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -42,7 +42,7 @@ if ($currentPath -and $currentPath.ToLower().Contains($nodeDir.ToLower())) {
 $env:Path = "$nodeDir;$env:Path"
 $env:npm_config_prefix = $nodeDir
 
-# ── 2. Register Task Scheduler auto-start ────────────────────────────────────
+# -- 2. Register Task Scheduler auto-start ------------------------------------
 Write-Host "  [2/4] Registering Task Scheduler auto-start..." -ForegroundColor Yellow
 
 $taskName  = "Halliburton-AutomationHub"
@@ -62,7 +62,7 @@ if ($?) {
     Write-Host "        You can start services manually with: start.ps1" -ForegroundColor Yellow
 }
 
-# ── 3. Create OneDrive MorningReports directories ────────────────────────────
+# -- 3. Create OneDrive MorningReports directories ----------------------------
 Write-Host "  [3/4] Creating MorningReports directories..." -ForegroundColor Yellow
 
 $morningReportBase = Join-Path $env:USERPROFILE "OneDrive - Halliburton\Documents\MorningReports"
@@ -79,7 +79,7 @@ foreach ($d in $dirs) {
     }
 }
 
-# ── 4. Start PM2 services ───────────────────────────────────────────────────
+# -- 4. Start PM2 services ----------------------------------------------------
 Write-Host "  [4/4] Starting PM2 services..." -ForegroundColor Yellow
 
 if (Test-Path $pm2Cmd) {
@@ -92,9 +92,9 @@ if (Test-Path $pm2Cmd) {
     Write-Host "        WARN: pm2.cmd not found at $pm2Cmd" -ForegroundColor Yellow
 }
 
-# ── Done ─────────────────────────────────────────────────────────────────────
+# -- Done ----------------------------------------------------------------------
 Write-Host ""
-Write-Host "  ✓ Setup complete!" -ForegroundColor Green
+Write-Host "  [OK] Setup complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "    Automation Hub:  http://localhost:8080" -ForegroundColor White
 Write-Host "    Kabal Scraper:   http://localhost:3000" -ForegroundColor White

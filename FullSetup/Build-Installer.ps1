@@ -32,16 +32,16 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-function Step([string]$msg) { Write-Host "`n═══ $msg ═══" -ForegroundColor Cyan }
+# -- Helpers ---------------------------------------------------------------
+function Step([string]$msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 function Info([string]$msg) { Write-Host "  $msg" -ForegroundColor Gray }
-function OK([string]$msg)   { Write-Host "  ✓ $msg" -ForegroundColor Green }
-function Fail([string]$msg) { Write-Host "  ✗ $msg" -ForegroundColor Red; exit 1 }
+function OK([string]$msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Fail([string]$msg) { Write-Host "  [FAIL] $msg" -ForegroundColor Red; exit 1 }
 
 $staging = "$PSScriptRoot\staging"
 $binDir  = "$PSScriptRoot\bin"
 
-# ── Resolve paths ────────────────────────────────────────────────────────────
+# -- Resolve paths ---------------------------------------------------------
 $modemCopierSrc = Join-Path $PSScriptRoot "..\ModemMergerWinFormsApp"
 $releaseBin     = Join-Path $modemCopierSrc "bin\Release"
 $solutionFile   = Join-Path $PSScriptRoot "..\ModemToolbarIE.sln"
@@ -57,7 +57,7 @@ if (Test-Path (Join-Path $autoHubGit "hub-server.js")) {
     Info "Using AutomationHub source from git repo: $autoHubGit"
 }
 
-# ── Validate prerequisites ──────────────────────────────────────────────────
+# -- Validate prerequisites ------------------------------------------------
 Step "Validating prerequisites"
 
 # WiX Toolset
@@ -95,9 +95,9 @@ foreach ($f in $requiredFiles) {
 }
 OK "All automation source files found"
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 1: Build .NET app
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 if (-not $SkipDotNetBuild) {
     Step "Building ModemCopier .NET app (Release)"
 
@@ -116,7 +116,7 @@ if (-not $SkipDotNetBuild) {
     }
 
     if (-not $msbuild) {
-        Write-Host "  MSBuild not found — using existing Release build" -ForegroundColor Yellow
+        Write-Host "  MSBuild not found -- using existing Release build" -ForegroundColor Yellow
     } else {
         Info "MSBuild: $msbuild"
         # Restore NuGet packages first
@@ -136,9 +136,9 @@ if (-not (Test-Path (Join-Path $releaseBin "ModemMergerWinFormsApp.exe"))) {
     Fail "ModemCopier Release build not found at: $releaseBin"
 }
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 2: Clean and create staging directory
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Preparing staging directory"
 
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
@@ -147,9 +147,9 @@ New-Item "$staging\ModemCopier" -ItemType Directory -Force | Out-Null
 New-Item "$staging\vba" -ItemType Directory -Force | Out-Null
 New-Item "$binDir" -ItemType Directory -Force | Out-Null
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 3: Stage ModemCopier .NET app
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Staging ModemCopier .NET app"
 
 $dotNetFiles = @(
@@ -170,7 +170,7 @@ foreach ($f in $dotNetFiles) {
     if (Test-Path $src) {
         Copy-Item $src "$staging\ModemCopier\" -Force
     } else {
-        Write-Host "  WARN: $f not found in Release build — skipping" -ForegroundColor Yellow
+        Write-Host "  WARN: $f not found in Release build -- skipping" -ForegroundColor Yellow
     }
 }
 
@@ -180,9 +180,9 @@ if (Test-Path "$staging\ModemCopier\ModemMergerWinFormsApp.exe") {
 }
 OK "ModemCopier files staged"
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 4: Extract Node.js 20 and pre-install PM2
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Extracting Node.js 20 runtime"
 
 $nodeStaging = "$staging\node"
@@ -220,9 +220,9 @@ if (Test-Path (Join-Path $nodeStaging "pm2.cmd")) {
     Fail "PM2 installation did not create pm2.cmd"
 }
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 5: Stage automation files
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Staging automation source files"
 
 # Top-level service files
@@ -261,9 +261,9 @@ Copy-Item "$PSScriptRoot\Setup-Services.cmd"  "$staging\" -Force
 Copy-Item "$PSScriptRoot\Remove-Services.cmd" "$staging\" -Force
 OK "Setup scripts staged"
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 6: Harvest directories with heat.exe
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Harvesting directories with heat.exe"
 
 $harvests = @(
@@ -275,7 +275,7 @@ $harvests = @(
 )
 
 foreach ($h in $harvests) {
-    Info "Harvesting $($h.Dir) → $($h.Out)"
+    Info "Harvesting $($h.Dir) -> $($h.Out)"
     & $heat dir $h.Dir `
         -cg $h.CG `
         -dr $h.DR `
@@ -287,9 +287,9 @@ foreach ($h in $harvests) {
 }
 OK "All directories harvested"
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 7: Compile WiX sources (candle.exe)
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Compiling WiX sources (candle.exe)"
 
 $wxsFiles = @("Product.wxs") + ($harvests | ForEach-Object { $_.Out })
@@ -307,9 +307,9 @@ $candleArgs = $defineArgs + @("-nologo", "-ext", "WixUIExtension", "-ext", "WixU
 if ($LASTEXITCODE -ne 0) { Fail "candle.exe failed" }
 OK "Compilation succeeded"
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # STEP 8: Link into MSI (light.exe)
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 Step "Linking MSI (light.exe)"
 
 $wixobjFiles = $wxsFiles | ForEach-Object { [IO.Path]::ChangeExtension($_, '.wixobj') }
@@ -322,12 +322,12 @@ $msiPath = Join-Path $binDir "HalliburtonAutomationHub-Setup.msi"
     @wixobjFiles
 if ($LASTEXITCODE -ne 0) { Fail "light.exe failed" }
 
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 # DONE
-# ═════════════════════════════════════════════════════════════════════════════
+# =========================================================================
 $msiSize = [math]::Round((Get-Item $msiPath).Length / 1MB, 1)
-Write-Host "`n" -NoNewline
-Write-Host "════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host ""
+Write-Host "========================================================" -ForegroundColor Green
 Write-Host "  MSI built successfully!" -ForegroundColor Green
 Write-Host "  $msiPath  ($msiSize MB)" -ForegroundColor White
-Write-Host "════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "========================================================" -ForegroundColor Green
