@@ -399,6 +399,12 @@ namespace ModemMergerWinFormsApp
             @"\bRAP\s*\d+\b.*\b(?:Drill|RIH\s*(?:&|with|w/))\b",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // Numeric/depth artifact rows that sometimes leak into task-name extraction,
+        // e.g. "-339.75 (-14.16)".
+        private static readonly Regex _numericArtifactTaskRx = new Regex(
+            @"^\s*[-+]?\d+(?:\.\d+)?\s*(?:\(\s*[-+]?\d+(?:\.\d+)?\s*\))?\s*$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         // DateTime patterns used in Kabal timeplanner task rows
         private static readonly string[] _kabalDateFormats = {
             "ddd dd-MM-yyyy HH:mm", // "Sun 19-04-2026 08:15"
@@ -1480,9 +1486,11 @@ namespace ModemMergerWinFormsApp
                         continue;
                     }
 
-                    // Longest non-date text is likely the task name
-                    if (val.Length > taskName.Length && !Regex.IsMatch(val, @"^\d+(\.\d+)?$"))
-                        taskName = val;
+                    // Longest text-like non-date value is likely the task name.
+                    // Filter out numeric/depth artifacts that can appear in some rigs (e.g. Ringhorne).
+                    var normalized = NormalizeTaskNameCandidate(val);
+                    if (normalized.Length > taskName.Length && IsLikelyTaskName(normalized))
+                        taskName = normalized;
                 }
 
                 if (!string.IsNullOrEmpty(taskName))
@@ -1817,6 +1825,28 @@ namespace ModemMergerWinFormsApp
             var cleaned = Regex.Replace(value.Trim(), @"^[A-Za-z]{2,3}\s+", "");
             return DateTime.TryParseExact(cleaned, _kabalDateFormats,
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
+        }
+
+        private static string NormalizeTaskNameCandidate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            var s = Regex.Replace(value.Trim(), @"\s+", " ");
+            s = Regex.Replace(s, @"^\[\s*OMITTED\s*\]\s*", "", RegexOptions.IgnoreCase);
+            return s.Trim();
+        }
+
+        private static bool IsLikelyTaskName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            if (_numericArtifactTaskRx.IsMatch(value)) return false;
+            if (!Regex.IsMatch(value, @"[A-Za-z]")) return false;
+
+            DateTime parsed;
+            if (TryParseKabalDate(value, out parsed)) return false;
+
+            // Reject strings that are almost entirely punctuation/numeric tokens.
+            if (Regex.IsMatch(value, @"^[\d\s\-\+\.,()/:%]+$")) return false;
+            return true;
         }
 
         /// <summary>
