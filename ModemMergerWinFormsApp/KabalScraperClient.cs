@@ -373,8 +373,9 @@ namespace ModemMergerWinFormsApp
             @"(?:\b(?:L/?D|LD|Lay\s*Down|Pull)\b.*\bBHA\b|\b(?:Rack\s*Back|R\s*/\s*B|RB)\b)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Current-operation time window: include tasks from now-3h to now+3h.
-        private static readonly TimeSpan _currentOpsWindow = TimeSpan.FromHours(3);
+        // Activity windows: include tasks from now-12h (past) to now+24h (next).
+        private static readonly TimeSpan _pastOpsWindow = TimeSpan.FromHours(12);
+        private static readonly TimeSpan _nextOpsWindow = TimeSpan.FromHours(24);
 
         // Regex to detect Whipstock tasks
         private static readonly Regex _whipstockRx = new Regex(
@@ -535,7 +536,7 @@ namespace ModemMergerWinFormsApp
             return await Task.Run(() =>
             {
                 ScrapeLog.Start();
-                ScrapeLog.Info("TimePlanner ParserVersion=2026-05-19b");
+                ScrapeLog.Info("TimePlanner ParserVersion=2026-05-19c");
                 ScrapeLog.Info($"TimePlanner: Operator={operatorName}, Rig={rigName}, Wells={string.Join(",", wellCodesToMatch)}");
 
                 OpenQA.Selenium.IWebDriver driver = null;
@@ -918,6 +919,7 @@ namespace ModemMergerWinFormsApp
 
                     var result = new TimePlannerResult { Success = true };
                     int planIdx = 0;
+                    var recentTaskCandidates = new List<TimePlannerRecentOperation>();
 
                     foreach (var w in wellsArr)
                     {
@@ -1076,6 +1078,7 @@ namespace ModemMergerWinFormsApp
                             ScrapeLog.Info($"  Dialogs: {dialogDump}");
 
                             List<TimePlannerSection> sections;
+                            List<TimePlannerTask> parsedTasks;
 
                             if (newHandles.Count > 0)
                             {
@@ -1108,7 +1111,7 @@ namespace ModemMergerWinFormsApp
                                     catch { }
                                 }
                                 ScrapeLog.Info($"  First cell text='{firstCellText}'. Parsing...");
-                                sections = ParseTimePlannerTasks(js, wellName);
+                                sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
                                 ScrapeLog.Info($"  New tab parsed {sections.Count} sections.");
                                 driver.Close();
                                 driver.SwitchTo().Window(handlesBefore.First());
@@ -1124,7 +1127,7 @@ namespace ModemMergerWinFormsApp
                                 {
                                     WaitForApexReady(driver);
                                     Thread.Sleep(250);
-                                    sections = ParseTimePlannerTasks(js, wellName);
+                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
                                 }
                                 else
                                 {
@@ -1146,7 +1149,7 @@ namespace ModemMergerWinFormsApp
                                         catch { }
                                     }
                                     ScrapeLog.Info($"  Content ready={contentReady}. Parsing...");
-                                    sections = ParseTimePlannerTasks(js, wellName);
+                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
                                     if (sections.Count == 0)
                                     {
                                         var domDump = js.ExecuteScript(@"
@@ -1166,6 +1169,18 @@ namespace ModemMergerWinFormsApp
                             }
 
                             result.Sections.AddRange(sections);
+                            foreach (var t in parsedTasks ?? new List<TimePlannerTask>())
+                            {
+                                DateTime dt;
+                                if (!TryParseKabalDate(t.StartDateTime, out dt)) continue;
+                                recentTaskCandidates.Add(new TimePlannerRecentOperation
+                                {
+                                    WellName = wellName,
+                                    TaskName = t.TaskName,
+                                    TaskDateTime = t.StartDateTime,
+                                    HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
+                                });
+                            }
                             ScrapeLog.Info($"  Extracted {sections.Count} sections for '{wellName}'");
 
                             // Navigate back to Gantt and wait for vis-labels to re-render
@@ -1192,7 +1207,7 @@ namespace ModemMergerWinFormsApp
                         }
                     }
 
-                    result.RecentOperations = BuildRecentOperations(result.Sections);
+                    result.RecentOperations = BuildRecentOperations(recentTaskCandidates);
                     result.LastUpdated = DateTime.Now;
 
                     ScrapeLog.Info($"TimePlanner: Total sections extracted={result.Sections.Count} from {planIdx} wells.");
@@ -1214,7 +1229,7 @@ namespace ModemMergerWinFormsApp
         /// Groups tasks into drilling sections based on M/U BHA and POOH markers.
         /// </summary>
         private static List<TimePlannerSection> ParseTimePlannerTasks(
-            OpenQA.Selenium.IJavaScriptExecutor js, string planName)
+            OpenQA.Selenium.IJavaScriptExecutor js, string planName, out List<TimePlannerTask> parsedTasks)
         {
             // Expand all collapsible rows so nested RAP tasks (including MU/POOH BHA lines)
             // are present in the DOM before table extraction.
@@ -1731,35 +1746,33 @@ namespace ModemMergerWinFormsApp
                 })
                 .ToList();
 
+            parsedTasks = allTasks;
             return sections;
         }
 
-        private static List<TimePlannerRecentOperation> BuildRecentOperations(List<TimePlannerSection> sections)
+        private static List<TimePlannerRecentOperation> BuildRecentOperations(List<TimePlannerRecentOperation> taskCandidates)
         {
             var result = new List<TimePlannerRecentOperation>();
-            var from = DateTime.Now - _currentOpsWindow;
-            var to = DateTime.Now + _currentOpsWindow;
+            var from = DateTime.Now - _pastOpsWindow;
+            var to = DateTime.Now + _nextOpsWindow;
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var sec in sections ?? new List<TimePlannerSection>())
+            foreach (var t in taskCandidates ?? new List<TimePlannerRecentOperation>())
             {
-                foreach (var t in sec.Tasks ?? new List<TimePlannerTask>())
+                DateTime dt;
+                if (!TryParseKabalDate(t.TaskDateTime, out dt)) continue;
+                if (dt < from || dt > to) continue;
+
+                var key = (t.WellName ?? "") + "|" + (t.TaskName ?? "") + "|" + dt.ToString("yyyyMMddHHmm");
+                if (!seen.Add(key)) continue;
+
+                result.Add(new TimePlannerRecentOperation
                 {
-                    DateTime dt;
-                    if (!TryParseKabalDate(t.StartDateTime, out dt)) continue;
-                    if (dt < from || dt > to) continue;
-
-                    var key = (sec.WellName ?? "") + "|" + (t.TaskName ?? "") + "|" + dt.ToString("yyyyMMddHHmm");
-                    if (!seen.Add(key)) continue;
-
-                    result.Add(new TimePlannerRecentOperation
-                    {
-                        WellName = sec.WellName,
-                        TaskName = t.TaskName,
-                        TaskDateTime = t.StartDateTime,
-                        HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
-                    });
-                }
+                    WellName = t.WellName,
+                    TaskName = t.TaskName,
+                    TaskDateTime = t.TaskDateTime,
+                    HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
+                });
             }
 
             return result

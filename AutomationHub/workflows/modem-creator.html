@@ -217,7 +217,8 @@
     <!-- ── Recent operations strip ──────────────────────────── -->
     <div class="recent-ops-strip">
         <div class="table-panel" id="recentPanel">
-            <h3>&#9201; Rig Activity (past 3h)</h3>
+            <h3>&#9201; Rig Activity (past 12h)</h3>
+            <div id="recentSummary" style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#374151;background:#fafafa"></div>
             <table>
                 <thead>
                     <tr>
@@ -329,6 +330,7 @@ const tpPanel        = document.getElementById('tpPanel');
 const tpBody         = document.getElementById('tpBody');
 const tpUpdated      = document.getElementById('tpUpdated');
 const recentPanel    = document.getElementById('recentPanel');
+const recentSummary  = document.getElementById('recentSummary');
 const recentBody     = document.getElementById('recentBody');
 const modemPanel     = document.getElementById('modemPanel');
 const modemBody      = document.getElementById('modemBody');
@@ -403,6 +405,7 @@ function showCachedForCurrentRig() {
     const rig = rigSel.value;
     // Always clear recent activity when rig context changes — show blank until freshly scraped.
     recentOperations = [];
+    recentSummary.textContent = '';
     recentBody.innerHTML = '';
     recentPanel.classList.remove('show');
     const cached = loadTpCache(customer, rig);
@@ -619,14 +622,27 @@ function timeOnly(dt) {
 
 function renderRecentOperationsTable() {
     recentBody.innerHTML = '';
-    // Only show past ops (hoursFromNow <= 0), sorted chronologically (oldest first).
+    // Past: last 12h. Next: next 24h.
     const past = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0)
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0 && op.hoursFromNow >= -12)
         .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    const next = (recentOperations || [])
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow > 0 && op.hoursFromNow <= 24)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+
+    const pastSummary = past.length
+        ? past.map(op => esc(op.taskName || '—') + ' (' + timeOnly(op.taskDateTime) + ')').join(', ')
+        : 'none';
+    const nextSummary = next.length
+        ? next.map(op => '<span style="color:#b45309;font-weight:600">' + esc(op.taskName || '—') + ' (' + timeOnly(op.taskDateTime) + ')</span>').join(', ')
+        : 'none';
+    recentSummary.innerHTML =
+        '<div><strong>Past Activity (12h):</strong> ' + pastSummary + '</div>' +
+        '<div style="margin-top:4px"><strong>Next Activity (24h):</strong> ' + nextSummary + '</div>';
 
     if (past.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="3" style="color:#6b7280">No operations in the past 3h.</td>';
+        tr.innerHTML = '<td colspan="3" style="color:#6b7280">No operations in the past 12h.</td>';
         recentBody.appendChild(tr);
         return;
     }
@@ -771,13 +787,22 @@ btnCopy.addEventListener('click', () => {
                      kabalDateForModem(m) + ' ' + kabalMatch].join('\t') + '\n';
         });
     }
-    // Recent operations snapshot (past only)
+    // Recent operations snapshot
     const pastOps = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0)
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0 && op.hoursFromNow >= -12)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    const nextOps = (recentOperations || [])
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow > 0 && op.hoursFromNow <= 24)
         .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
     if (pastOps.length > 0) {
-        text += '\nRIG ACTIVITY (past 3h)\nWell\tOperation\tTime\n';
+        text += '\nRIG ACTIVITY (past 12h)\nWell\tOperation\tTime\n';
         pastOps.forEach(op => {
+            text += [op.wellName || '', op.taskName || '', timeOnly(op.taskDateTime)].join('\t') + '\n';
+        });
+    }
+    if (nextOps.length > 0) {
+        text += '\nNEXT ACTIVITY (24h)\nWell\tOperation\tTime\n';
+        nextOps.forEach(op => {
             text += [op.wellName || '', op.taskName || '', timeOnly(op.taskDateTime)].join('\t') + '\n';
         });
     }
