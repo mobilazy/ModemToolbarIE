@@ -722,16 +722,15 @@ function renderModemTable() {
                 '<td>' + esc(m.LoadoutDate || m.loadoutDate || '—') + '</td>' +
                 '<td>' + esc(deliveryDateForModem(m)) + '</td>';
 
-            // Kabal Date: colored green (match) or orange (mismatch) vs Gant StartDate
             const kabalVal = kabalDateForModem(m);
             const kabalCol = kabalDateColor(m);
-            const kabalCell = document.createElement('td');
+            const kabalTd  = document.createElement('td');
             if (kabalCol) {
-                kabalCell.innerHTML = '<strong style="color:' + kabalCol + '">' + esc(kabalVal) + '</strong>';
+                kabalTd.innerHTML = '<strong style="color:' + kabalCol + '">' + esc(kabalVal) + '</strong>';
             } else {
-                kabalCell.textContent = kabalVal;
+                kabalTd.textContent = kabalVal;
             }
-            tr.innerHTML += kabalCell.outerHTML;
+            tr.innerHTML += kabalTd.outerHTML;
             modemBody.appendChild(tr);
         });
     }
