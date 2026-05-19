@@ -92,9 +92,13 @@
         }
         @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
 
+        /* ── Recent ops strip (full-width, above main tables) ── */
+        .recent-ops-strip { margin-top: 24px; }
+        .recent-ops-strip .table-panel { min-width: 0; }
+
         /* ── Side-by-side tables ─────────────────────────── */
         .tables-container {
-            display: flex; gap: 24px; margin-top: 24px;
+            display: flex; gap: 24px; margin-top: 12px;
             flex-wrap: wrap;
         }
         .table-panel {
@@ -108,6 +112,21 @@
             background: #f0f2f5; font-size: 14px; color: #374151;
             border-bottom: 2px solid #e5e7eb;
         }
+
+        .tp-updated-pill {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.5;
+            border: 1px solid transparent;
+        }
+        .tp-updated-fresh { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .tp-updated-warn  { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+        .tp-updated-old   { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .tp-updated-none  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
 
         table {
             width: 100%; border-collapse: collapse;
@@ -128,6 +147,8 @@
             background: #eef2ff; font-weight: 600;
         }
         tbody tr.well-header td { padding-top: 12px; color: #1e3a5f; }
+        tbody tr.recent-highlight { background: #ecfdf5; }
+        tbody tr.recent-highlight td { color: #065f46; font-weight: 600; }
 
         .badge {
             display: inline-block; padding: 2px 8px; border-radius: 12px;
@@ -172,15 +193,8 @@
             </select>
         </div>
     </div>
-    <div class="form-row">
-        <div class="form-group">
-            <label for="username">Kabal Username</label>
-            <input type="text" id="username" placeholder="first.last@halliburton.com">
-        </div>
-        <div class="form-group">
-            <label for="password">Kabal Password</label>
-            <input type="password" id="password" placeholder="••••••••">
-        </div>
+    <div class="subtitle" style="margin-bottom:12px;color:#4b5563">
+        Kabal credentials are managed in Modem Copier 2.0 and reused by this page.
     </div>
 
     <div class="button-row">
@@ -200,10 +214,27 @@
         <pre id="logContent" style="margin:0;padding:10px;max-height:400px;overflow:auto;font-size:11px;color:#9be;white-space:pre-wrap;word-break:break-all">(click Refresh)</pre>
     </div>
 
+    <!-- ── Recent operations strip ──────────────────────────── -->
+    <div class="recent-ops-strip">
+        <div class="table-panel" id="recentPanel">
+            <h3>&#9201; Rig Activity (past 3h)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Well</th>
+                        <th>Operation</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="recentBody"></tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- ── Side-by-side tables ────────────────────────────── -->
     <div class="tables-container">
         <div class="table-panel" id="tpPanel">
-            <h3>&#128197; TimePlanner Schedule</h3>
+            <h3>&#128197; TimePlanner Schedule <span id="tpUpdated" class="tp-updated-pill tp-updated-none">Not updated</span></h3>
             <table>
                 <thead>
                     <tr>
@@ -217,7 +248,7 @@
             </table>
         </div>
         <div class="table-panel" id="modemPanel">
-            <h3>&#128230; Gant Modems</h3>
+            <h3>&#128230; Gant Modems <span id="modemFetchBadge" style="display:none;font-size:0.75rem;font-weight:normal;margin-left:8px;padding:2px 7px;border-radius:10px;"></span></h3>
             <table>
                 <thead>
                     <tr>
@@ -267,7 +298,7 @@ function extractKabalId(hRefno, operator) {
 }
 
 const rigsByCustomer = {
-    'AkerBP':          ['SC8','Integrator','Invincible','Deepsea Nordkap','Stavanger'],
+    'AkerBP':          ['SC8','Integrator','Invincible','Deepsea Nordkap','Deepsea Stavanger'],
     'ConocoPhillips':  ['West Linus','Elara'],
     'Equinor':         ['Grane','Prospector','Promoter','Enabler','Heidrun','Njord A','Snorre A','Snorre B'],
     'Vår Energi':      ['Ringhorne','Pioneer','Prospector']
@@ -290,20 +321,96 @@ setInterval(checkApiHealth, 10000);
 // ── DOM refs ────────────────────────────────────────────────────────
 const customerSel    = document.getElementById('customer');
 const rigSel         = document.getElementById('rig');
-const userInput      = document.getElementById('username');
-const passInput      = document.getElementById('password');
 const btnTimeplanner = document.getElementById('btnTimeplanner');
 const btnLoadModems  = document.getElementById('btnLoadModems');
 const btnCopy        = document.getElementById('btnCopy');
 const statusLog      = document.getElementById('statusLog');
 const tpPanel        = document.getElementById('tpPanel');
 const tpBody         = document.getElementById('tpBody');
+const tpUpdated      = document.getElementById('tpUpdated');
+const recentPanel    = document.getElementById('recentPanel');
+const recentBody     = document.getElementById('recentBody');
 const modemPanel     = document.getElementById('modemPanel');
 const modemBody      = document.getElementById('modemBody');
 
 // ── State ───────────────────────────────────────────────────────────
 let sections = [];  // TimePlannerSection[]
+let recentOperations = []; // TimePlannerRecentOperation[]
+let lastUpdated = null;
 let modems   = [];  // GantModem[]
+let modemsFetchedAt = null;  // ISO timestamp when modems were last loaded
+
+function makeTpCacheKey(customer, rig) {
+    return 'tp_cache::' + (customer || '') + '::' + (rig || '');
+}
+
+function saveTpCache(customer, rig, payload) {
+    if (!customer || !rig || !payload) return;
+    localStorage.setItem(makeTpCacheKey(customer, rig), JSON.stringify(payload));
+}
+
+function loadTpCache(customer, rig) {
+    if (!customer || !rig) return null;
+    try {
+        const raw = localStorage.getItem(makeTpCacheKey(customer, rig));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function applyTimePlannerPayload(tp, fromCache) {
+    sections = tp.sections || [];
+    recentOperations = tp.recentOperations || [];
+    lastUpdated = tp.lastUpdated || null;
+
+    renderTimePlannerTable();
+    renderRecentOperationsTable();
+
+    tpPanel.classList.add('show');
+    recentPanel.classList.add('show');
+    btnLoadModems.disabled = false;
+    btnCopy.disabled = false;
+
+    updateLastUpdatedBadge(fromCache);
+}
+
+function updateLastUpdatedBadge(fromCache) {
+    if (!lastUpdated) {
+        tpUpdated.className = 'tp-updated-pill tp-updated-none';
+        tpUpdated.textContent = fromCache ? 'Cached, no timestamp' : 'Not updated';
+        return;
+    }
+
+    const dt = new Date(lastUpdated);
+    if (isNaN(dt.getTime())) {
+        tpUpdated.className = 'tp-updated-pill tp-updated-none';
+        tpUpdated.textContent = 'Invalid timestamp';
+        return;
+    }
+
+    const ageHours = (Date.now() - dt.getTime()) / 3600000;
+    let cls = 'tp-updated-fresh';
+    if (ageHours > 12) cls = 'tp-updated-old';
+    else if (ageHours > 3) cls = 'tp-updated-warn';
+
+    tpUpdated.className = 'tp-updated-pill ' + cls;
+    tpUpdated.textContent = 'Last update: ' + dt.toLocaleString() + (fromCache ? ' (cached)' : '');
+}
+
+function showCachedForCurrentRig() {
+    const customer = customerSel.value;
+    const rig = rigSel.value;
+    // Always clear recent activity when rig context changes — show blank until freshly scraped.
+    recentOperations = [];
+    recentBody.innerHTML = '';
+    recentPanel.classList.remove('show');
+    const cached = loadTpCache(customer, rig);
+    if (cached && Array.isArray(cached.sections)) {
+        applyTimePlannerPayload(cached, true);
+        log('Loaded cached TimePlanner data for ' + customer + ' / ' + rig + '.', false);
+    }
+}
 
 // ── Rig population ──────────────────────────────────────────────────
 customerSel.addEventListener('change', () => {
@@ -346,27 +453,78 @@ function esc(s) {
     return d.innerHTML;
 }
 
-function extractWellCode(name) {
-    if (!name) return null;
-    const m = name.match(/[A-Z]-\d+/i);
-    return m ? m[0].toUpperCase() : null;
+function kabalDateForModem(m) {
+    // Kabal sync date from backend (same source as Modem Shifter Sync with Kabal).
+    return m.KabalSyncDate || m.kabalSyncDate || '—';
+}
+
+function deliveryDateForModem(m) {
+    return m.DateEta || m.dateEta || '—';
+}
+
+// Normalize "dd.MM.yyyy" variants (with optional weekday/time) for comparison.
+function normalizeModemDate(s) {
+    if (!s) return '';
+    let v = s.toString().trim();
+    if (!v || v === '—') return '';
+    v = v.replace(/^[A-Za-z]{2,3}\s+/, '');
+    v = v.replace(/[-\/]/g, '.');
+    const m = v.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (!m) return v;
+    const dd = m[1].padStart(2, '0');
+    const mm = m[2].padStart(2, '0');
+    let yy = m[3];
+    if (yy.length === 2) yy = '20' + yy;
+    return dd + '.' + mm + '.' + yy;
+}
+
+// Green if Kabal sync date matches Delivery date (DateEta), same as Modem Shifter overlay.
+function kabalDateColor(m) {
+    const kabal = normalizeModemDate(kabalDateForModem(m));
+    const delivery = normalizeModemDate(deliveryDateForModem(m));
+    if (!kabal || kabal === '—') return '';
+    return kabal === delivery ? '#16a34a' : '#ea7600';
+}
+
+// Update modem fetch timestamp badge.
+function updateModemFetchBadge() {
+    const badge = document.getElementById('modemFetchBadge');
+    if (!badge) return;
+    if (!modemsFetchedAt) { badge.style.display = 'none'; return; }
+    const diffMs  = Date.now() - new Date(modemsFetchedAt).getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    let label, bg, color;
+    if (diffMin < 30) {
+        label = diffMin <= 1 ? 'just now' : diffMin + ' min ago';
+        bg = '#dcfce7'; color = '#166534';
+    } else if (diffMin < 120) {
+        label = diffMin + ' min ago';
+        bg = '#fef9c3'; color = '#854d0e';
+    } else {
+        const h = Math.round(diffMin / 60);
+        label = h + ' hr ago';
+        bg = '#fee2e2'; color = '#991b1b';
+    }
+    badge.textContent = label;
+    badge.style.background = bg;
+    badge.style.color = color;
+    badge.style.display = 'inline-block';
 }
 
 // ── Timeplanner button ──────────────────────────────────────────────
 btnTimeplanner.addEventListener('click', async () => {
     const customer = customerSel.value;
     const rig      = rigSel.value;
-    const user     = userInput.value.trim();
-    const pass     = passInput.value;
 
     if (!customer || !rig)  return alert('Select customer and rig.');
-    if (!user || !pass)     return alert('Enter Kabal credentials.');
 
     btnTimeplanner.disabled = true;
     btnTimeplanner.innerHTML = '<span class="spinner-inline"></span>Scraping…';
     statusLog.innerHTML = '';
     tpBody.innerHTML = '';
     tpPanel.classList.remove('show');
+    recentBody.innerHTML = '';
+    recentPanel.classList.remove('show');
     modemBody.innerHTML = '';
     modemPanel.classList.remove('show');
     btnLoadModems.disabled = true;
@@ -376,12 +534,10 @@ btnTimeplanner.addEventListener('click', async () => {
         const alive = await checkApiHealth();
         if (!alive) { log('Cannot reach Modem Copier 2.0 on localhost:9002.', true); return; }
 
-        log('Scraping Kabal TimePlanner (this may take a minute)…');
+        log('Scraping Kabal TimePlanner with credentials from Modem Copier 2.0 (this may take a minute)…');
         const tp = await apiPost('/api/timeplanner', {
             operator: customer,
             rig: rig,
-            username: user,
-            password: pass,
             headless: true
         });
 
@@ -391,17 +547,22 @@ btnTimeplanner.addEventListener('click', async () => {
         }
 
         sections = tp.sections || [];
+        recentOperations = tp.recentOperations || [];
+        lastUpdated = tp.lastUpdated || new Date().toISOString();
         log('Found ' + sections.length + ' drilling sections.');
 
-        if (sections.length === 0) {
-            log('No sections found — check scraper log for diagnostics.', true);
+        if (sections.length === 0 && recentOperations.length === 0) {
+            log('No BHA sections or recent operations found — check scraper log for diagnostics.', true);
             return;
         }
 
-        renderTimePlannerTable();
-        tpPanel.classList.add('show');
-        btnLoadModems.disabled = false;
-        btnCopy.disabled = false;
+        saveTpCache(customer, rig, {
+            sections,
+            recentOperations,
+            lastUpdated
+        });
+
+        applyTimePlannerPayload({ sections, recentOperations, lastUpdated }, false);
     } catch (err) {
         log('Error: ' + err.message, true);
     } finally {
@@ -429,9 +590,7 @@ function renderTimePlannerTable() {
 
         secs.forEach(sec => {
             const tr = document.createElement('tr');
-            let nameHtml = esc(sec.sectionName || '—');
-            if (sec.sectionSize) nameHtml += ' <span style="color:#888">(' + esc(sec.sectionSize) + ')</span>';
-            if (sec.isWhipstock) nameHtml += ' <span class="badge badge-whipstock">Whipstock</span>';
+            let nameHtml = esc(cleanSectionName(sec.sectionName) || '—');
 
             tr.innerHTML =
                 '<td>' + nameHtml + '</td>' +
@@ -441,6 +600,50 @@ function renderTimePlannerTable() {
             tpBody.appendChild(tr);
         });
     }
+}
+
+function cleanSectionName(name) {
+    if (!name) return name;
+    const m = name.match(/^(.*\bsection)\s*\(([^)]*)\)\s*$/i);
+    if (!m) return name;
+    // Remove only size-like trailing brackets, e.g. (17 1/2), (12 1/4" x 14").
+    return /\d/.test(m[2]) ? m[1].trim() : name;
+}
+
+function timeOnly(dt) {
+    if (!dt) return '—';
+    const parts = dt.trim().split(/\s+/);
+    const last = parts[parts.length - 1];
+    return last.includes(':') ? last.replace(/:\d{2}$/, '') : dt;
+}
+
+function renderRecentOperationsTable() {
+    recentBody.innerHTML = '';
+    // Only show past ops (hoursFromNow <= 0), sorted chronologically (oldest first).
+    const past = (recentOperations || [])
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+
+    if (past.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="3" style="color:#6b7280">No operations in the past 3h.</td>';
+        recentBody.appendChild(tr);
+        return;
+    }
+
+    // The op closest to 0 (least negative) = most recent = "now doing this".
+    const mostRecentH = past[past.length - 1].hoursFromNow;
+
+    past.forEach(op => {
+        const tr = document.createElement('tr');
+        const isCurrent = op.hoursFromNow === mostRecentH;
+        if (isCurrent) tr.classList.add('recent-highlight');
+        tr.innerHTML =
+            '<td>' + esc(op.wellName || '—') + '</td>' +
+            '<td>' + esc(op.taskName || '—') + (isCurrent ? ' <span class="badge badge-whipstock">Now</span>' : '') + '</td>' +
+            '<td>' + timeOnly(op.taskDateTime) + '</td>';
+        recentBody.appendChild(tr);
+    });
 }
 
 // ── Load Modems button ──────────────────────────────────────────────
@@ -464,8 +667,9 @@ btnLoadModems.addEventListener('click', async () => {
             return;
         }
         log('Got ' + modems.length + ' modems.');
-
+        modemsFetchedAt = new Date().toISOString();
         renderModemTable();
+        updateModemFetchBadge();
         modemPanel.classList.add('show');
     } catch (err) {
         log('Error: ' + err.message, true);
@@ -516,8 +720,18 @@ function renderModemTable() {
                 '<td>' + kabalHtml + '</td>' +
                 '<td>' + esc(m.WellSection || '—') + '</td>' +
                 '<td>' + esc(m.LoadoutDate || m.loadoutDate || '—') + '</td>' +
-                '<td>' + esc(m.DateEta || m.dateEta || '—') + '</td>' +
-                '<td>' + esc(m.DateLoad || m.dateLoad || '—') + '</td>';
+                '<td>' + esc(deliveryDateForModem(m)) + '</td>';
+
+            // Kabal Date: colored green (match) or orange (mismatch) vs Gant StartDate
+            const kabalVal = kabalDateForModem(m);
+            const kabalCol = kabalDateColor(m);
+            const kabalCell = document.createElement('td');
+            if (kabalCol) {
+                kabalCell.innerHTML = '<strong style="color:' + kabalCol + '">' + esc(kabalVal) + '</strong>';
+            } else {
+                kabalCell.textContent = kabalVal;
+            }
+            tr.innerHTML += kabalCell.outerHTML;
             modemBody.appendChild(tr);
         });
     }
@@ -537,21 +751,35 @@ btnCopy.addEventListener('click', () => {
         });
         for (const [well, secs] of Object.entries(grouped)) {
             secs.forEach(s => {
-                text += [well, s.sectionName || '', s.muBhaDateTime || '', s.poohDateTime || '',
+                text += [well, cleanSectionName(s.sectionName) || '', s.muBhaDateTime || '', s.poohDateTime || '',
                          s.durationDays ? s.durationDays.toFixed(1) : ''].join('\t') + '\n';
             });
         }
     }
     // Modems
     if (modems.length > 0) {
-        text += '\nMODEMS\nMob ID\tKabal ID\tWell\tSection\tLoadout\tDelivery\tKabal Date\n';
+        const fetchedLabel = modemsFetchedAt
+            ? 'Fetched: ' + new Date(modemsFetchedAt).toLocaleString() + '\n'
+            : '';
+        text += '\nMODEMS\n' + fetchedLabel + 'Mob ID\tKabal ID\tWell\tSection\tLoadout\tDelivery\tKabal Date\n';
         const customer = customerSel.value;
         modems.forEach(m => {
             const kid = extractKabalId(m.HRefno || m.hRefno || '', customer) || '';
+            const kabalMatch = normalizeModemDate(kabalDateForModem(m)) === normalizeModemDate(deliveryDateForModem(m)) ? '(match)' : '(mismatch)';
             text += [m.Id, kid, m.WellName || '', m.WellSection || '',
                      m.LoadoutDate || m.loadoutDate || '',
-                     m.DateEta || m.dateEta || '',
-                     m.DateLoad || m.dateLoad || ''].join('\t') + '\n';
+                     deliveryDateForModem(m),
+                     kabalDateForModem(m) + ' ' + kabalMatch].join('\t') + '\n';
+        });
+    }
+    // Recent operations snapshot (past only)
+    const pastOps = (recentOperations || [])
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    if (pastOps.length > 0) {
+        text += '\nRIG ACTIVITY (past 3h)\nWell\tOperation\tTime\n';
+        pastOps.forEach(op => {
+            text += [op.wellName || '', op.taskName || '', timeOnly(op.taskDateTime)].join('\t') + '\n';
         });
     }
     navigator.clipboard.writeText(text).then(() => {
@@ -561,22 +789,21 @@ btnCopy.addEventListener('click', () => {
     });
 });
 
-// ── Persist credentials in sessionStorage ───────────────────────────
+// ── Persist selections in sessionStorage ─────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-    userInput.value = sessionStorage.getItem('mc_user') || '';
-    passInput.value = sessionStorage.getItem('mc_pass') || '';
     const cust = sessionStorage.getItem('mc_cust');
     if (cust) {
         customerSel.value = cust;
         customerSel.dispatchEvent(new Event('change'));
         const r = sessionStorage.getItem('mc_rig');
-        if (r) setTimeout(() => rigSel.value = r, 0);
+        if (r) setTimeout(() => { rigSel.value = r; showCachedForCurrentRig(); }, 0);
     }
 });
-userInput.addEventListener('change', () => sessionStorage.setItem('mc_user', userInput.value));
-passInput.addEventListener('change', () => sessionStorage.setItem('mc_pass', passInput.value));
 customerSel.addEventListener('change', () => sessionStorage.setItem('mc_cust', customerSel.value));
-rigSel.addEventListener('change', () => sessionStorage.setItem('mc_rig', rigSel.value));
+rigSel.addEventListener('change', () => {
+    sessionStorage.setItem('mc_rig', rigSel.value);
+    showCachedForCurrentRig();
+});
 
 // ── Scraper Log Viewer ───────────────────────────────────────────
 const logPanel      = document.getElementById('logPanel');

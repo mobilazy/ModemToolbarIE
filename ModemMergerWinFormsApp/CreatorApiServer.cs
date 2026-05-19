@@ -2,9 +2,11 @@ using ModemWebUtility;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +23,16 @@ namespace ModemMergerWinFormsApp
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly Func<List<GantModem>> _getLoadedModems;
         private const int Port = 9002;
+        private static readonly TimeSpan KabalSyncCacheWindow = TimeSpan.FromMinutes(20);
+        private static readonly object KabalSyncCacheLock = new object();
+        private static readonly Dictionary<string, KabalSyncCacheEntry> KabalSyncCache =
+            new Dictionary<string, KabalSyncCacheEntry>(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class KabalSyncCacheEntry
+        {
+            public DateTime FetchedUtc { get; set; }
+            public Dictionary<string, string> ModemToKabalDate { get; set; }
+        }
 
         /// <param name="getLoadedModems">Returns the modems already loaded in the Shifter tab.</param>
         public CreatorApiServer(Func<List<GantModem>> getLoadedModems)
@@ -34,6 +46,37 @@ namespace ModemMergerWinFormsApp
         {
             _listener.Start();
             Task.Run(() => ListenLoop(_cts.Token));
+        }
+
+        private string ConfigPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "kabal.config");
+
+        private bool TryLoadSavedKabalCredentials(out string username, out string password)
+        {
+            username = "";
+            password = "";
+
+            try
+            {
+                if (!File.Exists(ConfigPath)) return false;
+
+                var lines = File.ReadAllLines(ConfigPath);
+                if (lines.Length < 2 || string.IsNullOrWhiteSpace(lines[0]) || string.IsNullOrWhiteSpace(lines[1]))
+                    return false;
+
+                var encBytes = Convert.FromBase64String(lines[1]);
+                var plainBytes = System.Security.Cryptography.ProtectedData.Unprotect(
+                    encBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+
+                username = lines[0];
+                password = Encoding.UTF8.GetString(plainBytes);
+                return !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password);
+            }
+            catch
+            {
+                username = "";
+                password = "";
+                return false;
+            }
         }
 
         public void Dispose()
@@ -151,14 +194,6 @@ namespace ModemMergerWinFormsApp
         // Otherwise fetches from Gant on the fly using customer+rig from the request body.
         private async Task HandleGetModems(HttpListenerContext ctx)
         {
-            var cached = _getLoadedModems();
-            if (cached != null && cached.Count > 0)
-            {
-                WriteJson(ctx, cached);
-                return;
-            }
-
-            // No cached modems — fetch from Gant directly using request body
             try
             {
                 var body = ReadBody(ctx);
@@ -179,7 +214,13 @@ namespace ModemMergerWinFormsApp
                     return;
                 }
 
-                var modems = await GantClient.FetchModemsAsync(customer, rig, DateTime.Today).ConfigureAwait(false);
+                var modems = _getLoadedModems() ?? new List<GantModem>();
+                if (modems.Count == 0)
+                    modems = await GantClient.FetchModemsAsync(customer, rig, DateTime.Today).ConfigureAwait(false);
+
+                // Use the same Kabal shipping-date source as Modem Shifter and cache it briefly.
+                await TryApplyKabalSyncDatesAsync(modems, customer, rig).ConfigureAwait(false);
+
                 WriteJson(ctx, modems);
             }
             catch (Exception ex)
@@ -189,10 +230,146 @@ namespace ModemMergerWinFormsApp
             }
         }
 
+        private async Task TryApplyKabalSyncDatesAsync(List<GantModem> modems, string customer, string rig)
+        {
+            if (modems == null || modems.Count == 0) return;
+
+            var cacheKey = (customer ?? "") + "|" + (rig ?? "");
+            KabalSyncCacheEntry cacheEntry = null;
+
+            lock (KabalSyncCacheLock)
+            {
+                if (KabalSyncCache.TryGetValue(cacheKey, out cacheEntry) &&
+                    DateTime.UtcNow - cacheEntry.FetchedUtc < KabalSyncCacheWindow)
+                {
+                    // fresh cache hit
+                }
+                else
+                {
+                    cacheEntry = null;
+                }
+            }
+
+            if (cacheEntry == null)
+            {
+                string user, pass;
+                if (!TryLoadSavedKabalCredentials(out user, out pass))
+                    return;
+
+                DateTime? from = null, to = null;
+                foreach (var m in modems)
+                {
+                    DateTime dt;
+                    if (!TryParseUiDate(m.DateEta, out dt) && !TryParseUiDate(m.StartDate, out dt))
+                        continue;
+                    if (from == null || dt < from.Value) from = dt;
+                    if (to == null || dt > to.Value) to = dt;
+                }
+
+                if (from == null || to == null)
+                {
+                    from = DateTime.Today.AddDays(-30);
+                    to = DateTime.Today.AddDays(90);
+                }
+
+                var sync = await KabalScraperClient.ScrapeAsync(
+                    customer,
+                    rig,
+                    user,
+                    pass,
+                    headless: true,
+                    dryRun: true,
+                    onStatus: null,
+                    dateFrom: from,
+                    dateTo: to).ConfigureAwait(false);
+
+                if (sync == null || !sync.Success || sync.Modems == null)
+                    return;
+
+                var byModem = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var gm in modems)
+                {
+                    var modemId = gm.Id.ToString();
+                    string hRefnoDigits = "";
+                    if (!string.IsNullOrWhiteSpace(gm.HRefno))
+                    {
+                        var hid = Regex.Match(gm.HRefno, @"(\d{4,10})");
+                        if (hid.Success) hRefnoDigits = hid.Groups[1].Value;
+                    }
+
+                    var match = sync.Modems.FirstOrDefault(km =>
+                        string.Equals(km.ModemNumber, modemId, StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrEmpty(km.PackageName) &&
+                         km.PackageName.IndexOf(modemId, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrEmpty(hRefnoDigits) &&
+                         string.Equals(km.KabalId, hRefnoDigits, StringComparison.OrdinalIgnoreCase)));
+
+                    if (match == null || string.IsNullOrWhiteSpace(match.ShippingDate))
+                        continue;
+
+                    var normalized = NormalizeDate(match.ShippingDate);
+                    if (!string.IsNullOrWhiteSpace(normalized))
+                        byModem[modemId] = normalized;
+                }
+
+                cacheEntry = new KabalSyncCacheEntry
+                {
+                    FetchedUtc = DateTime.UtcNow,
+                    ModemToKabalDate = byModem
+                };
+
+                lock (KabalSyncCacheLock)
+                    KabalSyncCache[cacheKey] = cacheEntry;
+            }
+
+            if (cacheEntry.ModemToKabalDate == null || cacheEntry.ModemToKabalDate.Count == 0)
+                return;
+
+            foreach (var m in modems)
+            {
+                string syncDate;
+                if (cacheEntry.ModemToKabalDate.TryGetValue(m.Id.ToString(), out syncDate))
+                    m.KabalSyncDate = syncDate;
+            }
+        }
+
+        private static string NormalizeDate(string dateStr)
+        {
+            if (string.IsNullOrWhiteSpace(dateStr)) return "";
+
+            var cleaned = Regex.Replace(dateStr.Trim(), @"^[A-Za-z]{2,3}\s+", "");
+            DateTime dt;
+            string[] formats = {
+                "dd.MM.yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "dd-MM-yyyy",
+                "dd.MM.yyyy HH:mm", "dd-MM-yy", "dd/MM/yy", "dd.MM.yy"
+            };
+
+            if (DateTime.TryParseExact(cleaned, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+                return dt.ToString("dd.MM.yyyy");
+
+            return cleaned;
+        }
+
+        private static bool TryParseUiDate(string value, out DateTime dt)
+        {
+            dt = DateTime.MinValue;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var cleaned = Regex.Replace(value.Trim(), @"^[A-Za-z]{2,3}\s+", "");
+            string[] formats = {
+                "dd.MM.yyyy", "dd-MM-yyyy", "dd/MM/yyyy",
+                "dd.MM.yyyy HH:mm", "dd-MM-yyyy HH:mm", "dd/MM/yyyy HH:mm",
+                "yyyy-MM-dd"
+            };
+
+            return DateTime.TryParseExact(cleaned, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
+        }
+
         // ── POST /api/timeplanner ────────────────────────────────────────
         // Body: { "operator": "AkerBP", "rig": "Noble Invincible",
-        //         "username": "...", "password": "...",
         //         "wellCodes": ["C-21", "C-11", ...], "headless": true }
+        // Credentials are loaded from the desktop app's kabal.config unless the caller
+        // explicitly provides username/password.
         private async Task HandleScrapeTimePlanner(HttpListenerContext ctx)
         {
             var body = ReadBody(ctx);
@@ -203,6 +380,19 @@ namespace ModemMergerWinFormsApp
             string user = req.ContainsKey("username") ? req["username"].ToString() : "";
             string pass = req.ContainsKey("password") ? req["password"].ToString() : "";
             bool headless = !req.ContainsKey("headless") || Convert.ToBoolean(req["headless"]);
+
+            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
+            {
+                if (!TryLoadSavedKabalCredentials(out user, out pass))
+                {
+                    WriteJson(ctx, new TimePlannerResult
+                    {
+                        Success = false,
+                        Error = "Kabal credentials are not saved in Modem Copier 2.0. Enter them in the desktop app first."
+                    });
+                    return;
+                }
+            }
 
             var wellCodes = new List<string>();
             if (req.ContainsKey("wellCodes"))

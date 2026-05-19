@@ -729,7 +729,7 @@ namespace ModemMergerWinFormsApp
         // Rig → customer mapping & rig lists per customer
         private static readonly Dictionary<string, string[]> _rigsByCustomer = new Dictionary<string, string[]>
         {
-            { "AkerBP",         new[] { "SC8", "Integrator", "Invincible", "Deepsea Nordkap", "Stavanger" } },
+            { "AkerBP",         new[] { "SC8", "Integrator", "Invincible", "Deepsea Nordkap", "Deepsea Stavanger" } },
             { "ConocoPhillips", new[] { "West Linus", "Elara" } },
             { "Equinor",        new[] { "Grane", "Prospector", "Promoter", "Enabler", "Heidrun", "Njord A", "Snorre A", "Snorre B" } },
             { "Vår Energi",     new[] { "Ringhorne", "Pioneer", "Prospector" } }

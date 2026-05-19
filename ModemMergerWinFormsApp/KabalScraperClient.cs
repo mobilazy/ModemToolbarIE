@@ -158,6 +158,7 @@ namespace ModemMergerWinFormsApp
         public string DateLoad { get; set; } = "";     // P_DATE_LOAD from modem edit page
         public string LoadoutDate { get; set; } = "";  // P_LOADOUT_DATE from modem edit page
         public string DateEta { get; set; } = "";      // P_DATE_ETA from modem edit page
+        public string KabalSyncDate { get; set; } = ""; // shippingDate from Kabal sync (same as Modem Shifter)
         public string HRefno { get; set; } = "";       // H_REFNO — contains Kabal cargo ID (e.g. LC123456)
     }
 
@@ -205,6 +206,22 @@ namespace ModemMergerWinFormsApp
         public string Error { get; set; }
         [JsonProperty("sections")]
         public List<TimePlannerSection> Sections { get; set; } = new List<TimePlannerSection>();
+        [JsonProperty("recentOperations")]
+        public List<TimePlannerRecentOperation> RecentOperations { get; set; } = new List<TimePlannerRecentOperation>();
+        [JsonProperty("lastUpdated")]
+        public DateTime LastUpdated { get; set; }
+    }
+
+    public class TimePlannerRecentOperation
+    {
+        [JsonProperty("wellName")]
+        public string WellName { get; set; }
+        [JsonProperty("taskName")]
+        public string TaskName { get; set; }
+        [JsonProperty("taskDateTime")]
+        public string TaskDateTime { get; set; }
+        [JsonProperty("hoursFromNow")]
+        public double HoursFromNow { get; set; }
     }
 
     // ── Clients ──────────────────────────────────────────────────────────
@@ -253,14 +270,15 @@ namespace ModemMergerWinFormsApp
         };
 
         // TimePlanner Gantt page per operator (page 3101).
-        // Shows all rigs with clickable well schedule bars.
+        // The PATH and P3101_OPERATION_TYPE_FILTER arguments are required; without them
+        // Kabal often loads only the vis.js shell and the rig rows stay blank/undefined.
         private static readonly Dictionary<string, string> TimePlannerUrls =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            { "Equinor",        "https://app01.kabal.com/mws/f?p=16786:3101:0:::::" },
-            { "Vår Energi",     "https://app01.kabal.com/mws/f?p=1364:3101:0:::::" },
-            { "ConocoPhillips", "https://app01.kabal.com/mws/f?p=1267:3101:0:::::" },
-            { "AkerBP",         "https://app01.kabal.com/mws/f?p=1276:3101:0:::::" },
+            { "Equinor",        "https://app01.kabal.com/mws/f?p=16786:3101:0::NO::PATH,P3101_OPERATION_TYPE_FILTER:planning.rig.timeplanner_gantt,all:" },
+            { "Vår Energi",     "https://app01.kabal.com/mws/f?p=1364:3101:0::NO::PATH,P3101_OPERATION_TYPE_FILTER:planning.rig.timeplanner_gantt,all:" },
+            { "ConocoPhillips", "https://app01.kabal.com/mws/f?p=1267:3101:0::NO::PATH,P3101_OPERATION_TYPE_FILTER:planning.rig.timeplanner_gantt,all:" },
+            { "AkerBP",         "https://app01.kabal.com/mws/f?p=1276:3101:0::NO::PATH,P3101_OPERATION_TYPE_FILTER:planning.rig.timeplanner_gantt,all:" },
         };
 
         // APEX App IDs per operator — used to verify we're on the right operator after session reuse
@@ -308,7 +326,7 @@ namespace ModemMergerWinFormsApp
             { "Invincible", "Noble Invincible"  },
             { "Integrator", "Noble Integrator"  },
             { "SC8",        "Scarabeo 8"        },
-            { "Stavanger",  "Deepsea Stavanger" },
+            { "Deepsea Stavanger", "Deepsea Stavanger" },
             { "Nordkap",    "Deepsea Nordkapp"  },
             // Add other operators' rigs here as confirmed
         };
@@ -329,21 +347,56 @@ namespace ModemMergerWinFormsApp
         // Regex to extract well code from well names — e.g. "C-21" from "2/8-C-21 Valhall PWP"
         private static readonly Regex _wellCodeRx = new Regex(@"([A-Z]-\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Regex to extract section hole size — e.g. "16 1/2" or "12 1/4" or "12.25"
+        // Regex to extract section hole size — e.g. "16 1/2" or "12 1/4" or "12.25".
+        // Also captures compound sizes like "17 1/2\" x 23 1/2\"" (bi-centric / combo BHA).
+        // Try compound first (CompoundSizeRx), then single (SectionSizeRx).
         private static readonly Regex _sectionSizeRx = new Regex(
             @"(\d+(?:\s*\d+/\d+)?(?:\.\d+)?)\s*(?:""|''|in\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex _sectionCompoundRx = new Regex(
+            @"(\d+(?:\s*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?\s*x\s*\d+(?:\s*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Regex to detect M/U BHA task names
+        // Regex to detect BHA section start markers:
+        // MU / Make up / PU / Pick up / Run + BHA.
         private static readonly Regex _muBhaRx = new Regex(
-            @"\b(?:M/?U|Make[\s-]*up|P/?U|Pick[\s-]*[Uu]p|RIH)\b.*\bBHA\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            @"\b(?:M/?U|Make[\s-]*up|P/?U|Pick[\s-]*up|Run)\b.*\bBHA\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Regex to detect POOH / L/D BHA task names
+        // Regex to detect BHA section end markers:
+        // POOH + BHA, or L/D / LD / Lay Down / Pull + BHA, or Rack Back aliases.
         private static readonly Regex _poohRx = new Regex(
-            @"\b(?:POOH|L/?D\s*BHA|Lay\s*Down\s*BHA)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            @"(?:\bPOOH\b.*\bBHA\b|\b(?:L/?D|LD|Lay\s*Down|Pull)\b.*\bBHA\b|\b(?:Rack\s*Back|R\s*/\s*B|RB)\b)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Hard end marker for section close preference (final lay down / rack back).
+        private static readonly Regex _ldBhaRx = new Regex(
+            @"(?:\b(?:L/?D|LD|Lay\s*Down|Pull)\b.*\bBHA\b|\b(?:Rack\s*Back|R\s*/\s*B|RB)\b)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Current-operation time window: include tasks from now-3h to now+3h.
+        private static readonly TimeSpan _currentOpsWindow = TimeSpan.FromHours(3);
 
         // Regex to detect Whipstock tasks
         private static readonly Regex _whipstockRx = new Regex(
             @"\b(?:Whipstock|PU\s*W/?S)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Whipstock BHA can be a standalone section start even without explicit MU token.
+        private static readonly Regex _whipstockBhaStartRx = new Regex(
+            @"\bWhipstock\b.*\bBHA\b|\bBHA\b.*\bWhipstock\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Regex to detect D-section style headers (Kabal well timeplanner page 3103):
+        // "D-02: Drill 17 1/2\" Section", "D-07: Drill 12 1/4\" section", etc.
+        private static readonly Regex _dSectionRx = new Regex(
+            @"\bDrill\s+\d.*\b[Ss]ection\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Regex to detect RAP-level drill/RIH-with-drill section headers.
+        // These are collapsed parent rows in the APEX TimePlanner table when the section
+        // has not yet started — no child tasks (M/U BHA etc.) are visible in the DOM.
+        private static readonly Regex _rapDrillRx = new Regex(
+            @"\bRAP\s*\d+\b.*\b(?:Drill|RIH\s*(?:&|with|w/))\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // DateTime patterns used in Kabal timeplanner task rows
         private static readonly string[] _kabalDateFormats = {
@@ -418,6 +471,7 @@ namespace ModemMergerWinFormsApp
                 options.AddArgument("--disable-dev-shm-usage");
                 options.AddArgument("--disable-blink-features=AutomationControlled");
                 options.AddArgument("--disable-extensions");
+                options.AddArgument("--disable-popup-blocking");
                 options.AddArgument("--no-first-run");
                 options.AddArgument("--no-default-browser-check");
                 options.AddArgument("--window-size=1920,1080");
@@ -426,6 +480,13 @@ namespace ModemMergerWinFormsApp
                 options.AddArgument("--user-data-dir=" + _userDataDir);
 
                 var driverDir = FindEdgeDriver();
+                if (string.IsNullOrEmpty(driverDir))
+                {
+                    var edgeMajor = GetInstalledEdgeMajorVersion();
+                    throw new InvalidOperationException(
+                        $"No compatible msedgedriver found for Edge major {edgeMajor}. " +
+                        "Auto-download failed or internet access is blocked.");
+                }
 
                 // Retry driver creation up to 2 times — first failure may be a
                 // transient crash caused by stale profile state.
@@ -447,9 +508,9 @@ namespace ModemMergerWinFormsApp
                         }
                         break; // success
                     }
-                    catch when (attempt < maxAttempts)
+                    catch (Exception ex) when (attempt < maxAttempts)
                     {
-                        ScrapeLog.Warn($"Edge driver creation failed (attempt {attempt}/{maxAttempts}), retrying...");
+                        ScrapeLog.Warn($"Edge driver creation failed (attempt {attempt}/{maxAttempts}): {ex.Message}");
                         KillOrphanEdgeProcesses();
                         Thread.Sleep(1500);
                     }
@@ -474,6 +535,7 @@ namespace ModemMergerWinFormsApp
             return await Task.Run(() =>
             {
                 ScrapeLog.Start();
+                ScrapeLog.Info("TimePlanner ParserVersion=2026-05-19b");
                 ScrapeLog.Info($"TimePlanner: Operator={operatorName}, Rig={rigName}, Wells={string.Join(",", wellCodesToMatch)}");
 
                 OpenQA.Selenium.IWebDriver driver = null;
@@ -766,7 +828,7 @@ namespace ModemMergerWinFormsApp
                     // Match by vertical position: item.midY must fall within rig label's top/bottom bounds.
                     var extractWellsJs = @"
                         var rigNameLower = '" + resolvedRigName.ToLower().Replace("'", "\\'") + @"';
-                        var result = { rigFound: false, wells: [], debug: { labels: 0, items: 0, labelTexts: [], allItemTexts: [] } };
+                        var result = { rigFound: false, wells: [], debug: { labels: 0, items: 0, labelTexts: [], allItemTexts: [], rowHeight: 0, skippedByRow: 0 } };
 
                         // Step 1: find the vis-label that matches the rig name.
                         // Text lives in .vis-inner (child div), not directly in .vis-label.
@@ -787,15 +849,25 @@ namespace ModemMergerWinFormsApp
                             }
                         }
 
-                        // Step 2: gather vis-items whose vertical midpoint falls in the rig row
+                        // Step 2: gather vis-items that overlap (or are very close to) the rig row.
+                        // vis.js can position bars a few px outside the label bounds, so midpoint-only
+                        // checks with tight +/-5 tolerance can drop valid wells.
                         var allItems = document.querySelectorAll('.vis-item');
                         result.debug.items = allItems.length;
+                        var rowHeight = (rigBottom > rigTop) ? (rigBottom - rigTop) : 40;
+                        result.debug.rowHeight = Math.round(rowHeight);
+                        var rigMid = (rigTop + rigBottom) / 2;
+                        var nearTol = Math.max(18, rowHeight * 0.9);
                         var seen = {};
                         for (var j = 0; j < allItems.length; j++) {
                             var item = allItems[j];
                             var ir = item.getBoundingClientRect();
                             var midY = ir.top + ir.height / 2;
-                            if (result.rigFound && (midY < rigTop - 5 || midY > rigBottom + 5)) continue;
+                            if (result.rigFound) {
+                                var overlap = Math.min(ir.bottom, rigBottom) - Math.max(ir.top, rigTop);
+                                var nearRow = Math.abs(midY - rigMid) <= nearTol;
+                                if (!(overlap > 0 || nearRow)) { result.debug.skippedByRow++; continue; }
+                            }
                             var cont = item.querySelector('.vis-item-content') || item;
                             var anch = cont.querySelector('a[href]');
                             // innerText for visible Svelte-rendered text; fallback to textContent
@@ -861,6 +933,53 @@ namespace ModemMergerWinFormsApp
                         try
                         {
                             var urlBefore = driver.Url;
+                            var handlesBefore = new HashSet<string>(driver.WindowHandles);
+
+                            // ── Inject click interceptors before ANY interaction ───────────────────────
+                            // We need to know EXACTLY what Kabal's Svelte/APEX handler calls when a
+                            // vis-item is clicked: window.open, apex.navigation.redirect, $.dialog('open')
+                            // or something else entirely.  We intercept all three paths.
+                            js.ExecuteScript(@"
+                                window._kabalClickResult = null;
+                                // 1. window.open
+                                var _oo = window.open;
+                                window.open = function(u,n,f) {
+                                    window._kabalClickResult = {type:'window.open', url: u||''};
+                                    return _oo.call(this, u, n, f);
+                                };
+                                // 2. APEX navigation
+                                try {
+                                    if (window.apex && apex.navigation) {
+                                        var _ar = apex.navigation.redirect;
+                                        if (_ar) apex.navigation.redirect = function(u) {
+                                            window._kabalClickResult = {type:'apex.redirect', url: u};
+                                            return _ar.apply(this, arguments);
+                                        };
+                                        var _aw = apex.navigation.openInNewWindow;
+                                        if (_aw) apex.navigation.openInNewWindow = function(u) {
+                                            window._kabalClickResult = {type:'apex.openInNewWindow', url: u};
+                                            return _aw.apply(this, arguments);
+                                        };
+                                    }
+                                } catch(e) {}
+                                // 3. jQuery UI dialog open
+                                try {
+                                    if (window.$ && $.fn && $.fn.dialog) {
+                                        var _od = $.fn.dialog;
+                                        $.fn.dialog = function(opt) {
+                                            if (opt === 'open') {
+                                                var el = this[0];
+                                                window._kabalClickResult = {
+                                                    type: 'jqui-dialog',
+                                                    id: (el && el.id) || '',
+                                                    cls: (el && el.className.substring(0,80)) || ''
+                                                };
+                                            }
+                                            return _od.apply(this, arguments);
+                                        };
+                                    }
+                                } catch(e) {}
+                            ");
 
                             if (!string.IsNullOrEmpty(wellHref) && wellHref.StartsWith("http"))
                             {
@@ -870,8 +989,6 @@ namespace ModemMergerWinFormsApp
                             else
                             {
                                 // No href in item — click the vis-item by data-id via JS executor
-                                // (JS executor click is the only reliable way to trigger vis.js/Svelte handlers
-                                //  on absolutely-positioned elements in headless Chrome)
                                 bool clicked = false;
                                 if (!string.IsNullOrEmpty(wellDataId))
                                 {
@@ -892,71 +1009,159 @@ namespace ModemMergerWinFormsApp
                                 }
                                 if (!clicked)
                                 {
-                                    // Fallback: find by text inside .vis-item-content and fire click event
-                                    var fallJs = @"
-                                        var name = '" + wellName.Replace("'", "\\'") + @"';
-                                        var items = document.querySelectorAll('.vis-item');
-                                        for (var i = 0; i < items.length; i++) {
-                                            var c = items[i].querySelector('.vis-item-content') || items[i];
-                                            if ((c.textContent||'').trim().indexOf(name) >= 0) {
-                                                items[i].dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
-                                                return true;
+                                    // Fallback: return the DOM element directly from JS, then use
+                                    // Actions.MoveToElement+Click to physically move the mouse and fire
+                                    // proper mouse events that vis.js/Svelte can intercept.
+                                    try
+                                    {
+                                        var findItemByTextJs = @"
+                                            var name = '" + wellName.Replace("'", "\\'") + @"';
+                                            var items = document.querySelectorAll('.vis-item');
+                                            for (var i = 0; i < items.length; i++) {
+                                                var c = items[i].querySelector('.vis-item-content') || items[i];
+                                                if ((c.textContent||'').trim().indexOf(name) >= 0) {
+                                                    return items[i];
+                                                }
                                             }
+                                            return null;
+                                        ";
+                                        var targetEl = js.ExecuteScript(findItemByTextJs) as OpenQA.Selenium.IWebElement;
+                                        if (targetEl != null)
+                                        {
+                                            js.ExecuteScript("arguments[0].scrollIntoView({block:'center',inline:'center'});", targetEl);
+                                            Thread.Sleep(250);
+                                            new OpenQA.Selenium.Interactions.Actions(driver)
+                                                .MoveToElement(targetEl)
+                                                .Click()
+                                                .Perform();
+                                            clicked = true;
+                                            ScrapeLog.Info($"  Clicked vis-item via Actions.MoveToElement for '{wellName}'");
                                         }
-                                        return false;
-                                    ";
-                                    clicked = js.ExecuteScript(fallJs) is bool bf && bf;
+                                        else
+                                        {
+                                            ScrapeLog.Warn($"  JS could not find vis-item for '{wellName}' — skipping.");
+                                        }
+                                    }
+                                    catch (Exception fallbackEx) { ScrapeLog.Warn($"  Actions click error: {fallbackEx.Message}"); }
+
                                     if (!clicked) { ScrapeLog.Warn($"  Could not click well bar: '{wellName}'"); continue; }
                                 }
                             }
 
-                            // Wait up to 5s for URL to change (navigation) or popup to open
-                            string urlAfter = urlBefore;
-                            for (int nw = 0; nw < 10; nw++)
-                            {
-                                Thread.Sleep(500);
-                                urlAfter = driver.Url;
-                                if (!urlAfter.Equals(urlBefore, StringComparison.OrdinalIgnoreCase)) break;
-                            }
-                            bool navigated = !urlAfter.Equals(urlBefore, StringComparison.OrdinalIgnoreCase);
-                            ScrapeLog.Info($"  After click: navigated={navigated}, url={urlAfter}");
+                            // ── Wait 3s, then read intercepted result + window handles + dialog state ──
+                            Thread.Sleep(3000);
+                            var handlesAfter = driver.WindowHandles;
+                            var newHandles = handlesAfter.Except(handlesBefore).ToList();
+                            var clickResult = js.ExecuteScript(
+                                "return window._kabalClickResult ? JSON.stringify(window._kabalClickResult) : null"
+                            ) as string;
+                            var dialogDump = js.ExecuteScript(@"
+                                var ds = document.querySelectorAll('.ui-dialog');
+                                return JSON.stringify({
+                                    count: ds.length,
+                                    dialogs: Array.from(ds).map(function(d) {
+                                        return {
+                                            id: d.id,
+                                            cls: d.className.substring(0,80),
+                                            open: d.style.display !== 'none' && !d.classList.contains('ui-dialog-hidden'),
+                                            tabCnt: d.querySelectorAll('table').length,
+                                            divCnt: d.querySelectorAll('div').length,
+                                            len: d.innerHTML.length,
+                                            html: d.innerHTML.substring(0, 500)
+                                        };
+                                    })
+                                });
+                            ") as string;
+                            ScrapeLog.Info($"  Intercept={clickResult ?? "null"} | newTabs={newHandles.Count} | url={driver.Url}");
+                            ScrapeLog.Info($"  Dialogs: {dialogDump}");
 
                             List<TimePlannerSection> sections;
-                            if (navigated)
+
+                            if (newHandles.Count > 0)
                             {
+                                // New tab opened — switch, parse, close, switch back
+                                driver.SwitchTo().Window(newHandles[0]);
+                                ScrapeLog.Info($"  Switched to new tab: {driver.Url}");
                                 WaitForApexReady(driver);
-                                Thread.Sleep(250);
+                                // APEX renders table structure immediately but fills cell text asynchronously.
+                                // Poll until at least one cell has meaningful content (max 12s).
+                                string firstCellText = "";
+                                for (int cw = 0; cw < 24; cw++)
+                                {
+                                    Thread.Sleep(500);
+                                    try
+                                    {
+                                        firstCellText = js.ExecuteScript(
+                                            "var cells = document.querySelectorAll('table td'); " +
+                                            "for (var i = 0; i < cells.length; i++) { " +
+                                            "  var td = cells[i]; " +
+                                            "  var txt = (td.textContent || td.innerText || '').trim(); " +
+                                            "  if (!txt) { " +
+                                            "    var ctrl = td.querySelector('input,textarea,select'); " +
+                                            "    txt = ctrl ? ((ctrl.value || ctrl.textContent || '').trim()) : ''; " +
+                                            "  } " +
+                                            "  if (txt) return txt; " +
+                                            "} " +
+                                            "return ''; ") as string ?? "";
+                                        if (!string.IsNullOrEmpty(firstCellText)) break;
+                                    }
+                                    catch { }
+                                }
+                                ScrapeLog.Info($"  First cell text='{firstCellText}'. Parsing...");
                                 sections = ParseTimePlannerTasks(js, wellName);
+                                ScrapeLog.Info($"  New tab parsed {sections.Count} sections.");
+                                driver.Close();
+                                driver.SwitchTo().Window(handlesBefore.First());
                             }
                             else
                             {
-                                // Clicking a vis-item may open a Kabal drawer/popup instead of navigating.
-                                // Try to find a plan detail link inside any open panel.
-                                var panelResult = js.ExecuteScript(
-                                    "var d = document.querySelector('#welsDrawer,[class*=drawer],[class*=reveal]');" +
-                                    "if (!d || d.offsetHeight === 0) return null;" +
-                                    "var a = d.querySelector('a[href]');" +
-                                    "return JSON.stringify({html: d.innerHTML.substring(0,400), href: a ? a.href : ''});") as string;
+                                // No new tab — check URL change or same-page dialog/inline content
+                                string urlAfter = driver.Url;
+                                bool navigated = !urlAfter.Equals(urlBefore, StringComparison.OrdinalIgnoreCase);
+                                ScrapeLog.Info($"  navigated={navigated}");
 
-                                if (!string.IsNullOrEmpty(panelResult))
+                                if (navigated)
                                 {
-                                    var panel = JsonConvert.DeserializeObject<Dictionary<string, string>>(panelResult);
-                                    var h = panel.ContainsKey("html") ? panel["html"] : "";
-                                    ScrapeLog.Info($"  Popup/drawer opened ({h.Length} chars): {h.Substring(0, Math.Min(200, h.Length))}");
-                                    var panelHref = panel.ContainsKey("href") ? panel["href"] : "";
-                                    if (!string.IsNullOrEmpty(panelHref) && panelHref.StartsWith("http"))
-                                    {
-                                        driver.Navigate().GoToUrl(panelHref);
-                                        WaitForApexReady(driver);
-                                        Thread.Sleep(250);
-                                        sections = ParseTimePlannerTasks(js, wellName);
-                                    }
-                                    else { sections = new List<TimePlannerSection>(); }
+                                    WaitForApexReady(driver);
+                                    Thread.Sleep(250);
+                                    sections = ParseTimePlannerTasks(js, wellName);
                                 }
                                 else
                                 {
-                                    ScrapeLog.Warn($"  No navigation and no popup for '{wellName}' — skipping.");
-                                    sections = new List<TimePlannerSection>();
+                                    // Poll for tables OR dialog content (Kabal may use non-table elements)
+                                    bool contentReady = false;
+                                    for (int tw = 0; tw < 18; tw++)
+                                    {
+                                        Thread.Sleep(500);
+                                        try
+                                        {
+                                            var rc = js.ExecuteScript(
+                                                "var t = document.querySelector('table,div.ui-dialog-content'); " +
+                                                "if (!t) return 0; " +
+                                                "var r = t.querySelectorAll('tbody tr,tr'); " +
+                                                "return r.length;");
+                                            long rowCount = rc is long rl ? rl : (rc is int ri ? (long)ri : 0);
+                                            if (rowCount > 0) { contentReady = true; break; }
+                                        }
+                                        catch { }
+                                    }
+                                    ScrapeLog.Info($"  Content ready={contentReady}. Parsing...");
+                                    sections = ParseTimePlannerTasks(js, wellName);
+                                    if (sections.Count == 0)
+                                    {
+                                        var domDump = js.ExecuteScript(@"
+                                            var info = { tableCount: 0, tables: [], dialogs: [], bodyLen: document.body.innerHTML.length };
+                                            document.querySelectorAll('table').forEach(function(t,i){
+                                                if(i<3) info.tables.push({cls:t.className.substring(0,60),rows:t.querySelectorAll('tr').length,html:t.innerHTML.substring(0,300)});
+                                            });
+                                            info.tableCount = document.querySelectorAll('table').length;
+                                            document.querySelectorAll('.ui-dialog').forEach(function(d){
+                                                info.dialogs.push({id:d.id,open:d.style.display!=='none',len:d.innerHTML.length,html:d.innerHTML.substring(0,400)});
+                                            });
+                                            return JSON.stringify(info);
+                                        ") as string;
+                                        ScrapeLog.Warn($"  0 sections. DOM: {domDump?.Substring(0, Math.Min(800, domDump?.Length ?? 0))}");
+                                    }
                                 }
                             }
 
@@ -987,6 +1192,9 @@ namespace ModemMergerWinFormsApp
                         }
                     }
 
+                    result.RecentOperations = BuildRecentOperations(result.Sections);
+                    result.LastUpdated = DateTime.Now;
+
                     ScrapeLog.Info($"TimePlanner: Total sections extracted={result.Sections.Count} from {planIdx} wells.");
                     onStatus?.Invoke($"Done. Found {result.Sections.Count} drilling sections from {planIdx} wells.");
                     return result;
@@ -1008,35 +1216,224 @@ namespace ModemMergerWinFormsApp
         private static List<TimePlannerSection> ParseTimePlannerTasks(
             OpenQA.Selenium.IJavaScriptExecutor js, string planName)
         {
-            // Extract all task rows via JS
-            var extractTasksJs = @"
+            // Expand all collapsible rows so nested RAP tasks (including MU/POOH BHA lines)
+            // are present in the DOM before table extraction.
+            var expandRowsJs = @"
+                function clickEl(el) {
+                    try {
+                        if (!el) return false;
+                        if (el.dataset && el.dataset.mmClicked === '1') return false;
+                        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        el.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true }));
+                        el.dispatchEvent(new MouseEvent('click',     { bubbles: true }));
+                        if (typeof el.click === 'function') el.click();
+                        if (el.dataset) el.dataset.mmClicked = '1';
+                        return true;
+                    } catch (e) { return false; }
+                }
+
+                var selectors = [
+                    '[aria-expanded=false]',
+                    'button[title*=Expand]',
+                    'a[title*=Expand]',
+                    '.a-TreeView-toggle.is-collapsed',
+                    '.a-TreeView-toggle[aria-expanded=false]',
+                    '.js-treeView-toggle[aria-expanded=false]',
+                    '.fa-caret-right',
+                    '.icon-right-arrow',
+                    '.t-Report-report .is-collapsed .js-toggle',
+                    '[aria-label*=Expand]',
+                    '[title*=expand]',
+                    '[class*=collapsed] [role=button]'
+                ];
+
+                var roots = document.querySelectorAll('table');
+                var clicked = 0;
+                for (var r = 0; r < roots.length; r++) {
+                    var root = roots[r];
+
+                    // Target RAP parent rows explicitly; many APEX reports hide children until
+                    // the RAP row toggle/cell is clicked.
+                    var rapRows = root.querySelectorAll('tr');
+                    for (var rr = 0; rr < rapRows.length; rr++) {
+                        var tr = rapRows[rr];
+                        var txt = (tr.textContent || '').trim();
+                        if (!/\bRAP\s*\d+/i.test(txt)) continue;
+
+                        var cls = (tr.className || '').toLowerCase();
+                        var trExpanded = tr.getAttribute ? tr.getAttribute('aria-expanded') : null;
+                        var trCollapsed = cls.indexOf('collapsed') >= 0 || trExpanded === 'false';
+
+                        var toggles = tr.querySelectorAll('[aria-expanded=false], .a-TreeView-toggle.is-collapsed, .js-treeView-toggle[aria-expanded=false], .fa-caret-right, .icon-right-arrow');
+                        for (var ti = 0; ti < toggles.length; ti++) {
+                            if (clickEl(toggles[ti])) clicked++;
+                        }
+
+                        // Some APEX layouts only expand when the first RAP cell is clicked.
+                        // Do this only for rows that are explicitly collapsed.
+                        if (trCollapsed) {
+                            var firstCell = tr.querySelector('td');
+                            if (firstCell && clickEl(firstCell)) clicked++;
+                        }
+                    }
+
+                    for (var s = 0; s < selectors.length; s++) {
+                        var nodes = [];
+                        try { nodes = root.querySelectorAll(selectors[s]); } catch (e) { continue; }
+                        for (var i = 0; i < nodes.length; i++) {
+                            var n = nodes[i];
+                            if (!n || n.disabled) continue;
+                            if (n.getAttribute && n.getAttribute('aria-expanded') === 'true') continue;
+                            if (clickEl(n)) clicked++;
+                        }
+                    }
+                }
+                return clicked;
+            ";
+
+            var countRowsJs = @"
                 var tables = document.querySelectorAll('table');
-                var best = null, bestRows = 0;
+                var best = 0;
+                for (var t = 0; t < tables.length; t++) {
+                    var r = tables[t].querySelectorAll('tbody tr').length;
+                    if (r === 0) r = tables[t].querySelectorAll('tr').length;
+                    if (r > best) best = r;
+                }
+                return best;
+            ";
+
+            int prevRows = -1;
+            for (int pass = 0; pass < 3; pass++)   // max 3 passes — RAP fallback covers future sections
+            {
+                int beforeRows = 0;
+                try
+                {
+                    var beforeObj = js.ExecuteScript(countRowsJs);
+                    if (beforeObj is long bl) beforeRows = (int)bl;
+                    else if (beforeObj is int bi) beforeRows = bi;
+                    else int.TryParse(Convert.ToString(beforeObj), out beforeRows);
+                }
+                catch { }
+
+                var clickObj = js.ExecuteScript(expandRowsJs);
+                var clicks = 0;
+                if (clickObj is long l) clicks = (int)l;
+                else if (clickObj is int i) clicks = i;
+                else int.TryParse(Convert.ToString(clickObj), out clicks);
+
+                Thread.Sleep(120);
+
+                int afterRows = beforeRows;
+                try
+                {
+                    var afterObj = js.ExecuteScript(countRowsJs);
+                    if (afterObj is long al) afterRows = (int)al;
+                    else if (afterObj is int ai) afterRows = ai;
+                    else int.TryParse(Convert.ToString(afterObj), out afterRows);
+                }
+                catch { }
+
+                ScrapeLog.Info($"ParseTimePlannerTasks: expand pass {pass + 1} clicked={clicks}, rows={beforeRows}->{afterRows}");
+
+                if ((clicks <= 0 && afterRows <= beforeRows) || (afterRows == prevRows && afterRows <= beforeRows))
+                    break;
+
+                prevRows = afterRows;
+                Thread.Sleep(80);
+            }
+
+            // Extract task rows via JS from the table that actually contains populated cells.
+            var extractTasksJs = @"
+                function cellValue(td) {
+                    if (!td) return '';
+                    var txt = (td.textContent || td.innerText || '').trim();
+                    if (txt) return txt;
+                    var ctrl = td.querySelector('input,textarea,select');
+                    if (ctrl) {
+                        var v = (ctrl.value || ctrl.textContent || '').trim();
+                        if (v) return v;
+                    }
+                    var titleEl = td.querySelector('[title]');
+                    if (titleEl && titleEl.title) {
+                        var t = titleEl.title.trim();
+                        if (t) return t;
+                    }
+                    return '';
+                }
+
+                var tables = document.querySelectorAll('table');
+                var best = null, bestScore = -1, bestRows = 0;
                 for (var t = 0; t < tables.length; t++) {
                     var rows = tables[t].querySelectorAll('tbody tr');
-                    if (rows.length > bestRows) { bestRows = rows.length; best = tables[t]; }
+                    if (rows.length === 0) rows = tables[t].querySelectorAll('tr');
+
+                    var nonEmptyCells = 0;
+                    var sampleCells = tables[t].querySelectorAll('td');
+                    for (var c = 0; c < sampleCells.length; c++) {
+                        if (cellValue(sampleCells[c])) nonEmptyCells++;
+                    }
+
+                    // Prefer table with populated cells; use row count only as a tiebreaker.
+                    var score = nonEmptyCells * 1000 + rows.length;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestRows = rows.length;
+                        best = tables[t];
+                    }
                 }
-                if (!best) return JSON.stringify([]);
+                if (!best) return JSON.stringify({ tableCount: tables.length, rows: [] });
                 var headers = [];
                 var ths = best.querySelectorAll('th');
-                for (var i = 0; i < ths.length; i++) headers.push(ths[i].innerText.trim().toLowerCase());
+                for (var i = 0; i < ths.length; i++) headers.push((ths[i].textContent || ths[i].innerText || '').trim().toLowerCase());
+                var dataRows = best.querySelectorAll('tbody tr');
+                if (dataRows.length === 0) {
+                    // No tbody — skip first row (likely a header tr) and use all remaining tr
+                    var allTr = best.querySelectorAll('tr');
+                    dataRows = Array.prototype.slice.call(allTr, headers.length > 0 ? 1 : 0);
+                }
                 var data = [];
-                var rows = best.querySelectorAll('tbody tr');
-                for (var r = 0; r < rows.length; r++) {
-                    var cells = rows[r].querySelectorAll('td');
+                for (var r = 0; r < dataRows.length; r++) {
+                    var cells = dataRows[r].querySelectorAll('td');
+                    if (cells.length === 0) continue;
                     var obj = {};
                     for (var c = 0; c < cells.length; c++) {
-                        var key = c < headers.length ? headers[c] : 'col_' + c;
-                        obj[key] = cells[c].innerText.trim();
+                        var key = c < headers.length ? (headers[c] || '') : '';
+                        // APEX page 3103 often has blank header text; never allow empty keys.
+                        if (!key) key = 'col_' + c;
+                        // Keep all cells even when duplicate header captions exist.
+                        if (Object.prototype.hasOwnProperty.call(obj, key)) key = key + '_' + c;
+                        obj[key] = cellValue(cells[c]);
                     }
                     data.push(obj);
                 }
-                return JSON.stringify(data);
+                return JSON.stringify({ tableCount: tables.length, selectedRows: bestRows, selectedScore: bestScore, rows: data });
             ";
 
             var json = js.ExecuteScript(extractTasksJs) as string;
-            var taskRows = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json ?? "[]");
-            ScrapeLog.Info($"ParseTimePlannerTasks: {taskRows?.Count ?? 0} raw task rows for '{planName}'");
+            // Result is now { tableCount: N, rows: [...] }
+            List<Dictionary<string, string>> taskRows;
+            int tableCount = 0;
+            try
+            {
+                var wrapper = JsonConvert.DeserializeObject<Dictionary<string, object>>(json ?? "{}");
+                if (wrapper != null && wrapper.ContainsKey("rows"))
+                {
+                    tableCount = wrapper.ContainsKey("tableCount") ? Convert.ToInt32(wrapper["tableCount"]) : 0;
+                    taskRows = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(wrapper["rows"].ToString());
+                    if (wrapper.ContainsKey("selectedRows") || wrapper.ContainsKey("selectedScore"))
+                    {
+                        var selectedRows = wrapper.ContainsKey("selectedRows") ? Convert.ToInt32(wrapper["selectedRows"]) : 0;
+                        var selectedScore = wrapper.ContainsKey("selectedScore") ? Convert.ToInt32(wrapper["selectedScore"]) : 0;
+                        ScrapeLog.Info($"ParseTimePlannerTasks: selected table rows={selectedRows}, score={selectedScore}");
+                    }
+                }
+                else
+                {
+                    taskRows = new List<Dictionary<string, string>>();
+                }
+            }
+            catch { taskRows = new List<Dictionary<string, string>>(); }
+            ScrapeLog.Info($"ParseTimePlannerTasks: {tableCount} tables, {taskRows?.Count ?? 0} raw rows for '{planName}'");
             if (taskRows != null && taskRows.Count > 0)
             {
                 ScrapeLog.Info($"  headers: {string.Join(" | ", taskRows[0].Keys)}");
@@ -1075,7 +1472,7 @@ namespace ModemMergerWinFormsApp
 
                 if (!string.IsNullOrEmpty(taskName))
                 {
-                    bool isMuBha    = _muBhaRx.IsMatch(taskName);
+                    bool isMuBha    = IsSectionStartTask(taskName);
                     bool isPooh     = _poohRx.IsMatch(taskName);
                     bool isWhip     = _whipstockRx.IsMatch(taskName);
                     bool isKey = isMuBha || isPooh || isWhip;
@@ -1091,60 +1488,312 @@ namespace ModemMergerWinFormsApp
                 }
             }
 
-            // Group into sections: each M/U BHA starts a new section, POOH ends it
+            // Build all BHA sections for this well:
+            // each MU/PU/RIH-with-BHA starts a section, first following POOH/LD-BHA ends it.
             var sections = new List<TimePlannerSection>();
-            TimePlannerSection current = null;
 
-            foreach (var task in allTasks)
+            var timedTasks = new List<Tuple<TimePlannerTask, DateTime>>();
+            foreach (var t in allTasks)
             {
-                if (_muBhaRx.IsMatch(task.TaskName))
+                DateTime st;
+                if (TryParseKabalDate(t.StartDateTime, out st))
+                    timedTasks.Add(Tuple.Create(t, st));
+            }
+            timedTasks = timedTasks.OrderBy(x => x.Item2).ToList();
+
+            TimePlannerSection current = null;
+            string pendingSoftEnd = null;
+            for (int ti = 0; ti < timedTasks.Count; ti++)
+            {
+                var tt = timedTasks[ti];
+                var task = tt.Item1;
+
+                if (IsSectionStartTask(task.TaskName))
                 {
-                    // Start a new section
-                    var sizeMatch = _sectionSizeRx.Match(task.TaskName);
-                    var size = sizeMatch.Success ? sizeMatch.Groups[1].Value.Trim() : "";
+                    if (current != null && string.IsNullOrWhiteSpace(current.PoohDateTime))
+                    {
+                        current.PoohDateTime = !string.IsNullOrWhiteSpace(pendingSoftEnd) ? pendingSoftEnd : task.StartDateTime;
+                        DateTime cMu, cEnd;
+                        if (TryParseKabalDate(current.MuBhaDateTime, out cMu) && TryParseKabalDate(current.PoohDateTime, out cEnd))
+                            current.DurationDays = Math.Round((cEnd - cMu).TotalDays, 2);
+                        current = null;
+                        pendingSoftEnd = null;
+                    }
+
+                    string size;
+                    string sectionName;
+                    ExtractSectionSizeAndName(task.TaskName, out size, out sectionName);
+
+                    // If M/U BHA has no explicit size, infer from nearby drill/section/hole rows.
+                    if (string.IsNullOrWhiteSpace(size))
+                    {
+                        for (int bi = ti - 1; bi >= 0 && bi >= ti - 8; bi--)
+                        {
+                            var prevTask = timedTasks[bi].Item1;
+                            var prevName = prevTask.TaskName ?? "";
+                            if (string.IsNullOrWhiteSpace(prevName)) continue;
+
+                            // Prefer contextual rows that typically carry section size descriptors.
+                            if (prevName.IndexOf("hole", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                prevName.IndexOf("section", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                prevName.IndexOf("drill", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                !_rapDrillRx.IsMatch(prevName))
+                                continue;
+
+                            string hintSize;
+                            string hintSectionName;
+                            ExtractSectionSizeAndName(prevName, out hintSize, out hintSectionName);
+                            if (!string.IsNullOrWhiteSpace(hintSize))
+                            {
+                                size = hintSize;
+                                sectionName = hintSectionName;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(size) && _whipstockRx.IsMatch(task.TaskName))
+                        sectionName = "Whipstock section";
 
                     current = new TimePlannerSection
                     {
                         WellName = planName,
                         PlanName = planName,
-                        SectionName = !string.IsNullOrEmpty(size) ? size + "\" section" : task.TaskName,
+                        SectionName = sectionName,
                         SectionSize = size,
                         MuBhaDateTime = task.StartDateTime,
-                        IsWhipstock = false,
+                        IsWhipstock = _whipstockRx.IsMatch(task.TaskName),
                     };
                     current.Tasks.Add(task);
                     sections.Add(current);
                     ScrapeLog.Info($"  >> Section STARTED: '{current.SectionName}' at {task.StartDateTime}");
+                    continue;
                 }
-                else if (_poohRx.IsMatch(task.TaskName) && current != null)
+
+                if (_poohRx.IsMatch(task.TaskName) && current != null)
                 {
-                    // End current section
-                    current.PoohDateTime = !string.IsNullOrEmpty(task.EndDateTime) ? task.EndDateTime : task.StartDateTime;
                     current.Tasks.Add(task);
 
-                    // Calculate duration
-                    DateTime muDt, poohDt;
-                    if (TryParseKabalDate(current.MuBhaDateTime, out muDt) &&
-                        TryParseKabalDate(current.PoohDateTime, out poohDt))
+                    var endValue = !string.IsNullOrEmpty(task.EndDateTime) ? task.EndDateTime : task.StartDateTime;
+                    if (_ldBhaRx.IsMatch(task.TaskName))
                     {
-                        current.DurationDays = Math.Round((poohDt - muDt).TotalDays, 2);
+                        current.PoohDateTime = endValue;
+                        DateTime muDt, poohDt;
+                        if (TryParseKabalDate(current.MuBhaDateTime, out muDt) && TryParseKabalDate(current.PoohDateTime, out poohDt))
+                            current.DurationDays = Math.Round((poohDt - muDt).TotalDays, 2);
+                        current = null;
+                        pendingSoftEnd = null;
                     }
-
-                    current = null;
+                    else
+                    {
+                        // Interim POOH marker (e.g. below BOP) — keep as fallback,
+                        // but wait for L/D BHA before closing the section.
+                        pendingSoftEnd = endValue;
+                    }
+                    continue;
                 }
-                else
+
+                if (current != null)
                 {
-                    if (current != null)
-                    {
-                        current.Tasks.Add(task);
-                        // Check for whipstock
-                        if (_whipstockRx.IsMatch(task.TaskName))
-                            current.IsWhipstock = true;
-                    }
+                    current.Tasks.Add(task);
+                    if (_whipstockRx.IsMatch(task.TaskName))
+                        current.IsWhipstock = true;
                 }
             }
 
+            if (current != null && string.IsNullOrWhiteSpace(current.PoohDateTime) && !string.IsNullOrWhiteSpace(pendingSoftEnd))
+            {
+                current.PoohDateTime = pendingSoftEnd;
+                DateTime muDt, poohDt;
+                if (TryParseKabalDate(current.MuBhaDateTime, out muDt) && TryParseKabalDate(current.PoohDateTime, out poohDt))
+                    current.DurationDays = Math.Round((poohDt - muDt).TotalDays, 2);
+            }
+
+            // ── RAP-DRILL FALLBACK ─────────────────────────────────────────────────────
+            // APEX only renders child tasks for the currently-active RAP; future RAPs are
+            // collapsed and only their header row appears in the DOM.  Walk through all
+            // RAP-level drill/RIH headers; if no section was found within ±2 h of that
+            // RAP's start time (= child tasks were visible), synthesise a section from the
+            // header row itself, using the next RAP header as the section end.
+            var rapDrillList = timedTasks
+                .Where(tt => _rapDrillRx.IsMatch(tt.Item1.TaskName))
+                .ToList();
+
+            for (int ri = 0; ri < rapDrillList.Count; ri++)
+            {
+                var rapTt    = rapDrillList[ri];
+                var rapStart = rapTt.Item2;
+
+                // Skip if existing sections already cover this RAP window.
+                bool covered = sections.Any(s =>
+                {
+                    DateTime sd;
+                    return TryParseKabalDate(s.MuBhaDateTime, out sd)
+                           && Math.Abs((sd - rapStart).TotalHours) < 2.0;
+                });
+                if (covered) continue;
+
+                // Use next RAP-drill header's start as this section's end.
+                string rapEndDt = (ri + 1 < rapDrillList.Count)
+                    ? rapDrillList[ri + 1].Item1.StartDateTime
+                    : null;
+
+                string size;
+                string sectionName;
+                ExtractSectionSizeAndName(rapTt.Item1.TaskName, out size, out sectionName);
+
+                var syn = new TimePlannerSection
+                {
+                    WellName      = planName,
+                    PlanName      = planName,
+                    SectionName   = sectionName,
+                    SectionSize   = size,
+                    MuBhaDateTime = rapTt.Item1.StartDateTime,
+                    PoohDateTime  = rapEndDt ?? "",
+                    IsWhipstock   = false,
+                };
+                syn.Tasks.Add(rapTt.Item1);
+
+                if (!string.IsNullOrEmpty(rapEndDt))
+                {
+                    DateTime synMu, synEnd;
+                    if (TryParseKabalDate(syn.MuBhaDateTime, out synMu)
+                        && TryParseKabalDate(rapEndDt, out synEnd))
+                        syn.DurationDays = Math.Round((synEnd - synMu).TotalDays, 2);
+                }
+
+                sections.Add(syn);
+                ScrapeLog.Info($"  >> Section (RAP fallback): '{syn.SectionName}' at {rapTt.Item1.StartDateTime}");
+            }
+
+            // ── D-SECTION FALLBACK ─────────────────────────────────────────────────────
+            // The Kabal well timeplanner (page 3103) renders flat "D-XX: Drill SIZE Section"
+            // top-level tasks. Sub-tasks (Run/Pull BHA) are nested but expansion often
+            // yields 0 clicks (they are not collapsible APEX rows).  Synthesise sections
+            // from these D-level headers when no section was found within ±2 h of their
+            // start time, using the next D-section header's start as the section end.
+            var dSectionList = timedTasks
+                .Where(tt => _dSectionRx.IsMatch(tt.Item1.TaskName))
+                .OrderBy(tt => tt.Item2)
+                .ToList();
+
+            for (int di = 0; di < dSectionList.Count; di++)
+            {
+                var dTt    = dSectionList[di];
+                var dStart = dTt.Item2;
+
+                bool covered = sections.Any(s =>
+                {
+                    DateTime sd;
+                    return TryParseKabalDate(s.MuBhaDateTime, out sd)
+                           && Math.Abs((sd - dStart).TotalHours) < 2.0;
+                });
+                if (covered) continue;
+
+                string dEndDt = (di + 1 < dSectionList.Count)
+                    ? dSectionList[di + 1].Item1.StartDateTime
+                    : null;
+
+                string dSize;
+                string dSectionName;
+                ExtractSectionSizeAndName(dTt.Item1.TaskName, out dSize, out dSectionName);
+
+                var synD = new TimePlannerSection
+                {
+                    WellName      = planName,
+                    PlanName      = planName,
+                    SectionName   = dSectionName,
+                    SectionSize   = dSize,
+                    MuBhaDateTime = dTt.Item1.StartDateTime,
+                    PoohDateTime  = dEndDt ?? "",
+                    IsWhipstock   = false,
+                };
+                synD.Tasks.Add(dTt.Item1);
+
+                if (!string.IsNullOrEmpty(dEndDt))
+                {
+                    DateTime synMu, synEnd;
+                    if (TryParseKabalDate(synD.MuBhaDateTime, out synMu)
+                        && TryParseKabalDate(dEndDt, out synEnd))
+                        synD.DurationDays = Math.Round((synEnd - synMu).TotalDays, 2);
+                }
+
+                sections.Add(synD);
+                ScrapeLog.Info($"  >> Section (D-section fallback): '{synD.SectionName}' at {dTt.Item1.StartDateTime}");
+            }
+
+            // Re-sort all sections by start time after both extraction passes.
+            sections = sections
+                .OrderBy(s =>
+                {
+                    DateTime sd;
+                    return TryParseKabalDate(s.MuBhaDateTime, out sd) ? sd : DateTime.MaxValue;
+                })
+                .ToList();
+
             return sections;
+        }
+
+        private static List<TimePlannerRecentOperation> BuildRecentOperations(List<TimePlannerSection> sections)
+        {
+            var result = new List<TimePlannerRecentOperation>();
+            var from = DateTime.Now - _currentOpsWindow;
+            var to = DateTime.Now + _currentOpsWindow;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var sec in sections ?? new List<TimePlannerSection>())
+            {
+                foreach (var t in sec.Tasks ?? new List<TimePlannerTask>())
+                {
+                    DateTime dt;
+                    if (!TryParseKabalDate(t.StartDateTime, out dt)) continue;
+                    if (dt < from || dt > to) continue;
+
+                    var key = (sec.WellName ?? "") + "|" + (t.TaskName ?? "") + "|" + dt.ToString("yyyyMMddHHmm");
+                    if (!seen.Add(key)) continue;
+
+                    result.Add(new TimePlannerRecentOperation
+                    {
+                        WellName = sec.WellName,
+                        TaskName = t.TaskName,
+                        TaskDateTime = t.StartDateTime,
+                        HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
+                    });
+                }
+            }
+
+            return result
+                .OrderBy(x => Math.Abs(x.HoursFromNow))
+                .ThenBy(x => x.WellName)
+                .ToList();
+        }
+
+        private static void ExtractSectionSizeAndName(string taskName, out string size, out string sectionName)
+        {
+            size = "";
+            sectionName = taskName ?? "";
+            if (string.IsNullOrWhiteSpace(taskName)) return;
+
+            var compMatch = _sectionCompoundRx.Match(taskName);
+            if (compMatch.Success)
+            {
+                size = compMatch.Groups[1].Value.Trim();
+                // Normalize optional in/quotes to canonical quoted display for consistency.
+                size = Regex.Replace(size, @"\s*(?:in\b|''|'')\s*", "\"");
+                size = Regex.Replace(size, @"\s*x\s*", " x ");
+                sectionName = size + " section";
+                return;
+            }
+
+            var sizeMatch = _sectionSizeRx.Match(taskName);
+            size = sizeMatch.Success ? sizeMatch.Groups[1].Value.Trim() : "";
+            sectionName = !string.IsNullOrEmpty(size) ? size + "\" section" : taskName;
+        }
+
+        private static bool IsSectionStartTask(string taskName)
+        {
+            if (string.IsNullOrWhiteSpace(taskName)) return false;
+            return _muBhaRx.IsMatch(taskName) || _whipstockBhaStartRx.IsMatch(taskName);
         }
 
         private static bool TryParseKabalDate(string value, out DateTime result)
@@ -1462,31 +2111,267 @@ namespace ModemMergerWinFormsApp
         /// </summary>
         private static string FindEdgeDriver()
         {
-            // 1. Check app directory (same folder as the running .exe)
+            var edgeMajor = GetInstalledEdgeMajorVersion();
+            if (edgeMajor > 0)
+                ScrapeLog.Info($"Edge browser major version detected: {edgeMajor}");
+            else
+                ScrapeLog.Warn("Could not detect installed Edge version. Will use newest available driver.");
+
+            var candidates = new List<string>();
+
+            // 1) App directory (same folder as the running .exe)
             var appDir = AppDomain.CurrentDomain.BaseDirectory;
             if (File.Exists(Path.Combine(appDir, "msedgedriver.exe")))
-                return appDir;
+                candidates.Add(appDir);
 
-            // 2. Check working directory
+            // 2) Current working directory
             var cwd = Directory.GetCurrentDirectory();
             if (File.Exists(Path.Combine(cwd, "msedgedriver.exe")))
-                return cwd;
+                candidates.Add(cwd);
 
-            // 3. Fallback: Selenium cache
+            // 3) Selenium cache
             var cacheRoot = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".cache", "selenium", "msedgedriver", "win64");
             if (Directory.Exists(cacheRoot))
             {
-                foreach (var dir in Directory.GetDirectories(cacheRoot)
-                             .OrderByDescending(d => d))
+                foreach (var dir in Directory.GetDirectories(cacheRoot).OrderByDescending(d => d))
                 {
                     if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
-                        return dir;
+                        candidates.Add(dir);
                 }
             }
 
+            // 4) AppData downloaded driver cache (managed by this app)
+            var appCacheRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "ModemMerger", "drivers", "msedgedriver");
+            if (Directory.Exists(appCacheRoot))
+            {
+                foreach (var dir in Directory.GetDirectories(appCacheRoot).OrderByDescending(d => d))
+                {
+                    if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
+                        candidates.Add(dir);
+                }
+            }
+
+            // 5) PATH directories
+            var envPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var p in envPath.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    var dir = p.Trim();
+                    if (File.Exists(Path.Combine(dir, "msedgedriver.exe")))
+                        candidates.Add(dir);
+                }
+                catch { }
+            }
+
+            // Select first compatible driver by major version.
+            var distinctCandidates = candidates
+                .Where(d => !string.IsNullOrWhiteSpace(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            string fallbackDir = null;
+            foreach (var dir in distinctCandidates)
+            {
+                var exe = Path.Combine(dir, "msedgedriver.exe");
+                var drvMajor = GetFileMajorVersion(exe);
+                ScrapeLog.Info($"Found msedgedriver major={drvMajor} at {exe}");
+                if (fallbackDir == null && drvMajor > 0)
+                    fallbackDir = dir;
+                if (edgeMajor > 0 && drvMajor == edgeMajor)
+                    return dir;
+            }
+
+            // No compatible local driver found: auto-download matching one.
+            if (edgeMajor > 0)
+            {
+                var downloaded = DownloadMatchingEdgeDriver(edgeMajor);
+                if (!string.IsNullOrEmpty(downloaded))
+                    return downloaded;
+            }
+
+            // Last fallback when Edge version is unknown.
+            return edgeMajor <= 0 ? fallbackDir : null;
+        }
+
+        private static int GetInstalledEdgeMajorVersion()
+        {
+            var candidates = new[]
+            {
+                @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+            };
+
+            foreach (var p in candidates)
+            {
+                try
+                {
+                    if (!File.Exists(p)) continue;
+                    return GetFileMajorVersion(p);
+                }
+                catch { }
+            }
+            return 0;
+        }
+
+        private static int GetFileMajorVersion(string filePath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return 0;
+                var fvi = FileVersionInfo.GetVersionInfo(filePath);
+                return fvi.FileMajorPart;
+            }
+            catch { return 0; }
+        }
+
+        private static string DownloadMatchingEdgeDriver(int edgeMajor)
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+
+                var latestVersion = GetLatestEdgeDriverVersion(edgeMajor);
+                if (string.IsNullOrWhiteSpace(latestVersion))
+                {
+                    ScrapeLog.Warn($"Could not resolve latest EdgeDriver for major {edgeMajor}.");
+                    return null;
+                }
+
+                var root = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "ModemMerger", "drivers", "msedgedriver", latestVersion);
+                Directory.CreateDirectory(root);
+
+                var exePath = Path.Combine(root, "msedgedriver.exe");
+                if (File.Exists(exePath) && GetFileMajorVersion(exePath) == edgeMajor)
+                {
+                    ScrapeLog.Info($"Using cached matching EdgeDriver at {exePath}");
+                    return root;
+                }
+
+                var zipPath = Path.Combine(root, "edgedriver_win64.zip");
+                var zipUrls = new[]
+                {
+                    $"https://msedgedriver.microsoft.com/{latestVersion}/edgedriver_win64.zip",
+                    $"https://msedgedriver.azureedge.net/{latestVersion}/edgedriver_win64.zip"
+                };
+
+                bool downloadedZip = false;
+                Exception lastDownloadErr = null;
+                foreach (var zipUrl in zipUrls)
+                {
+                    try
+                    {
+                        ScrapeLog.Info($"Downloading EdgeDriver {latestVersion} from {zipUrl}");
+                        using (var wc = new WebClient())
+                            wc.DownloadFile(zipUrl, zipPath);
+                        downloadedZip = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastDownloadErr = ex;
+                        ScrapeLog.Warn($"Driver ZIP download failed from {zipUrl}: {ex.Message}");
+                    }
+                }
+
+                if (!downloadedZip)
+                    throw new InvalidOperationException(
+                        $"Could not download EdgeDriver {latestVersion}. Last error: {lastDownloadErr?.Message}");
+
+                ExtractZipWithPowerShell(zipPath, root);
+
+                if (File.Exists(exePath) && GetFileMajorVersion(exePath) == edgeMajor)
+                {
+                    ScrapeLog.Info($"Downloaded matching EdgeDriver to {exePath}");
+                    return root;
+                }
+
+                ScrapeLog.Warn("EdgeDriver download/extract completed but msedgedriver.exe was not usable.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                ScrapeLog.Warn($"EdgeDriver auto-download failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string GetLatestEdgeDriverVersion(int edgeMajor)
+        {
+            var endpoints = new[]
+            {
+                $"https://msedgedriver.microsoft.com/LATEST_RELEASE_{edgeMajor}_WINDOWS",
+                $"https://msedgedriver.microsoft.com/LATEST_RELEASE_{edgeMajor}",
+                $"https://msedgedriver.azureedge.net/LATEST_RELEASE_{edgeMajor}_WINDOWS",
+                $"https://msedgedriver.azureedge.net/LATEST_RELEASE_{edgeMajor}"
+            };
+
+            foreach (var ep in endpoints)
+            {
+                try
+                {
+                    using (var wc = new WebClient())
+                    {
+                        var bytes = wc.DownloadData(ep);
+                        var variants = new[]
+                        {
+                            Encoding.UTF8.GetString(bytes),
+                            Encoding.Unicode.GetString(bytes),
+                            Encoding.BigEndianUnicode.GetString(bytes),
+                            Encoding.ASCII.GetString(bytes)
+                        };
+
+                        foreach (var raw in variants)
+                        {
+                            if (string.IsNullOrWhiteSpace(raw)) continue;
+                            var cleaned = raw
+                                .Replace("\0", "")
+                                .Trim('\uFEFF', '\uFFFE', ' ', '\r', '\n', '\t');
+                            var m = Regex.Match(cleaned, @"\d+\.\d+\.\d+\.\d+");
+                            if (m.Success)
+                                return m.Value;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ScrapeLog.Warn($"Version lookup failed at {ep}: {ex.Message}");
+                }
+            }
             return null;
+        }
+
+        private static void ExtractZipWithPowerShell(string zipPath, string destinationDir)
+        {
+            var psZip = zipPath.Replace("'", "''");
+            var psDst = destinationDir.Replace("'", "''");
+            var cmd = $"Expand-Archive -LiteralPath '{psZip}' -DestinationPath '{psDst}' -Force";
+
+            var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"" + cmd + "\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using (var p = Process.Start(psi))
+            {
+                var stdout = p.StandardOutput.ReadToEnd();
+                var stderr = p.StandardError.ReadToEnd();
+                p.WaitForExit();
+                if (p.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Expand-Archive failed (exit {p.ExitCode}). {stderr} {stdout}".Trim());
+                }
+            }
         }
 
         /// <summary>
@@ -1502,29 +2387,27 @@ namespace ModemMergerWinFormsApp
                 var normalised = Path.GetFullPath(_userDataDir)
                     .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-                foreach (var proc in Process.GetProcessesByName("msedge"))
+                // Single WMI query for all msedge processes — avoids per-PID round-trips
+                // which can take several seconds each.
+                var pidsToKill = new HashSet<int>();
+                using (var searcher = new System.Management.ManagementObjectSearcher(
+                    "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'msedge.exe'"))
+                {
+                    foreach (var obj in searcher.Get())
+                    {
+                        var cmdLine = obj["CommandLine"]?.ToString();
+                        if (cmdLine != null && cmdLine.IndexOf(normalised, StringComparison.OrdinalIgnoreCase) >= 0)
+                            pidsToKill.Add(Convert.ToInt32(obj["ProcessId"]));
+                    }
+                }
+
+                foreach (var pid in pidsToKill)
                 {
                     try
                     {
-                        // Match on command-line via MainModule path as a fast filter,
-                        // then check if process uses our user-data-dir
-                        string cmdLine = null;
-                        try
-                        {
-                            using (var searcher = new System.Management.ManagementObjectSearcher(
-                                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {proc.Id}"))
-                            {
-                                foreach (var obj in searcher.Get())
-                                    cmdLine = obj["CommandLine"]?.ToString();
-                            }
-                        }
-                        catch { }
-
-                        if (cmdLine != null && cmdLine.IndexOf(normalised, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            proc.Kill();
-                            ScrapeLog.Warn($"Killed orphan msedge.exe PID {proc.Id}");
-                        }
+                        var proc = Process.GetProcessById(pid);
+                        proc.Kill();
+                        ScrapeLog.Warn($"Killed orphan msedge.exe PID {pid}");
                     }
                     catch { }
                 }
@@ -2051,7 +2934,7 @@ namespace ModemMergerWinFormsApp
             }
 
             // 4) Fetch view pages in parallel to get actual dates + ship-to
-            var throttle = new SemaphoreSlim(10, 10);
+            var throttle = new SemaphoreSlim(20, 20);
             await Task.WhenAll(modems.Select(m => FetchModemDetailsAsync(m, throttle)));
 
             return modems;
