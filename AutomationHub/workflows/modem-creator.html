@@ -781,15 +781,34 @@ function timeOnly(dt) {
     return String(h).padStart(2, '0') + ':' + mm;
 }
 
+function getRecentPastNext() {
+    // Remove duplicate activity rows (same well, task, and full task timestamp).
+    const seen = new Set();
+    const deduped = (recentOperations || []).filter(op => {
+        const key = [
+            (op.wellName || '').trim().toLowerCase(),
+            (op.taskName || '').trim().toLowerCase(),
+            String(op.taskDateTime || '').trim().toLowerCase()
+        ].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    const past = deduped
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0 && op.hoursFromNow >= -12)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    const next = deduped
+        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow > 0 && op.hoursFromNow <= 24)
+        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+
+    return { past, next };
+}
+
 function renderRecentOperationsTable() {
     recentBody.innerHTML = '';
     // Past: last 12h. Next: next 24h.
-    const past = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0 && op.hoursFromNow >= -12)
-        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
-    const next = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow > 0 && op.hoursFromNow <= 24)
-        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    const { past, next } = getRecentPastNext();
 
     const pastSummary = past.length
         ? past.map(op => esc(op.taskName || '—') + ' (' + timeOnly(op.taskDateTime) + ')').join(', ')
@@ -808,12 +827,21 @@ function renderRecentOperationsTable() {
         return;
     }
 
-    // The op closest to 0 (least negative) = most recent = "now doing this".
-    const mostRecentH = past[past.length - 1].hoursFromNow;
+    const currentOp = past.find(op => op && op.isCurrent === true) || past[past.length - 1];
+    const currentKey = [
+        (currentOp.wellName || '').trim().toLowerCase(),
+        (currentOp.taskName || '').trim().toLowerCase(),
+        String(currentOp.taskDateTime || '').trim().toLowerCase()
+    ].join('|');
 
     past.forEach(op => {
         const tr = document.createElement('tr');
-        const isCurrent = op.hoursFromNow === mostRecentH;
+        const opKey = [
+            (op.wellName || '').trim().toLowerCase(),
+            (op.taskName || '').trim().toLowerCase(),
+            String(op.taskDateTime || '').trim().toLowerCase()
+        ].join('|');
+        const isCurrent = opKey === currentKey;
         if (isCurrent) tr.classList.add('recent-highlight');
         tr.innerHTML =
             '<td>' + esc(op.wellName || '—') + '</td>' +
@@ -951,12 +979,7 @@ btnCopy.addEventListener('click', () => {
         });
     }
     // Recent operations snapshot
-    const pastOps = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow <= 0 && op.hoursFromNow >= -12)
-        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
-    const nextOps = (recentOperations || [])
-        .filter(op => typeof op.hoursFromNow === 'number' && op.hoursFromNow > 0 && op.hoursFromNow <= 24)
-        .sort((a, b) => a.hoursFromNow - b.hoursFromNow);
+    const { past: pastOps, next: nextOps } = getRecentPastNext();
     if (pastOps.length > 0) {
         text += '\nRIG ACTIVITY (past 12h)\nWell\tOperation\tTime\n';
         pastOps.forEach(op => {

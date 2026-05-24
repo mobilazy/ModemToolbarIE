@@ -222,6 +222,8 @@ namespace ModemMergerWinFormsApp
         public string EndDateTime { get; set; }
         [JsonProperty("isKeyTask")]
         public bool IsKeyTask { get; set; }
+        [JsonProperty("isCurrent")]
+        public bool IsCurrent { get; set; }
     }
 
     public class TimePlannerSection
@@ -270,6 +272,8 @@ namespace ModemMergerWinFormsApp
         public string TaskDateTime { get; set; }
         [JsonProperty("hoursFromNow")]
         public double HoursFromNow { get; set; }
+        [JsonProperty("isCurrent")]
+        public bool IsCurrent { get; set; }
     }
 
     // ── Clients ──────────────────────────────────────────────────────────
@@ -600,8 +604,8 @@ namespace ModemMergerWinFormsApp
             return await Task.Run(() =>
             {
                 ScrapeLog.Start("TimePlanner");
-                ScrapeLog.Info("TimePlanner ParserVersion=2026-05-19c");
-                ScrapeLog.Info("TimePlanner Build=2026-05-22-timeout2m");
+                ScrapeLog.Info("TimePlanner ParserVersion=2026-05-25a");
+                ScrapeLog.Info("TimePlanner Build=2026-05-25-anchor-recent-window");
                 ScrapeLog.Info($"TimePlanner: Operator={operatorName}, Rig={rigName}, Wells={string.Join(",", wellCodesToMatch)}");
                 var timeout = TimeSpan.FromMinutes(2);
                 var deadlineUtc = DateTime.UtcNow.Add(timeout);
@@ -1312,7 +1316,8 @@ namespace ModemMergerWinFormsApp
                                     WellName = wellName,
                                     TaskName = t.TaskName,
                                     TaskDateTime = t.StartDateTime,
-                                    HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
+                                    HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2),
+                                    IsCurrent = t.IsCurrent
                                 });
                             }
                             ScrapeLog.Info($"  Extracted {sections.Count} sections for '{wellName}'");
@@ -1525,6 +1530,36 @@ namespace ModemMergerWinFormsApp
                     return '';
                 }
 
+                function isGreenish(bg) {
+                    if (!bg) return false;
+                    var m = bg.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+                    if (!m) return false;
+                    var r = parseInt(m[1], 10), g = parseInt(m[2], 10), b = parseInt(m[3], 10);
+                    return g >= 90 && g >= r + 18 && g >= b + 18;
+                }
+
+                function rowLooksCurrent(tr) {
+                    if (!tr) return false;
+                    var cls = (tr.className || '').toLowerCase();
+                    if (/(^|\s)(current|active|selected|highlight|is-current|is-active)(\s|$)/.test(cls)) return true;
+
+                    var style = ((tr.getAttribute && tr.getAttribute('style')) || '').toLowerCase();
+                    if (/(#d1fae5|#dcfce7|#ecfdf5|#22c55e|#16a34a|#10b981)/.test(style)) return true;
+
+                    try {
+                        var rowBg = window.getComputedStyle(tr).backgroundColor || '';
+                        if (isGreenish(rowBg)) return true;
+
+                        var tds = tr.querySelectorAll('td');
+                        for (var i = 0; i < tds.length; i++) {
+                            var bg = window.getComputedStyle(tds[i]).backgroundColor || '';
+                            if (isGreenish(bg)) return true;
+                        }
+                    } catch (e) { }
+
+                    return false;
+                }
+
                 var tables = document.querySelectorAll('table');
                 var best = null, bestScore = -1, bestRows = 0;
                 for (var t = 0; t < tables.length; t++) {
@@ -1557,7 +1592,8 @@ namespace ModemMergerWinFormsApp
                 }
                 var data = [];
                 for (var r = 0; r < dataRows.length; r++) {
-                    var cells = dataRows[r].querySelectorAll('td');
+                    var rowEl = dataRows[r];
+                    var cells = rowEl.querySelectorAll('td');
                     if (cells.length === 0) continue;
                     var obj = {};
                     for (var c = 0; c < cells.length; c++) {
@@ -1568,6 +1604,9 @@ namespace ModemMergerWinFormsApp
                         if (Object.prototype.hasOwnProperty.call(obj, key)) key = key + '_' + c;
                         obj[key] = cellValue(cells[c]);
                     }
+                    obj.__rowClass = (rowEl.className || '').trim();
+                    obj.__rowStyle = ((rowEl.getAttribute && rowEl.getAttribute('style')) || '').trim();
+                    obj.__rowHighlighted = rowLooksCurrent(rowEl) ? '1' : '0';
                     data.push(obj);
                 }
                 return JSON.stringify({ tableCount: tables.length, selectedRows: bestRows, selectedScore: bestScore, rows: data });
@@ -1615,9 +1654,12 @@ namespace ModemMergerWinFormsApp
                 string taskName = "", startDt = "", endDt = "";
                 bool seenDateColumn = false;
                 string fallbackLongestName = "";
+                bool isCurrentRow = row.TryGetValue("__rowHighlighted", out var rowMarker) && rowMarker == "1";
 
                 foreach (var kv in row)
                 {
+                    if (kv.Key != null && kv.Key.StartsWith("__", StringComparison.Ordinal)) continue;
+
                     var val = kv.Value;
                     if (string.IsNullOrWhiteSpace(val)) continue;
 
@@ -1665,6 +1707,7 @@ namespace ModemMergerWinFormsApp
                         StartDateTime = startDt,
                         EndDateTime = endDt,
                         IsKeyTask = isKey,
+                        IsCurrent = isCurrentRow,
                     });
                 }
             }
@@ -2144,32 +2187,104 @@ namespace ModemMergerWinFormsApp
 
         private static List<TimePlannerRecentOperation> BuildRecentOperations(List<TimePlannerRecentOperation> taskCandidates)
         {
-            var result = new List<TimePlannerRecentOperation>();
-            var from = DateTime.Now - _pastOpsWindow;
-            var to = DateTime.Now + _nextOpsWindow;
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var parsed = new List<Tuple<TimePlannerRecentOperation, DateTime>>();
+            var byKey = new Dictionary<string, TimePlannerRecentOperation>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var t in taskCandidates ?? new List<TimePlannerRecentOperation>())
             {
                 DateTime dt;
                 if (!TryParseKabalDate(t.TaskDateTime, out dt)) continue;
-                if (dt < from || dt > to) continue;
 
                 var key = (t.WellName ?? "") + "|" + (t.TaskName ?? "") + "|" + dt.ToString("yyyyMMddHHmm");
-                if (!seen.Add(key)) continue;
+                if (byKey.TryGetValue(key, out var existing))
+                {
+                    if (!existing.IsCurrent && t.IsCurrent) existing.IsCurrent = true;
+                    continue;
+                }
 
-                result.Add(new TimePlannerRecentOperation
+                var normalized = new TimePlannerRecentOperation
                 {
                     WellName = t.WellName,
                     TaskName = t.TaskName,
                     TaskDateTime = t.TaskDateTime,
-                    HoursFromNow = Math.Round((dt - DateTime.Now).TotalHours, 2)
-                });
+                    IsCurrent = t.IsCurrent
+                };
+
+                byKey[key] = normalized;
+                parsed.Add(Tuple.Create(normalized, dt));
+            }
+
+            if (parsed.Count == 0) return new List<TimePlannerRecentOperation>();
+
+            DateTime anchor;
+            var marked = parsed.Where(x => x.Item1.IsCurrent).OrderBy(x => x.Item2).ToList();
+            if (marked.Count > 0)
+            {
+                // If multiple rows are highlighted, use the latest highlighted timestamp.
+                anchor = marked.Last().Item2;
+                ScrapeLog.Info($"BuildRecentOperations: anchor=current-row ({anchor:dd-MM-yyyy HH:mm}), markedRows={marked.Count}");
+            }
+            else
+            {
+                // Fallback: choose an anchor that best balances a real past/next window inside the timeline.
+                var now = DateTime.Now;
+                DateTime bestAnchor = parsed[0].Item2;
+                int bestBalance = -1;
+                int bestDirectional = -1;
+                int bestTotal = -1;
+                double bestNowDist = double.MaxValue;
+
+                foreach (var candidate in parsed)
+                {
+                    var cdt = candidate.Item2;
+                    int pastCount = parsed.Count(x => x.Item2 < cdt && x.Item2 >= cdt - _pastOpsWindow);
+                    int nextCount = parsed.Count(x => x.Item2 > cdt && x.Item2 <= cdt + _nextOpsWindow);
+                    int total = pastCount + 1 + nextCount;
+                    int balance = Math.Min(pastCount, nextCount);
+                    int directional = (pastCount > 0 ? 1 : 0) + (nextCount > 0 ? 1 : 0);
+                    double nowDist = Math.Abs((cdt - now).TotalMinutes);
+
+                    bool better = false;
+                    if (balance > bestBalance) better = true;
+                    else if (balance == bestBalance && directional > bestDirectional) better = true;
+                    else if (balance == bestBalance && directional == bestDirectional && total > bestTotal) better = true;
+                    else if (balance == bestBalance && directional == bestDirectional && total == bestTotal && nowDist < bestNowDist) better = true;
+
+                    if (better)
+                    {
+                        bestAnchor = cdt;
+                        bestBalance = balance;
+                        bestDirectional = directional;
+                        bestTotal = total;
+                        bestNowDist = nowDist;
+                    }
+                }
+
+                anchor = bestAnchor;
+                var anchorOp = parsed.FirstOrDefault(x => x.Item2 == anchor)?.Item1;
+                if (anchorOp != null) anchorOp.IsCurrent = true;
+                ScrapeLog.Info($"BuildRecentOperations: anchor=window-fit ({anchor:dd-MM-yyyy HH:mm}), balance={bestBalance}, directional={bestDirectional}, total={bestTotal}");
+            }
+
+            var from = anchor - _pastOpsWindow;
+            var to = anchor + _nextOpsWindow;
+
+            var result = new List<TimePlannerRecentOperation>();
+            foreach (var item in parsed.OrderBy(x => x.Item2).ThenBy(x => x.Item1.WellName))
+            {
+                var dt = item.Item2;
+                if (dt < from || dt > to) continue;
+
+                var op = item.Item1;
+                var hours = Math.Round((dt - anchor).TotalHours, 2);
+                op.HoursFromNow = Math.Abs(hours) < 0.005 ? 0 : hours;
+                result.Add(op);
             }
 
             return result
-                .OrderBy(x => Math.Abs(x.HoursFromNow))
+                .OrderBy(x => x.HoursFromNow)
                 .ThenBy(x => x.WellName)
+                .ThenBy(x => x.TaskName)
                 .ToList();
         }
 
