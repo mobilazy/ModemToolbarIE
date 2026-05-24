@@ -399,9 +399,9 @@ namespace ModemMergerWinFormsApp
         // Also captures compound sizes like "12-1/4\" x 13\"" and "8-1/2\" x 9-1/2\"".
         // Try compound first (CompoundSizeRx), then single (SectionSizeRx).
         private static readonly Regex _sectionSizeRx = new Regex(
-            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?)\s*(?:""|''|in\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?)\s*(?:""|''|in\b|inch(?:es)?\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex _sectionCompoundRx = new Regex(
-            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?\s*x\s*\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?)",
+            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b|inch(?:es)?\b)?\s*x\s*\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b|inch(?:es)?\b)?)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // Regex to detect BHA section start markers:
@@ -1791,6 +1791,190 @@ namespace ModemMergerWinFormsApp
                     current.DurationDays = Math.Round((poohDt - muDt).TotalDays, 2);
             }
 
+            // ── SIZE-AWARE BHA PAIR FALLBACK ─────────────────────────────────────────
+            // Safety layer: if a MU/PU/RIH-with-BHA start exists but primary section build
+            // missed the matching end, pair it with first subsequent POOH/LD/Rack-back BHA
+            // before the next BHA start. Prefer matching section size when available.
+            for (int si = 0; si < timedTasks.Count; si++)
+            {
+                CheckTimeout("BHA pair fallback sections");
+                var startTask = timedTasks[si].Item1;
+                if (!IsSectionStartTask(startTask.TaskName)) continue;
+
+                var startDt = timedTasks[si].Item2;
+                bool alreadyCovered = sections.Any(s =>
+                {
+                    DateTime sd;
+                    return TryParseKabalDate(s.MuBhaDateTime, out sd)
+                           && Math.Abs((sd - startDt).TotalHours) < 1.0;
+                });
+                if (alreadyCovered) continue;
+
+                string startSize, startSectionName;
+                ExtractSectionSizeAndName(startTask.TaskName, out startSize, out startSectionName);
+
+                // Infer missing size from nearby hole/section rows around this start marker.
+                if (string.IsNullOrWhiteSpace(startSize))
+                {
+                    for (int ni = Math.Max(0, si - 8); ni <= Math.Min(timedTasks.Count - 1, si + 8); ni++)
+                    {
+                        if (ni == si) continue;
+                        var nName = timedTasks[ni].Item1.TaskName ?? "";
+                        if (!IsHoleOrSectionTaskName(nName) && nName.IndexOf("BHA", StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+                        string nSize, nSectionName;
+                        ExtractSectionSizeAndName(nName, out nSize, out nSectionName);
+                        if (string.IsNullOrWhiteSpace(nSize)) continue;
+                        startSize = nSize;
+                        startSectionName = nSectionName;
+                        break;
+                    }
+                }
+
+                int nextStartIdx = timedTasks.FindIndex(si + 1, t => IsSectionStartTask(t.Item1.TaskName));
+                if (nextStartIdx < 0) nextStartIdx = timedTasks.Count;
+
+                int endIdx = -1;
+                string endValue = "";
+                for (int ei = si + 1; ei < nextStartIdx; ei++)
+                {
+                    var endTask = timedTasks[ei].Item1;
+                    if (!_poohRx.IsMatch(endTask.TaskName) && !_ldBhaRx.IsMatch(endTask.TaskName)) continue;
+
+                    string endSize, _;
+                    ExtractSectionSizeAndName(endTask.TaskName, out endSize, out _);
+
+                    bool sizeOk = SizesLikelyMatch(startSize, endSize)
+                                  || (string.IsNullOrWhiteSpace(startSize) || string.IsNullOrWhiteSpace(endSize));
+                    if (!sizeOk) continue;
+
+                    endIdx = ei;
+                    endValue = !string.IsNullOrWhiteSpace(endTask.EndDateTime) ? endTask.EndDateTime : endTask.StartDateTime;
+                    break;
+                }
+
+                if (endIdx < 0 || string.IsNullOrWhiteSpace(endValue)) continue;
+
+                var syn = new TimePlannerSection
+                {
+                    WellName = planName,
+                    PlanName = planName,
+                    SectionName = ResolveSectionName(startSize, startSectionName, startTask.TaskName),
+                    SectionSize = startSize,
+                    MuBhaDateTime = startTask.StartDateTime,
+                    PoohDateTime = endValue,
+                    IsWhipstock = _whipstockRx.IsMatch(startTask.TaskName),
+                };
+
+                for (int ti2 = si; ti2 <= endIdx; ti2++)
+                    syn.Tasks.Add(timedTasks[ti2].Item1);
+
+                DateTime synMu, synEnd;
+                if (TryParseKabalDate(syn.MuBhaDateTime, out synMu) && TryParseKabalDate(syn.PoohDateTime, out synEnd))
+                    syn.DurationDays = Math.Round((synEnd - synMu).TotalDays, 2);
+
+                sections.Add(syn);
+                ScrapeLog.Info($"  >> Section (BHA fallback): '{syn.SectionName}' {syn.MuBhaDateTime} -> {syn.PoohDateTime}");
+            }
+
+            // ── HOLE-GUIDED BHA FALLBACK ──────────────────────────────────────────────
+            // Safety layer: when MU rows are partially missing/collapsed, use hole rows as
+            // anchors, then find nearest BHA start + BHA end (rack-back/POOH/LD) for same size.
+            for (int hi = 0; hi < timedTasks.Count; hi++)
+            {
+                CheckTimeout("Hole-guided fallback sections");
+                var holeTask = timedTasks[hi].Item1;
+                if (!IsHoleOrSectionTaskName(holeTask.TaskName)) continue;
+
+                string holeSize, holeSectionName;
+                ExtractSectionSizeAndName(holeTask.TaskName, out holeSize, out holeSectionName);
+                if (string.IsNullOrWhiteSpace(holeSize)) continue;
+
+                var holeStartDt = timedTasks[hi].Item2;
+                bool covered = sections.Any(s =>
+                {
+                    DateTime sd;
+                    if (!TryParseKabalDate(s.MuBhaDateTime, out sd)) return false;
+                    if (Math.Abs((sd - holeStartDt).TotalHours) >= 2.5) return false;
+                    if (string.IsNullOrWhiteSpace(s.SectionSize)) return true;
+                    return SizesLikelyMatch(s.SectionSize, holeSize);
+                });
+                if (covered) continue;
+
+                int nextHoleIdx = timedTasks.FindIndex(hi + 1, t =>
+                {
+                    if (!IsHoleOrSectionTaskName(t.Item1.TaskName)) return false;
+                    string hs, hn;
+                    ExtractSectionSizeAndName(t.Item1.TaskName, out hs, out hn);
+                    return !string.IsNullOrWhiteSpace(hs);
+                });
+                if (nextHoleIdx < 0) nextHoleIdx = timedTasks.Count;
+
+                int startIdx = hi;
+                for (int si2 = hi; si2 < nextHoleIdx; si2++)
+                {
+                    var n = timedTasks[si2].Item1;
+                    if (!IsSectionStartTask(n.TaskName)) continue;
+                    string ns, _;
+                    ExtractSectionSizeAndName(n.TaskName, out ns, out _);
+                    if (SizesLikelyMatch(holeSize, ns) || string.IsNullOrWhiteSpace(ns))
+                    {
+                        startIdx = si2;
+                        break;
+                    }
+                }
+
+                int endIdx2 = -1;
+                string endValue2 = "";
+                for (int ei2 = startIdx + 1; ei2 < nextHoleIdx; ei2++)
+                {
+                    var endTask = timedTasks[ei2].Item1;
+                    if (!_poohRx.IsMatch(endTask.TaskName) && !_ldBhaRx.IsMatch(endTask.TaskName)) continue;
+                    string es, _;
+                    ExtractSectionSizeAndName(endTask.TaskName, out es, out _);
+                    if (!SizesLikelyMatch(holeSize, es) && !string.IsNullOrWhiteSpace(es)) continue;
+
+                    endIdx2 = ei2;
+                    endValue2 = !string.IsNullOrWhiteSpace(endTask.EndDateTime) ? endTask.EndDateTime : endTask.StartDateTime;
+                    break;
+                }
+
+                if (endIdx2 < 0 || string.IsNullOrWhiteSpace(endValue2)) continue;
+
+                var startTask2 = timedTasks[startIdx].Item1;
+                DateTime startDt2;
+                if (!TryParseKabalDate(startTask2.StartDateTime, out startDt2)) continue;
+
+                bool startCovered = sections.Any(s =>
+                {
+                    DateTime sd;
+                    return TryParseKabalDate(s.MuBhaDateTime, out sd)
+                           && Math.Abs((sd - startDt2).TotalHours) < 1.0;
+                });
+                if (startCovered) continue;
+
+                var syn2 = new TimePlannerSection
+                {
+                    WellName = planName,
+                    PlanName = planName,
+                    SectionName = ResolveSectionName(holeSize, holeSectionName, holeTask.TaskName),
+                    SectionSize = holeSize,
+                    MuBhaDateTime = startTask2.StartDateTime,
+                    PoohDateTime = endValue2,
+                    IsWhipstock = _whipstockRx.IsMatch(startTask2.TaskName),
+                };
+
+                for (int ti3 = startIdx; ti3 <= endIdx2; ti3++)
+                    syn2.Tasks.Add(timedTasks[ti3].Item1);
+
+                DateTime syn2Mu, syn2End;
+                if (TryParseKabalDate(syn2.MuBhaDateTime, out syn2Mu) && TryParseKabalDate(syn2.PoohDateTime, out syn2End))
+                    syn2.DurationDays = Math.Round((syn2End - syn2Mu).TotalDays, 2);
+
+                sections.Add(syn2);
+                ScrapeLog.Info($"  >> Section (hole-guided fallback): '{syn2.SectionName}' {syn2.MuBhaDateTime} -> {syn2.PoohDateTime}");
+            }
+
             // ── RAP-DRILL FALLBACK ─────────────────────────────────────────────────────
             // APEX only renders child tasks for the currently-active RAP; future RAPs are
             // collapsed and only their header row appears in the DOM.  Walk through all
@@ -1981,6 +2165,44 @@ namespace ModemMergerWinFormsApp
             var sizeMatch = _sectionSizeRx.Match(taskName);
             size = sizeMatch.Success ? NormalizeSize(sizeMatch.Groups[1].Value) : "";
             sectionName = !string.IsNullOrEmpty(size) ? size + "\" section" : taskName;
+        }
+
+        private static string BuildSizeKey(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            var s = value.ToLowerInvariant();
+            s = Regex.Replace(s, @"inch(?:es)?\b|in\b|\""|''", "", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\s+", "");
+            s = s.Replace("-", "");
+            s = Regex.Replace(s, @"[^0-9x/\.]", "");
+            return s;
+        }
+
+        private static bool SizesLikelyMatch(string left, string right)
+        {
+            var lk = BuildSizeKey(left);
+            var rk = BuildSizeKey(right);
+            if (string.IsNullOrWhiteSpace(lk) || string.IsNullOrWhiteSpace(rk)) return false;
+            if (string.Equals(lk, rk, StringComparison.OrdinalIgnoreCase)) return true;
+
+            // Handle cases where one side includes extra context but the same size tokens.
+            return lk.Contains(rk) || rk.Contains(lk);
+        }
+
+        private static bool IsHoleOrSectionTaskName(string taskName)
+        {
+            if (string.IsNullOrWhiteSpace(taskName)) return false;
+            return taskName.IndexOf("hole", StringComparison.OrdinalIgnoreCase) >= 0
+                || taskName.IndexOf("section", StringComparison.OrdinalIgnoreCase) >= 0
+                || taskName.IndexOf("drill", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string ResolveSectionName(string sectionSize, string sectionName, string fallbackTaskName)
+        {
+            if (!string.IsNullOrWhiteSpace(sectionSize)) return sectionSize + "\" section";
+            if (!string.IsNullOrWhiteSpace(sectionName)) return sectionName;
+            if (!string.IsNullOrWhiteSpace(fallbackTaskName)) return fallbackTaskName;
+            return "BHA section";
         }
 
         private static bool IsSectionStartTask(string taskName)
