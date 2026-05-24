@@ -300,6 +300,12 @@ function extractKabalId(hRefno, operator) {
     return m ? m[1] : null;
 }
 
+function modemKabalId(m, operator) {
+    const direct = String((m && (m.KabalId || m.kabalId)) || '').trim();
+    if (/^\d{4,8}$/.test(direct)) return direct;
+    return extractKabalId((m && (m.HRefno || m.hRefno)) || '', operator);
+}
+
 const rigsByCustomer = {
     'AkerBP':          ['SC8','Integrator','Invincible','Deepsea Nordkap','Deepsea Stavanger'],
     'ConocoPhillips':  ['West Linus','Elara'],
@@ -344,6 +350,7 @@ let lastUpdated = null;
 let modems   = [];  // GantModem[]
 let modemsFetchedAt = null;  // ISO timestamp when modems were last loaded
 const TP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MODEM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const TP_REQUEST_TIMEOUT_MS = 120000;
 let tpCountdownTimer = null;
 let tpTimedOut = false;
@@ -353,9 +360,21 @@ function makeTpCacheKey(customer, rig) {
     return 'tp_cache::' + (customer || '') + '::' + (rig || '');
 }
 
+function makeModemCacheKey(customer, rig) {
+    return 'modem_cache::' + (customer || '') + '::' + (rig || '');
+}
+
 function saveTpCache(customer, rig, payload) {
     if (!customer || !rig || !payload) return;
     localStorage.setItem(makeTpCacheKey(customer, rig), JSON.stringify({
+        savedAtUtc: new Date().toISOString(),
+        payload
+    }));
+}
+
+function saveModemCache(customer, rig, payload) {
+    if (!customer || !rig || !payload) return;
+    localStorage.setItem(makeModemCacheKey(customer, rig), JSON.stringify({
         savedAtUtc: new Date().toISOString(),
         payload
     }));
@@ -383,6 +402,24 @@ function loadTpCache(customer, rig) {
     }
 }
 
+function loadModemCache(customer, rig) {
+    if (!customer || !rig) return null;
+    try {
+        const key = makeModemCacheKey(customer, rig);
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const savedAtMs = parsed && parsed.savedAtUtc ? Date.parse(parsed.savedAtUtc) : NaN;
+        if (!parsed || !parsed.payload || isNaN(savedAtMs) || (Date.now() - savedAtMs) > MODEM_CACHE_TTL_MS) {
+            localStorage.removeItem(key);
+            return null;
+        }
+        return parsed.payload;
+    } catch {
+        return null;
+    }
+}
+
 function clearStaleTpCache() {
     try {
         for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -393,6 +430,26 @@ function clearStaleTpCache() {
                 const parsed = raw ? JSON.parse(raw) : null;
                 const ts = parsed && parsed.savedAtUtc ? Date.parse(parsed.savedAtUtc) : NaN;
                 if (!parsed || !parsed.payload || isNaN(ts) || (Date.now() - ts) > TP_CACHE_TTL_MS) {
+                    localStorage.removeItem(k);
+                }
+            } catch {
+                localStorage.removeItem(k);
+            }
+        }
+    } catch {
+    }
+}
+
+function clearStaleModemCache() {
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (!k || !k.startsWith('modem_cache::')) continue;
+            try {
+                const raw = localStorage.getItem(k);
+                const parsed = raw ? JSON.parse(raw) : null;
+                const ts = parsed && parsed.savedAtUtc ? Date.parse(parsed.savedAtUtc) : NaN;
+                if (!parsed || !parsed.payload || isNaN(ts) || (Date.now() - ts) > MODEM_CACHE_TTL_MS) {
                     localStorage.removeItem(k);
                 }
             } catch {
@@ -524,15 +581,37 @@ function updateLastUpdatedBadge(fromCache) {
 function showCachedForCurrentRig() {
     const customer = customerSel.value;
     const rig = rigSel.value;
+    sections = [];
+    lastUpdated = null;
+    tpBody.innerHTML = '';
+    tpPanel.classList.remove('show');
+    updateLastUpdatedBadge(false);
     // Always clear recent activity when rig context changes — show blank until freshly scraped.
     recentOperations = [];
     recentSummary.textContent = '';
     recentBody.innerHTML = '';
     recentPanel.classList.remove('show');
+    modems = [];
+    modemsFetchedAt = null;
+    modemBody.innerHTML = '';
+    modemPanel.classList.remove('show');
+    updateModemFetchBadge();
+
     const cached = loadTpCache(customer, rig);
     if (cached && Array.isArray(cached.sections)) {
         applyTimePlannerPayload(cached, true);
         log('Loaded cached TimePlanner data for ' + customer + ' / ' + rig + '.', false);
+    }
+
+    const cachedModems = loadModemCache(customer, rig);
+    if (cachedModems && Array.isArray(cachedModems.modems) && cachedModems.modems.length > 0) {
+        modems = cachedModems.modems;
+        modemsFetchedAt = cachedModems.modemsFetchedAt || cachedModems.fetchedAtUtc || new Date().toISOString();
+        renderModemTable();
+        updateModemFetchBadge();
+        modemPanel.classList.add('show');
+        btnCopy.disabled = false;
+        log('Loaded cached Gant modems for ' + customer + ' / ' + rig + '.', false);
     }
 }
 
@@ -874,6 +953,7 @@ btnLoadModems.addEventListener('click', async () => {
         }
         log('Got ' + modems.length + ' modems.');
         modemsFetchedAt = new Date().toISOString();
+        saveModemCache(customer, rig, { modems, modemsFetchedAt });
         renderModemTable();
         updateModemFetchBadge();
         modemPanel.classList.add('show');
@@ -914,7 +994,7 @@ function renderModemTable() {
             // Kabal ID link
             let kabalHtml = '—';
             const hRefno = m.HRefno || m.hRefno || '';
-            const kabalDigits = extractKabalId(hRefno, customer);
+            const kabalDigits = modemKabalId(m, customer);
             if (kabalDigits) {
                 const kUrl = kabalCargoUrl(customer, kabalDigits);
                 kabalHtml = '<a class="link" href="' + kUrl + '" target="_blank">' + kabalDigits + '</a>';
@@ -970,7 +1050,7 @@ btnCopy.addEventListener('click', () => {
         text += '\nMODEMS\n' + fetchedLabel + 'Mob ID\tKabal ID\tWell\tSection\tLoadout\tDelivery\tKabal Date\n';
         const customer = customerSel.value;
         modems.forEach(m => {
-            const kid = extractKabalId(m.HRefno || m.hRefno || '', customer) || '';
+            const kid = modemKabalId(m, customer) || '';
             const kabalMatch = normalizeModemDate(kabalDateForModem(m)) === normalizeModemDate(deliveryDateForModem(m)) ? '(match)' : '(mismatch)';
             text += [m.Id, kid, m.WellName || '', m.WellSection || '',
                      m.LoadoutDate || m.loadoutDate || '',
@@ -1002,6 +1082,7 @@ btnCopy.addEventListener('click', () => {
 // ── Persist selections in sessionStorage ─────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
     clearStaleTpCache();
+    clearStaleModemCache();
     const cust = sessionStorage.getItem('mc_cust');
     if (cust) {
         customerSel.value = cust;

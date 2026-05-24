@@ -208,6 +208,9 @@ namespace ModemMergerWinFormsApp
         public string DateEta { get; set; } = "";      // P_DATE_ETA from modem edit page
         public string KabalSyncDate { get; set; } = ""; // shippingDate from Kabal sync (same as Modem Shifter)
         public string HRefno { get; set; } = "";       // H_REFNO — contains Kabal cargo ID (e.g. LC123456)
+        public string KabalId { get; set; } = "";      // Cargo ID digits (e.g. 191954)
+        public string KabalIdSource { get; set; } = ""; // Ref | ShippingInstructions | ShippingInstructionsCache
+        public string ShippingInstructions { get; set; } = "";
     }
 
     // ── TimePlanner DTOs ─────────────────────────────────────────────────
@@ -3676,6 +3679,26 @@ namespace ModemMergerWinFormsApp
     public static class GantClient
     {
         private const string GantUrl = "http://norwayappsprd.corp.halliburton.com/pls/log_web/gant.fetch_data";
+        private static readonly object _shippingIdCacheLock = new object();
+        private static readonly string _shippingIdCachePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModemMerger",
+            "shipping-kabal-ids.json");
+        private static Dictionary<string, ShippingKabalIdCacheEntry> _shippingIdCache;
+
+        private sealed class ShippingKabalIdCacheEntry
+        {
+            [JsonProperty("operatorName")]
+            public string OperatorName { get; set; }
+            [JsonProperty("modemId")]
+            public int ModemId { get; set; }
+            [JsonProperty("kabalId")]
+            public string KabalId { get; set; }
+            [JsonProperty("shippingInstructions")]
+            public string ShippingInstructions { get; set; }
+            [JsonProperty("capturedAtUtc")]
+            public DateTime CapturedAtUtc { get; set; }
+        }
 
         // Shared cookie container so the Negotiate handshake cookie is reused
         private static readonly CookieContainer _cookies = new CookieContainer();
@@ -3695,6 +3718,14 @@ namespace ModemMergerWinFormsApp
             { "AkerBP",         "0000352210" },
             { "ConocoPhillips", "0000361542" },
             { "V\u00e5r Energi",     "0000317277" }
+        };
+        private static readonly Dictionary<string, string> _kabalIdPrefixes =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "AkerBP",         "LC" },
+            { "ConocoPhillips", "CONOCOPHILLIPS" },
+            { "Equinor",        "EQNO" },
+            { "Vår Energi",     "VAAR" },
         };
         // Map UI customer name → partial match on Gant's CustomerName field.
         // Used to client-side filter when v_customer is empty (returns all customers).
@@ -3774,7 +3805,7 @@ namespace ModemMergerWinFormsApp
 
             // 4) Fetch view pages in parallel to get actual dates + ship-to
             var throttle = new SemaphoreSlim(20, 20);
-            await Task.WhenAll(modems.Select(m => FetchModemDetailsAsync(m, throttle)));
+            await Task.WhenAll(modems.Select(m => FetchModemDetailsAsync(m, customerName, throttle)));
 
             return modems;
         }
@@ -3795,7 +3826,7 @@ namespace ModemMergerWinFormsApp
         private const string ModemEditUrl = "http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_order_new$header_mc.QueryViewByKey?P_SSORD_ID=";
         private const string ModemViewUrl = "http://norwayappsprd.corp.halliburton.com/pls/log_web/mobssus_vieword$order_mc.QueryViewByKey?P_SSORD_ID=";
 
-        private static async Task FetchModemDetailsAsync(GantModem m, SemaphoreSlim throttle)
+        private static async Task FetchModemDetailsAsync(GantModem m, string customerName, SemaphoreSlim throttle)
         {
             await throttle.WaitAsync().ConfigureAwait(false);
             try
@@ -3810,9 +3841,142 @@ namespace ModemMergerWinFormsApp
                     m.PShipTo1 = ParseHiddenByNameFast(html, "H_SHIPTO_1");
 
                 m.HRefno = ParseHiddenByNameFast(html, "H_REFNO");
+                if (string.IsNullOrWhiteSpace(m.HRefno))
+                    m.HRefno = ParseLabeledFieldValueFast(html, "Ref:");
+
+                var refKabalId = KabalScraperClient.ExtractKabalId(m.HRefno, customerName);
+                if (!string.IsNullOrWhiteSpace(refKabalId))
+                {
+                    m.KabalId = refKabalId;
+                    m.KabalIdSource = "Ref";
+                }
+
+                if (string.IsNullOrWhiteSpace(m.KabalId))
+                {
+                    try
+                    {
+                        var editHtml = await GetFromGantAsync(ModemEditUrl + m.Id).ConfigureAwait(false);
+
+                        var shippingInstructions = ParseLabeledFieldValueFast(editHtml, "Shipping Instructions:");
+                        if (!string.IsNullOrWhiteSpace(shippingInstructions))
+                            m.ShippingInstructions = shippingInstructions;
+
+                        var shippingKabalId = ExtractKabalIdFromText(shippingInstructions, customerName);
+                        if (string.IsNullOrWhiteSpace(shippingKabalId))
+                            shippingKabalId = ExtractKabalIdFromText(editHtml, customerName);
+                        if (!string.IsNullOrWhiteSpace(shippingKabalId))
+                        {
+                            m.KabalId = shippingKabalId;
+                            m.KabalIdSource = "ShippingInstructions";
+                            SaveShippingKabalId(customerName, m.Id, shippingKabalId, shippingInstructions);
+                        }
+                    }
+                    catch (WebException)
+                    {
+                        // Expected for shipped/non-editable orders (often 401/redirect).
+                    }
+
+                    if (string.IsNullOrWhiteSpace(m.KabalId) && TryGetCachedShippingKabalId(customerName, m.Id, out var cachedId))
+                    {
+                        m.KabalId = cachedId;
+                        m.KabalIdSource = "ShippingInstructionsCache";
+                    }
+                }
             }
             catch { /* best effort */ }
             finally { throttle.Release(); }
+        }
+
+        private static string BuildShippingIdCacheKey(string operatorName, int modemId)
+        {
+            return (operatorName ?? "") + "|" + modemId;
+        }
+
+        private static Dictionary<string, ShippingKabalIdCacheEntry> GetShippingIdCache()
+        {
+            lock (_shippingIdCacheLock)
+            {
+                if (_shippingIdCache != null) return _shippingIdCache;
+
+                try
+                {
+                    if (File.Exists(_shippingIdCachePath))
+                    {
+                        using (var fs = new FileStream(_shippingIdCachePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                        using (var sr = new StreamReader(fs, Encoding.UTF8, true))
+                        {
+                            var json = sr.ReadToEnd();
+                            _shippingIdCache = JsonConvert.DeserializeObject<Dictionary<string, ShippingKabalIdCacheEntry>>(json)
+                                               ?? new Dictionary<string, ShippingKabalIdCacheEntry>(StringComparer.OrdinalIgnoreCase);
+                        }
+                    }
+                }
+                catch
+                {
+                    _shippingIdCache = new Dictionary<string, ShippingKabalIdCacheEntry>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                if (_shippingIdCache == null)
+                    _shippingIdCache = new Dictionary<string, ShippingKabalIdCacheEntry>(StringComparer.OrdinalIgnoreCase);
+
+                return _shippingIdCache;
+            }
+        }
+
+        private static bool TryGetCachedShippingKabalId(string operatorName, int modemId, out string kabalId)
+        {
+            kabalId = "";
+            var cache = GetShippingIdCache();
+            var key = BuildShippingIdCacheKey(operatorName, modemId);
+            lock (_shippingIdCacheLock)
+            {
+                if (!cache.TryGetValue(key, out var entry)) return false;
+                if (entry == null || string.IsNullOrWhiteSpace(entry.KabalId)) return false;
+                kabalId = entry.KabalId.Trim();
+                return !string.IsNullOrWhiteSpace(kabalId);
+            }
+        }
+
+        private static void SaveShippingKabalId(string operatorName, int modemId, string kabalId, string shippingInstructions)
+        {
+            if (string.IsNullOrWhiteSpace(kabalId)) return;
+
+            lock (_shippingIdCacheLock)
+            {
+                var cache = GetShippingIdCache();
+                var key = BuildShippingIdCacheKey(operatorName, modemId);
+
+                cache[key] = new ShippingKabalIdCacheEntry
+                {
+                    OperatorName = operatorName,
+                    ModemId = modemId,
+                    KabalId = kabalId.Trim(),
+                    ShippingInstructions = (shippingInstructions ?? "").Trim(),
+                    CapturedAtUtc = DateTime.UtcNow
+                };
+
+                // Keep cache bounded: latest 5000 records by capture time.
+                if (cache.Count > 5000)
+                {
+                    var keep = cache
+                        .OrderByDescending(kv => kv.Value?.CapturedAtUtc ?? DateTime.MinValue)
+                        .Take(5000)
+                        .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+                    _shippingIdCache = keep;
+                    cache = keep;
+                }
+
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_shippingIdCachePath));
+                    var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
+                    File.WriteAllText(_shippingIdCachePath, json, new UTF8Encoding(false));
+                }
+                catch
+                {
+                    // Best effort persistence only.
+                }
+            }
         }
 
         // ── Fast string-based parsers (no regex, ~10x faster on 46 KB pages) ──
@@ -3880,6 +4044,45 @@ namespace ModemMergerWinFormsApp
             int valEnd = html.IndexOf('<', valStart);
             if (valEnd < 0) return "";
             return html.Substring(valStart, valEnd - valStart).Trim();
+        }
+
+        private static string ParseLabeledFieldValueFast(string html, string label)
+        {
+            if (string.IsNullOrWhiteSpace(html) || string.IsNullOrWhiteSpace(label)) return "";
+
+            int pos = IndexOfIgnoreCase(html, "<b>" + label + "</b>", 0);
+            if (pos < 0)
+                pos = IndexOfIgnoreCase(html, label, 0);
+            if (pos < 0) return "";
+
+            int labelTdClose = IndexOfIgnoreCase(html, "</td>", pos);
+            if (labelTdClose < 0) return "";
+            int nextTd = IndexOfIgnoreCase(html, "<td", labelTdClose);
+            if (nextTd < 0) return "";
+            int gtPos = html.IndexOf('>', nextTd);
+            if (gtPos < 0) return "";
+            int tdEnd = IndexOfIgnoreCase(html, "</td>", gtPos);
+            if (tdEnd < 0) return "";
+
+            var inner = html.Substring(gtPos + 1, tdEnd - gtPos - 1);
+
+            var valueMatch = Regex.Match(inner, "\\bvalue\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", RegexOptions.IgnoreCase);
+            if (valueMatch.Success)
+                return WebUtility.HtmlDecode(valueMatch.Groups[1].Value).Trim();
+
+            var stripped = Regex.Replace(inner, "<[^>]+>", " ");
+            return WebUtility.HtmlDecode(stripped).Trim();
+        }
+
+        private static string ExtractKabalIdFromText(string text, string operatorName)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(operatorName)) return null;
+
+            if (!_kabalIdPrefixes.TryGetValue(operatorName, out var prefix)) return null;
+
+            var rx = new Regex(@"\b" + Regex.Escape(prefix) + @"\s*[-:]?\s*(\d{4,8})\b", RegexOptions.IgnoreCase);
+            var m = rx.Match(text);
+            return m.Success ? m.Groups[1].Value : null;
         }
 
         private static string ParseHiddenByNameFast(string html, string name)
