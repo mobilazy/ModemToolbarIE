@@ -1150,15 +1150,45 @@ namespace ModemMergerWinFormsApp
                                 }
                             }
 
-                            // ── Wait 3s, then read intercepted result + window handles + dialog state ──
+                            // ── Wait for click response (new tab, navigation, or intercepted action) ──
                             ScrapeLog.Info($"  Waiting for page response after click on '{wellName}'...");
-                            for (int ws = 0; ws < 3; ws++) { Thread.Sleep(1000); ScrapeLog.Info($"  Waiting... ({ws + 1}s)"); }
-                            CheckTimeout("Waiting after well click");
                             var handlesAfter = driver.WindowHandles;
                             var newHandles = handlesAfter.Except(handlesBefore).ToList();
-                            var clickResult = js.ExecuteScript(
+                            var clickResult = (js.ExecuteScript(
                                 "return window._kabalClickResult ? JSON.stringify(window._kabalClickResult) : null"
-                            ) as string;
+                            ) as string) ?? "";
+
+                            bool responseObserved = newHandles.Count > 0 || !string.IsNullOrWhiteSpace(clickResult);
+                            for (int ws = 0; ws < 12 && !responseObserved; ws++) // up to ~3s, 250ms polling
+                            {
+                                CheckTimeout("Waiting after well click");
+                                Thread.Sleep(250);
+
+                                handlesAfter = driver.WindowHandles;
+                                newHandles = handlesAfter.Except(handlesBefore).ToList();
+
+                                try
+                                {
+                                    clickResult = (js.ExecuteScript(
+                                        "return window._kabalClickResult ? JSON.stringify(window._kabalClickResult) : null"
+                                    ) as string) ?? "";
+                                }
+                                catch { }
+
+                                if (newHandles.Count > 0 || !string.IsNullOrWhiteSpace(clickResult) ||
+                                    !driver.Url.Equals(urlBefore, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    responseObserved = true;
+                                    break;
+                                }
+
+                                if (ws % 4 == 3)
+                                    ScrapeLog.Info($"  Waiting... ({(ws + 1) * 250}ms)");
+                            }
+
+                            if (!responseObserved)
+                                ScrapeLog.Warn("  No immediate click response detected after ~3s; attempting parse flow anyway.");
+
                             var dialogDump = js.ExecuteScript(@"
                                 var ds = document.querySelectorAll('.ui-dialog');
                                 return JSON.stringify({
@@ -1176,7 +1206,7 @@ namespace ModemMergerWinFormsApp
                                     })
                                 });
                             ") as string;
-                            ScrapeLog.Info($"  Intercept={clickResult ?? "null"} | newTabs={newHandles.Count} | url={driver.Url}");
+                            ScrapeLog.Info($"  Intercept={(string.IsNullOrWhiteSpace(clickResult) ? "null" : clickResult)} | newTabs={newHandles.Count} | url={driver.Url}");
                             ScrapeLog.Info($"  Dialogs: {dialogDump}");
 
                             List<TimePlannerSection> sections;
