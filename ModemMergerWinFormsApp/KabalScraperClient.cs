@@ -20,7 +20,7 @@ namespace ModemMergerWinFormsApp
 
     /// <summary>
     /// Minimal file logger for the Kabal scraper. Writes to
-    /// %APPDATA%\ModemMerger\scraper-log.txt (last run only).
+    /// %APPDATA%\ModemMerger\scraper-log.txt (current run only).
     /// </summary>
     public static class ScrapeLog
     {
@@ -30,15 +30,21 @@ namespace ModemMergerWinFormsApp
 
         public static string LogPath => _logPath;
 
-        public static void Start()
+        public static void Start(string operation = "General")
         {
             _logDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "ModemMerger");
             Directory.CreateDirectory(_logDir);
             _logPath = Path.Combine(_logDir, "scraper-log.txt");
-            File.WriteAllText(_logPath,
-                $"=== Kabal Scraper Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
+
+            var runHeader =
+                $"=== Kabal Scraper Run — {DateTime.Now:yyyy-MM-dd HH:mm:ss} | Op={operation} | PID={Process.GetCurrentProcess().Id} ==={Environment.NewLine}";
+
+            lock (_lock)
+            {
+                WriteAllTextSharedWithRetry(_logPath, runHeader);
+            }
         }
 
         public static void Info(string message)  => Write("INFO ", message);
@@ -49,7 +55,49 @@ namespace ModemMergerWinFormsApp
         {
             if (_logPath == null) return;
             var line = $"[{DateTime.Now:HH:mm:ss}] {level}  {message}{Environment.NewLine}";
-            lock (_lock) { File.AppendAllText(_logPath, line); }
+            lock (_lock) { AppendAllTextSharedWithRetry(_logPath, line); }
+        }
+
+        private static void WriteAllTextSharedWithRetry(string path, string content)
+        {
+            const int maxAttempts = 8;
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                try
+                {
+                    using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                    using (var sw = new StreamWriter(fs, new UTF8Encoding(false)))
+                    {
+                        sw.Write(content);
+                    }
+                    return;
+                }
+                catch (IOException) when (i < maxAttempts - 1)
+                {
+                    Thread.Sleep(30);
+                }
+            }
+        }
+
+        private static void AppendAllTextSharedWithRetry(string path, string content)
+        {
+            const int maxAttempts = 8;
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                try
+                {
+                    using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                    using (var sw = new StreamWriter(fs, new UTF8Encoding(false)))
+                    {
+                        sw.Write(content);
+                    }
+                    return;
+                }
+                catch (IOException) when (i < maxAttempts - 1)
+                {
+                    Thread.Sleep(30);
+                }
+            }
         }
 
         /// <summary>Captures screenshot + URL on error only.</summary>
@@ -347,13 +395,13 @@ namespace ModemMergerWinFormsApp
         // Regex to extract well code from well names — e.g. "C-21" from "2/8-C-21 Valhall PWP"
         private static readonly Regex _wellCodeRx = new Regex(@"([A-Z]-\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Regex to extract section hole size — e.g. "16 1/2" or "12 1/4" or "12.25".
-        // Also captures compound sizes like "17 1/2\" x 23 1/2\"" (bi-centric / combo BHA).
+        // Regex to extract section hole size — e.g. "16 1/2", "16-1/2", "12 1/4", "12.25".
+        // Also captures compound sizes like "12-1/4\" x 13\"" and "8-1/2\" x 9-1/2\"".
         // Try compound first (CompoundSizeRx), then single (SectionSizeRx).
         private static readonly Regex _sectionSizeRx = new Regex(
-            @"(\d+(?:\s*\d+/\d+)?(?:\.\d+)?)\s*(?:""|''|in\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?)\s*(?:""|''|in\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex _sectionCompoundRx = new Regex(
-            @"(\d+(?:\s*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?\s*x\s*\d+(?:\s*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?)",
+            @"(\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?\s*x\s*\d+(?:[\s-]*\d+/\d+)?(?:\.\d+)?\s*(?:""|''|in\b)?)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // Regex to detect BHA section start markers:
@@ -408,10 +456,20 @@ namespace ModemMergerWinFormsApp
         // DateTime patterns used in Kabal timeplanner task rows
         private static readonly string[] _kabalDateFormats = {
             "ddd dd-MM-yyyy HH:mm", // "Sun 19-04-2026 08:15"
+            "dddd dd-MM-yyyy HH:mm",
+            "ddd dd-MM-yyyy H:mm",
+            "dddd dd-MM-yyyy H:mm",
             "dd-MM-yyyy HH:mm",
+            "dd-MM-yyyy H:mm",
             "dd.MM.yyyy HH:mm",
+            "dd.MM.yyyy H:mm",
             "dd/MM/yyyy HH:mm",
+            "dd/MM/yyyy H:mm",
+            "ddd dd-MM-yyyy HH:mm:ss",
+            "dddd dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
             "yyyy-MM-dd HH:mm",
+            "yyyy-MM-dd HH:mm:ss",
         };
 
         /// <summary>
@@ -541,13 +599,33 @@ namespace ModemMergerWinFormsApp
         {
             return await Task.Run(() =>
             {
-                ScrapeLog.Start();
+                ScrapeLog.Start("TimePlanner");
                 ScrapeLog.Info("TimePlanner ParserVersion=2026-05-19c");
+                ScrapeLog.Info("TimePlanner Build=2026-05-22-timeout2m");
                 ScrapeLog.Info($"TimePlanner: Operator={operatorName}, Rig={rigName}, Wells={string.Join(",", wellCodesToMatch)}");
+                var timeout = TimeSpan.FromMinutes(2);
+                var deadlineUtc = DateTime.UtcNow.Add(timeout);
+                var currentStage = "TimePlanner init";
+                ScrapeLog.Info($"TimePlanner timeout budget: {(int)timeout.TotalSeconds}s");
+
+                void SetStage(string stage)
+                {
+                    currentStage = stage;
+                    ScrapeLog.Info($"TimePlanner Stage: {stage}");
+                    onStatus?.Invoke(stage);
+                }
+
+                void CheckTimeout(string stage)
+                {
+                    if (DateTime.UtcNow <= deadlineUtc) return;
+                    throw new TimeoutException($"TimePlanner scrape timed out after {(int)timeout.TotalSeconds}s at stage '{stage}'.");
+                }
 
                 OpenQA.Selenium.IWebDriver driver = null;
                 try
                 {
+                    SetStage("Starting browser driver");
+                    CheckTimeout(currentStage);
                     driver = GetOrCreateDriver(headless);
 
                     // ── Resolve target TimePlanner URL ──
@@ -579,9 +657,11 @@ namespace ModemMergerWinFormsApp
                     if (cacheHit)
                     {
                         ScrapeLog.Info($"TimePlanner: Session cache hit for {operatorName} (App {expectedAppId}) — verified <30 min ago, skipping login check.");
-                        onStatus?.Invoke("Session cached — loading Gantt...");
+                        SetStage("Session cached — loading Gantt...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(tpUrl);
                         WaitForApexReady(driver, timeoutSeconds: 3);
+                        CheckTimeout(currentStage);
                         if (driver.Url.Contains("p=" + expectedAppId + ":"))
                         {
                             ScrapeLog.Info($"TimePlanner: Cache confirmed. URL={driver.Url}");
@@ -595,9 +675,11 @@ namespace ModemMergerWinFormsApp
                     }
                     else
                     {
-                        onStatus?.Invoke("Checking existing session...");
+                        SetStage("Checking existing session...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(tpUrl);
                         WaitForApexReady(driver, timeoutSeconds: 5);
+                        CheckTimeout(currentStage);
 
                         // Session is valid only if the URL contains this operator's exact APEX App ID
                         if (driver.Url.Contains("p=" + expectedAppId + ":"))
@@ -618,11 +700,13 @@ namespace ModemMergerWinFormsApp
                         bool alreadyOnLogin = driver.Url.Contains("kabal-account") || driver.Url.Contains("login");
                         if (!alreadyOnLogin)
                         {
-                            onStatus?.Invoke("Navigating to Kabal login...");
+                            SetStage("Navigating to Kabal login...");
+                            CheckTimeout(currentStage);
                             driver.Navigate().GoToUrl(LoginUrl);
                         }
 
-                        onStatus?.Invoke("Entering credentials...");
+                        SetStage("Entering credentials...");
+                        CheckTimeout(currentStage);
                         var usernameField = WaitFor(driver, d =>
                         {
                             try
@@ -636,7 +720,8 @@ namespace ModemMergerWinFormsApp
                         usernameField.SendKeys(username);
                         ClickSubmitButton(driver, usernameField);
 
-                        onStatus?.Invoke("Entering password...");
+                        SetStage("Entering password...");
+                        CheckTimeout(currentStage);
                         var passwordField = WaitFor(driver, d =>
                         {
                             try
@@ -650,6 +735,7 @@ namespace ModemMergerWinFormsApp
                         passwordField.SendKeys(password);
                         ClickSubmitButton(driver, passwordField);
                         WaitForApexReady(driver, timeoutSeconds: 10);
+                        CheckTimeout(currentStage);
 
                         // Operator selection
                         string operatorDisplay;
@@ -657,7 +743,8 @@ namespace ModemMergerWinFormsApp
                             operatorDisplay = operatorName;
                         try
                         {
-                            onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
+                            SetStage($"Selecting operator: {operatorDisplay}...");
+                            CheckTimeout(currentStage);
                             var opLink = WaitFor(driver, d =>
                             {
                                 try
@@ -669,6 +756,7 @@ namespace ModemMergerWinFormsApp
                             }, timeoutSeconds: 5);
                             opLink.Click();
                             WaitForApexReady(driver, timeoutSeconds: 10);
+                            CheckTimeout(currentStage);
                         }
                         catch (Exception opEx)
                         {
@@ -676,9 +764,11 @@ namespace ModemMergerWinFormsApp
                         }
 
                         // Navigate to timeplanner listing
-                        onStatus?.Invoke("Navigating to timeplanner...");
+                        SetStage("Navigating to timeplanner...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(tpUrl);
                         WaitForApexReady(driver);
+                        CheckTimeout(currentStage);
 
                         if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account"))
                         {
@@ -698,14 +788,16 @@ namespace ModemMergerWinFormsApp
                     var js = driver as OpenQA.Selenium.IJavaScriptExecutor;
                     // Ensure a large window so vis.js renders all group label rows (it virtualizes by viewport height)
                     driver.Manage().Window.Size = new System.Drawing.Size(1920, 1080);
-                    onStatus?.Invoke("Waiting for Gantt chart data...");
+                    SetStage("Waiting for Gantt chart data...");
                     WaitForApexReady(driver);
+                    CheckTimeout(currentStage);
 
                     // Poll for vis-timeline group labels to render. vis-label elements are the rig-name labels in
                     // the left group panel — they do NOT appear in body.innerText so cannot be detected by text search.
                     bool ganttDataLoaded = false;
                     for (int waitSec = 0; waitSec < 35; waitSec++)
                     {
+                        CheckTimeout("Waiting for Gantt chart data");
                         Thread.Sleep(1000);
                         try
                         {
@@ -728,13 +820,13 @@ namespace ModemMergerWinFormsApp
                                     ganttDataLoaded = true;
                                     break;
                                 }
-                                else if (labelsN > 0 && waitSec % 5 == 4)
-                                    ScrapeLog.Info($"TimePlanner: Gantt has {labelsN} label(s) but still empty text... ({waitSec + 1}s)");
+                                else if (labelsN > 0 && waitSec % 2 == 1)
+                                    ScrapeLog.Info($"TimePlanner: Gantt has {labelsN} label(s) but no text yet... ({waitSec + 1}s)");
                             }
                         }
                         catch { }
-                        if (waitSec % 5 == 4)
-                            ScrapeLog.Info($"TimePlanner: Still waiting for Gantt labels with text... ({waitSec + 1}s)");
+                        if (waitSec % 2 == 1)
+                            ScrapeLog.Info($"TimePlanner: Waiting for Gantt... ({waitSec + 1}s / 35s)");
                     }
                     if (!ganttDataLoaded)
                     {
@@ -929,6 +1021,7 @@ namespace ModemMergerWinFormsApp
 
                     foreach (var w in wellsArr)
                     {
+                        CheckTimeout("Iterating wells");
                         var wellName = w.ContainsKey("name") ? w["name"].ToString() : "";
                         var wellHref = w.ContainsKey("href") ? w["href"].ToString() : "";
                         var wellDataId = w.ContainsKey("dataId") ? w["dataId"].ToString() : "";
@@ -936,10 +1029,11 @@ namespace ModemMergerWinFormsApp
                         if (string.IsNullOrEmpty(wellName)) continue;
                         planIdx++;
                         ScrapeLog.Info($"TimePlanner: [WELL #{planIdx}] '{wellName}' href='{wellHref}' dataId='{wellDataId}'");
-                        onStatus?.Invoke($"Scraping tasks for {wellName} ({planIdx}/{wellsArr.Count})...");
+                        SetStage($"Scraping tasks for {wellName} ({planIdx}/{wellsArr.Count})...");
 
                         try
                         {
+                            CheckTimeout(currentStage);
                             var urlBefore = driver.Url;
                             var handlesBefore = new HashSet<string>(driver.WindowHandles);
 
@@ -1057,7 +1151,9 @@ namespace ModemMergerWinFormsApp
                             }
 
                             // ── Wait 3s, then read intercepted result + window handles + dialog state ──
-                            Thread.Sleep(3000);
+                            ScrapeLog.Info($"  Waiting for page response after click on '{wellName}'...");
+                            for (int ws = 0; ws < 3; ws++) { Thread.Sleep(1000); ScrapeLog.Info($"  Waiting... ({ws + 1}s)"); }
+                            CheckTimeout("Waiting after well click");
                             var handlesAfter = driver.WindowHandles;
                             var newHandles = handlesAfter.Except(handlesBefore).ToList();
                             var clickResult = js.ExecuteScript(
@@ -1097,6 +1193,7 @@ namespace ModemMergerWinFormsApp
                                 string firstCellText = "";
                                 for (int cw = 0; cw < 24; cw++)
                                 {
+                                    CheckTimeout("Waiting for detail tab data");
                                     Thread.Sleep(500);
                                     try
                                     {
@@ -1117,7 +1214,7 @@ namespace ModemMergerWinFormsApp
                                     catch { }
                                 }
                                 ScrapeLog.Info($"  First cell text='{firstCellText}'. Parsing...");
-                                sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
+                                sections = ParseTimePlannerTasks(js, wellName, out parsedTasks, deadlineUtc);
                                 ScrapeLog.Info($"  New tab parsed {sections.Count} sections.");
                                 driver.Close();
                                 driver.SwitchTo().Window(handlesBefore.First());
@@ -1133,7 +1230,7 @@ namespace ModemMergerWinFormsApp
                                 {
                                     WaitForApexReady(driver);
                                     Thread.Sleep(250);
-                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
+                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks, deadlineUtc);
                                 }
                                 else
                                 {
@@ -1141,6 +1238,7 @@ namespace ModemMergerWinFormsApp
                                     bool contentReady = false;
                                     for (int tw = 0; tw < 18; tw++)
                                     {
+                                        CheckTimeout("Waiting for inline/detail content");
                                         Thread.Sleep(500);
                                         try
                                         {
@@ -1155,7 +1253,7 @@ namespace ModemMergerWinFormsApp
                                         catch { }
                                     }
                                     ScrapeLog.Info($"  Content ready={contentReady}. Parsing...");
-                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks);
+                                    sections = ParseTimePlannerTasks(js, wellName, out parsedTasks, deadlineUtc);
                                     if (sections.Count == 0)
                                     {
                                         var domDump = js.ExecuteScript(@"
@@ -1194,6 +1292,7 @@ namespace ModemMergerWinFormsApp
                             WaitForApexReady(driver);
                             for (int rw = 0; rw < 30; rw++)
                             {
+                                CheckTimeout("Waiting for Gantt re-render");
                                 Thread.Sleep(500);
                                 try
                                 {
@@ -1222,9 +1321,9 @@ namespace ModemMergerWinFormsApp
                 }
                 catch (Exception ex)
                 {
-                    ScrapeLog.Error($"TimePlanner: {ex.GetType().Name}: {ex.Message}");
+                    ScrapeLog.Error($"TimePlanner: {ex.GetType().Name} at stage '{currentStage}': {ex.Message}");
                     if (driver != null) ScrapeLog.SaveErrorSnapshot(driver, "timeplanner_error");
-                    return new TimePlannerResult { Success = false, Error = ex.Message };
+                    return new TimePlannerResult { Success = false, Error = $"{ex.Message} (stage: {currentStage})" };
                 }
                 // NOTE: driver is NOT disposed here — shared instance kept alive for session reuse.
             });
@@ -1235,8 +1334,18 @@ namespace ModemMergerWinFormsApp
         /// Groups tasks into drilling sections based on M/U BHA and POOH markers.
         /// </summary>
         private static List<TimePlannerSection> ParseTimePlannerTasks(
-            OpenQA.Selenium.IJavaScriptExecutor js, string planName, out List<TimePlannerTask> parsedTasks)
+            OpenQA.Selenium.IJavaScriptExecutor js,
+            string planName,
+            out List<TimePlannerTask> parsedTasks,
+            DateTime? deadlineUtc = null)
         {
+            void CheckTimeout(string stage)
+            {
+                if (!deadlineUtc.HasValue) return;
+                if (DateTime.UtcNow <= deadlineUtc.Value) return;
+                throw new TimeoutException($"TimePlanner parse timed out during '{stage}' for '{planName}'.");
+            }
+
             // Expand all collapsible rows so nested RAP tasks (including MU/POOH BHA lines)
             // are present in the DOM before table extraction.
             var expandRowsJs = @"
@@ -1326,6 +1435,7 @@ namespace ModemMergerWinFormsApp
             int prevRows = -1;
             for (int pass = 0; pass < 3; pass++)   // max 3 passes — RAP fallback covers future sections
             {
+                CheckTimeout("expand rows pass " + (pass + 1));
                 int beforeRows = 0;
                 try
                 {
@@ -1342,6 +1452,7 @@ namespace ModemMergerWinFormsApp
                 else if (clickObj is int i) clicks = i;
                 else int.TryParse(Convert.ToString(clickObj), out clicks);
 
+                CheckTimeout("post expand click pass " + (pass + 1));
                 Thread.Sleep(120);
 
                 int afterRows = beforeRows;
@@ -1360,10 +1471,12 @@ namespace ModemMergerWinFormsApp
                     break;
 
                 prevRows = afterRows;
+                CheckTimeout("stabilize pass " + (pass + 1));
                 Thread.Sleep(80);
             }
 
             // Extract task rows via JS from the table that actually contains populated cells.
+            CheckTimeout("extract task rows");
             var extractTasksJs = @"
                 function cellValue(td) {
                     if (!td) return '';
@@ -1468,7 +1581,10 @@ namespace ModemMergerWinFormsApp
             var allTasks = new List<TimePlannerTask>();
             foreach (var row in taskRows)
             {
+                CheckTimeout("parse task rows");
                 string taskName = "", startDt = "", endDt = "";
+                bool seenDateColumn = false;
+                string fallbackLongestName = "";
 
                 foreach (var kv in row)
                 {
@@ -1483,15 +1599,27 @@ namespace ModemMergerWinFormsApp
                             startDt = val;
                         else if (string.IsNullOrEmpty(endDt))
                             endDt = val;
+                        seenDateColumn = true;
                         continue;
                     }
 
-                    // Longest text-like non-date value is likely the task name.
-                    // Filter out numeric/depth artifacts that can appear in some rigs (e.g. Ringhorne).
+                    // Prefer the first meaningful text before date/time columns.
+                    // This avoids post-time note fields overriding the real activity title.
                     var normalized = NormalizeTaskNameCandidate(val);
-                    if (normalized.Length > taskName.Length && IsLikelyTaskName(normalized))
+                    if (!IsLikelyTaskName(normalized)) continue;
+
+                    if (!seenDateColumn && string.IsNullOrEmpty(taskName))
+                    {
                         taskName = normalized;
+                        continue;
+                    }
+
+                    if (normalized.Length > fallbackLongestName.Length)
+                        fallbackLongestName = normalized;
                 }
+
+                if (string.IsNullOrEmpty(taskName))
+                    taskName = fallbackLongestName;
 
                 if (!string.IsNullOrEmpty(taskName))
                 {
@@ -1528,6 +1656,7 @@ namespace ModemMergerWinFormsApp
             string pendingSoftEnd = null;
             for (int ti = 0; ti < timedTasks.Count; ti++)
             {
+                CheckTimeout("build BHA sections");
                 var tt = timedTasks[ti];
                 var task = tt.Item1;
 
@@ -1644,6 +1773,7 @@ namespace ModemMergerWinFormsApp
 
             for (int ri = 0; ri < rapDrillList.Count; ri++)
             {
+                CheckTimeout("RAP fallback sections");
                 var rapTt    = rapDrillList[ri];
                 var rapStart = rapTt.Item2;
 
@@ -1702,6 +1832,7 @@ namespace ModemMergerWinFormsApp
 
             for (int di = 0; di < dSectionList.Count; di++)
             {
+                CheckTimeout("D-section fallback sections");
                 var dTt    = dSectionList[di];
                 var dStart = dTt.Item2;
 
@@ -1795,10 +1926,21 @@ namespace ModemMergerWinFormsApp
             sectionName = taskName ?? "";
             if (string.IsNullOrWhiteSpace(taskName)) return;
 
+            string NormalizeSize(string raw)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) return "";
+                var s = raw.Trim();
+                // Normalize whole-fraction separator to '-' for stable display (16 1/2 -> 16-1/2).
+                s = Regex.Replace(s, @"(\d)\s+(\d+/\d+)", "$1-$2");
+                s = Regex.Replace(s, @"\s*x\s*", " x ", RegexOptions.IgnoreCase);
+                s = Regex.Replace(s, @"\s+", " ");
+                return s.Trim();
+            }
+
             var compMatch = _sectionCompoundRx.Match(taskName);
             if (compMatch.Success)
             {
-                size = compMatch.Groups[1].Value.Trim();
+                size = NormalizeSize(compMatch.Groups[1].Value);
                 // Normalize optional in/quotes to canonical quoted display for consistency.
                 size = Regex.Replace(size, @"\s*(?:in\b|''|'')\s*", "\"");
                 size = Regex.Replace(size, @"\s*x\s*", " x ");
@@ -1807,7 +1949,7 @@ namespace ModemMergerWinFormsApp
             }
 
             var sizeMatch = _sectionSizeRx.Match(taskName);
-            size = sizeMatch.Success ? sizeMatch.Groups[1].Value.Trim() : "";
+            size = sizeMatch.Success ? NormalizeSize(sizeMatch.Groups[1].Value) : "";
             sectionName = !string.IsNullOrEmpty(size) ? size + "\" section" : taskName;
         }
 
@@ -1821,10 +1963,24 @@ namespace ModemMergerWinFormsApp
         {
             result = default;
             if (string.IsNullOrWhiteSpace(value)) return false;
-            // Strip leading day-of-week prefix (e.g. "Sun ")
-            var cleaned = Regex.Replace(value.Trim(), @"^[A-Za-z]{2,3}\s+", "");
-            return DateTime.TryParseExact(cleaned, _kabalDateFormats,
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
+
+            // Normalize whitespace (incl. NBSP) and strip optional leading weekday token.
+            var cleaned = value.Replace('\u00A0', ' ').Trim();
+            cleaned = Regex.Replace(cleaned, @"\s+", " ");
+            cleaned = Regex.Replace(cleaned, @"^[\p{L}]{2,12},?\s+", "", RegexOptions.CultureInvariant);
+
+            if (DateTime.TryParseExact(cleaned, _kabalDateFormats,
+                CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out result))
+                return true;
+
+            // Some Kabal cells append non-date info after timestamp (e.g. "... 15:15 Depth").
+            // Extract and parse the first date-time token only.
+            var m = Regex.Match(cleaned, @"\b\d{1,2}[\-\./]\d{1,2}[\-\./]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?\b");
+            if (!m.Success) return false;
+
+            var dtToken = m.Value;
+            return DateTime.TryParseExact(dtToken, _kabalDateFormats,
+                CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out result);
         }
 
         private static string NormalizeTaskNameCandidate(string value)
@@ -1866,12 +2022,34 @@ namespace ModemMergerWinFormsApp
         {
             return await Task.Run(() =>
             {
-                ScrapeLog.Start();
+                ScrapeLog.Start("Sync");
+                ScrapeLog.Info("ScrapeBuild=2026-05-22-timeout2m");
                 ScrapeLog.Info($"Operator={operatorName}, Rig={rigName}");
+                var timeout = TimeSpan.FromMinutes(2);
+                var deadlineUtc = DateTime.UtcNow.Add(timeout);
+                var currentStage = "Initializing";
+                ScrapeLog.Info($"Scrape timeout budget: {(int)timeout.TotalSeconds}s");
+
+                void SetStage(string stage)
+                {
+                    currentStage = stage;
+                    ScrapeLog.Info($"Stage: {stage}");
+                    onStatus?.Invoke(stage);
+                }
+
+                void CheckTimeout(string stage)
+                {
+                    if (DateTime.UtcNow <= deadlineUtc) return;
+                    var elapsed = DateTime.UtcNow - (deadlineUtc - timeout);
+                    throw new TimeoutException(
+                        $"Scrape timed out after {(int)timeout.TotalSeconds}s at stage '{stage}' (elapsed {(int)elapsed.TotalSeconds}s).");
+                }
 
                 OpenQA.Selenium.IWebDriver driver = null;
                 try
                 {
+                    SetStage("Starting browser driver");
+                    CheckTimeout(currentStage);
                     driver = GetOrCreateDriver(headless);
 
                     // ── Resolve target APEX URL ──
@@ -1891,21 +2069,23 @@ namespace ModemMergerWinFormsApp
                     if (cacheHit)
                     {
                         ScrapeLog.Info($"ScrapeAsync: Session cache hit for {operatorName} — verified <30 min ago, skipping login check.");
-                        onStatus?.Invoke("Session cached — loading data...");
+                        SetStage("Session cached — loading data...");
                         needsLogin = false;
                     }
                     else
                     {
-                        onStatus?.Invoke("Checking existing session...");
+                        SetStage("Checking existing session...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(targetUrl);
                         WaitForApexReady(driver, timeoutSeconds: 5);
+                        CheckTimeout(currentStage);
 
                         if (driver.Url.Contains("app01.kabal.com") &&
                             !driver.Url.Contains("login") &&
                             !driver.Url.Contains("kabal-account"))
                         {
                             ScrapeLog.Info("ScrapeAsync: Session reused — skipping login.");
-                            onStatus?.Invoke("Session valid — skipping login.");
+                            SetStage("Session valid — skipping login.");
                             needsLogin = false;
                             lock (_lastSessionVerified) _lastSessionVerified[cacheKey] = DateTime.UtcNow;
                         }
@@ -1922,16 +2102,18 @@ namespace ModemMergerWinFormsApp
                     bool alreadyOnLogin = driver.Url.Contains("kabal-account") || driver.Url.Contains("login");
                     if (!alreadyOnLogin)
                     {
-                        onStatus?.Invoke("Navigating to Kabal login...");
+                        SetStage("Navigating to Kabal login...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(LoginUrl);
                     }
                     else
                     {
-                        onStatus?.Invoke("Already on login page...");
+                        SetStage("Already on login page...");
                         ScrapeLog.Info("Skipped LoginUrl navigation — already redirected to login.");
                     }
 
-                    onStatus?.Invoke("Entering credentials...");
+                    SetStage("Entering credentials...");
+                    CheckTimeout(currentStage);
                     var usernameField = WaitFor(driver, d =>
                     {
                         try
@@ -1947,7 +2129,8 @@ namespace ModemMergerWinFormsApp
                     // Submit username — use FindElements + no implicit wait to avoid 3s per failed selector
                     ClickSubmitButton(driver, usernameField);
 
-                    onStatus?.Invoke("Entering password...");
+                    SetStage("Entering password...");
+                    CheckTimeout(currentStage);
                     var passwordField = WaitFor(driver, d =>
                     {
                         try
@@ -1963,6 +2146,7 @@ namespace ModemMergerWinFormsApp
                     // Submit password
                     ClickSubmitButton(driver, passwordField);
                     WaitForApexReady(driver, timeoutSeconds: 10);
+                    CheckTimeout(currentStage);
 
                     // Operator selection (if present)
                     string operatorDisplay;
@@ -1971,7 +2155,8 @@ namespace ModemMergerWinFormsApp
 
                     try
                     {
-                        onStatus?.Invoke($"Selecting operator: {operatorDisplay}...");
+                        SetStage($"Selecting operator: {operatorDisplay}...");
+                        CheckTimeout(currentStage);
                         var opLink = WaitFor(driver, d =>
                         {
                             try
@@ -1983,6 +2168,7 @@ namespace ModemMergerWinFormsApp
                         }, timeoutSeconds: 5);
                         opLink.Click();
                         WaitForApexReady(driver, timeoutSeconds: 10);
+                        CheckTimeout(currentStage);
                     }
                     catch (Exception opEx)
                     {
@@ -1999,9 +2185,11 @@ namespace ModemMergerWinFormsApp
                             "P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout",
                             $"P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH,P328_FROM_DATE,P328_TO_DATE:loadout,,,cargo.operations.loadout,{df},{dt}");
                     }
-                    onStatus?.Invoke($"Navigating to {operatorName} loadout page...");
+                            SetStage($"Navigating to {operatorName} loadout page...");
+                            CheckTimeout(currentStage);
                     driver.Navigate().GoToUrl(navUrl);
                     WaitForApexReady(driver);
+                            CheckTimeout(currentStage);
 
                     if (driver.Url.Contains("login") || driver.Url.Contains("kabal-account:login"))
                     {
@@ -2021,21 +2209,35 @@ namespace ModemMergerWinFormsApp
                         var dateUrl = targetUrl.Replace(
                             "P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH:loadout,,,cargo.operations.loadout",
                             $"P328_VALUE_TYPE,P328_ACTION,P3523_FILTER,PATH,P328_FROM_DATE,P328_TO_DATE:loadout,,,cargo.operations.loadout,{df},{dt}");
+                        SetStage("Loading date-filtered page...");
+                        CheckTimeout(currentStage);
                         driver.Navigate().GoToUrl(dateUrl);
                         WaitForApexReady(driver);
+                        CheckTimeout(currentStage);
                     }
 
                     // ── Apply APEX IR filters ──
-                    onStatus?.Invoke("Configuring filters...");
+                    SetStage("Configuring filters...");
+                    CheckTimeout(currentStage);
                     ConfigureApexIR(driver, dateFrom, dateTo);
+                    CheckTimeout(currentStage);
 
                     // ── Scrape APEX Interactive Report ──
-                    onStatus?.Invoke("Scraping APEX table...");
-                    var allRows = ScrapeApexIR(driver);
+                    SetStage("Scraping APEX table...");
+                    CheckTimeout(currentStage);
+                    var allRows = ScrapeApexIR(driver, deadlineUtc, stage =>
+                    {
+                        currentStage = stage;
+                        ScrapeLog.Info($"Stage: {stage}");
+                        onStatus?.Invoke(stage);
+                    });
+                    CheckTimeout(currentStage);
 
+                    SetStage("Parsing scraped rows...");
+                    CheckTimeout(currentStage);
                     var modems = ParseModems(allRows);
                     ScrapeLog.Info($"Scraped {allRows.Count} rows → {modems.Count} modems.");
-                    onStatus?.Invoke($"Parsed {modems.Count} modem records from {allRows.Count} rows.");
+                    SetStage($"Parsed {modems.Count} modem records from {allRows.Count} rows.");
 
                     ScrapeLog.Info("Scrape OK.");
                     return new ScraperResult
@@ -2048,9 +2250,13 @@ namespace ModemMergerWinFormsApp
                 }
                 catch (Exception ex)
                 {
-                    ScrapeLog.Error($"{ex.GetType().Name}: {ex.Message}");
+                    ScrapeLog.Error($"{ex.GetType().Name} at stage '{currentStage}': {ex.Message}");
                     if (driver != null) ScrapeLog.SaveErrorSnapshot(driver, "error");
-                    return new ScraperResult { Success = false, Error = ex.Message };
+                    return new ScraperResult
+                    {
+                        Success = false,
+                        Error = $"{ex.Message} (stage: {currentStage})"
+                    };
                 }
                 // NOTE: driver is NOT disposed here — it is a shared instance kept alive for 30-min session reuse.
             });
@@ -2214,6 +2420,18 @@ namespace ModemMergerWinFormsApp
             // Select first compatible driver by major version.
             var distinctCandidates = candidates
                 .Where(d => !string.IsNullOrWhiteSpace(d))
+                .Select(d =>
+                {
+                    try
+                    {
+                        return Path.GetFullPath(d)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    catch
+                    {
+                        return d.TrimEnd('\\', '/');
+                    }
+                })
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -2600,11 +2818,17 @@ namespace ModemMergerWinFormsApp
         /// Returns a list of dictionaries (column header → cell value).
         /// Uses JavaScript bulk extraction instead of per-cell Selenium calls for speed.
         /// </summary>
-        private static List<Dictionary<string, string>> ScrapeApexIR(OpenQA.Selenium.IWebDriver driver)
+        private static List<Dictionary<string, string>> ScrapeApexIR(
+            OpenQA.Selenium.IWebDriver driver,
+            DateTime? deadlineUtc = null,
+            Action<string> onStage = null)
         {
             var allRows = new List<Dictionary<string, string>>();
             int pageNum = 0;
             var js = driver as OpenQA.Selenium.IJavaScriptExecutor;
+            string lastPageSignature = null;
+            int repeatedPageCount = 0;
+            const int maxPages = 200;
 
             // JavaScript that extracts all table data in one call (avoids hundreds of WebDriver round-trips)
             const string extractTableJs = @"
@@ -2638,10 +2862,21 @@ namespace ModemMergerWinFormsApp
             while (true)
             {
                 pageNum++;
+                if (deadlineUtc.HasValue && DateTime.UtcNow > deadlineUtc.Value)
+                    throw new TimeoutException($"Scrape timed out while reading APEX page {pageNum}.");
+
+                onStage?.Invoke($"Scraping APEX page {pageNum}...");
+                if (pageNum > maxPages)
+                {
+                    ScrapeLog.Warn($"Pagination guard hit: exceeded {maxPages} pages. Stopping scrape to avoid infinite loop.");
+                    break;
+                }
+
                 WaitForApexReady(driver);
 
                 // Extract all rows from current page in a single JS call
                 bool tableFound = false;
+                var pageRows = new List<Dictionary<string, string>>();
                 if (js != null)
                 {
                     try
@@ -2654,7 +2889,8 @@ namespace ModemMergerWinFormsApp
                             if (tableFound)
                             {
                                 var rowsArray = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(parsed["rows"].ToString());
-                                allRows.AddRange(rowsArray);
+                                pageRows = rowsArray ?? new List<Dictionary<string, string>>();
+                                allRows.AddRange(pageRows);
                             }
                         }
                     }
@@ -2693,6 +2929,7 @@ namespace ModemMergerWinFormsApp
                                         var key = i < headers.Count ? headers[i] : $"col_{i}";
                                         obj[key] = cells[i].Text.Trim();
                                     }
+                                    pageRows.Add(obj);
                                     allRows.Add(obj);
                                 }
                                 catch { }
@@ -2710,6 +2947,24 @@ namespace ModemMergerWinFormsApp
                     break;
                 }
 
+                var currentPageSignature = BuildPageSignature(pageRows);
+                if (!string.IsNullOrWhiteSpace(currentPageSignature) &&
+                    string.Equals(lastPageSignature, currentPageSignature, StringComparison.Ordinal))
+                {
+                    repeatedPageCount++;
+                    ScrapeLog.Warn($"Pagination appears stuck on same page signature (repeat {repeatedPageCount}).");
+                    if (repeatedPageCount >= 2)
+                    {
+                        ScrapeLog.Warn("Stopping pagination to avoid infinite loop.");
+                        break;
+                    }
+                }
+                else
+                {
+                    repeatedPageCount = 0;
+                    lastPageSignature = currentPageSignature;
+                }
+
                 // Try to click Next — disable implicit wait to avoid 3s×4 = 12s delay on last page
                 bool nextClicked = false;
                 driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
@@ -2723,6 +2978,8 @@ namespace ModemMergerWinFormsApp
                     };
                     foreach (var ns in nextSelectors)
                     {
+                        if (deadlineUtc.HasValue && DateTime.UtcNow > deadlineUtc.Value)
+                            throw new TimeoutException($"Scrape timed out while evaluating pagination on page {pageNum}.");
                         try
                         {
                             var found = driver.FindElements(OpenQA.Selenium.By.CssSelector(ns));
@@ -2749,6 +3006,25 @@ namespace ModemMergerWinFormsApp
             }
 
             return allRows;
+        }
+
+        private static string BuildPageSignature(List<Dictionary<string, string>> pageRows)
+        {
+            if (pageRows == null || pageRows.Count == 0) return "empty";
+
+            string RowSig(Dictionary<string, string> row)
+            {
+                if (row == null || row.Count == 0) return "{}";
+                var parts = row
+                    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Take(10)
+                    .Select(kv => (kv.Key ?? "") + "=" + (kv.Value ?? ""));
+                return string.Join("|", parts);
+            }
+
+            var first = RowSig(pageRows[0]);
+            var last = RowSig(pageRows[pageRows.Count - 1]);
+            return pageRows.Count + "::" + first + "::" + last;
         }
 
         /// <summary>

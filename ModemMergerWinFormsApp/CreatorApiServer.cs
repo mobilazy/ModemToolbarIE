@@ -161,7 +161,7 @@ namespace ModemMergerWinFormsApp
             string content = "";
             if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
             {
-                try { content = File.ReadAllText(logPath, System.Text.Encoding.UTF8); }
+                try { content = ReadAllTextShared(logPath); }
                 catch (Exception ex) { content = $"[Error reading log: {ex.Message}]"; }
             }
             else
@@ -172,7 +172,7 @@ namespace ModemMergerWinFormsApp
                     "ModemMerger", "scraper-log.txt");
                 if (File.Exists(defaultPath))
                 {
-                    try { content = File.ReadAllText(defaultPath, System.Text.Encoding.UTF8); }
+                    try { content = ReadAllTextShared(defaultPath); }
                     catch (Exception ex) { content = $"[Error reading log: {ex.Message}]"; }
                 }
                 else
@@ -182,10 +182,22 @@ namespace ModemMergerWinFormsApp
             var bytes = System.Text.Encoding.UTF8.GetBytes(content);
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "text/plain; charset=utf-8";
+            ctx.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            ctx.Response.Headers["Pragma"] = "no-cache";
+            ctx.Response.Headers["Expires"] = "0";
             ctx.Response.ContentLength64 = bytes.Length;
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
             ctx.Response.OutputStream.Close();
             return Task.CompletedTask;
+        }
+
+        private static string ReadAllTextShared(string path)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var sr = new StreamReader(fs, Encoding.UTF8, true))
+            {
+                return sr.ReadToEnd();
+            }
         }
 
         // ── GET /api/modems ──────────────────────────────────────────────

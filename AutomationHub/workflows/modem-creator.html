@@ -71,6 +71,7 @@
             box-shadow: 0 5px 15px rgba(16,185,129,0.4);
         }
         .button-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        #btnTimeplanner { min-width: 170px; white-space: nowrap; flex: 0 0 auto; }
 
         /* ── Status log ──────────────────────────────────── */
         #statusLog {
@@ -210,6 +211,7 @@
         <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#2a2a2a;border-radius:4px 4px 0 0">
             <strong style="color:#ccc">Scraper Log</strong>
             <button class="btn btn-secondary" id="btnRefreshLog" style="padding:2px 10px;font-size:12px">&#8635; Refresh</button>
+            <span id="logFetchedAt" style="color:#666;font-size:11px;margin-left:4px"></span>
         </div>
         <pre id="logContent" style="margin:0;padding:10px;max-height:400px;overflow:auto;font-size:11px;color:#9be;white-space:pre-wrap;word-break:break-all">(click Refresh)</pre>
     </div>
@@ -341,6 +343,11 @@ let recentOperations = []; // TimePlannerRecentOperation[]
 let lastUpdated = null;
 let modems   = [];  // GantModem[]
 let modemsFetchedAt = null;  // ISO timestamp when modems were last loaded
+const TP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const TP_REQUEST_TIMEOUT_MS = 120000;
+let tpCountdownTimer = null;
+let tpTimedOut = false;
+let tpLogSignatureAtStart = '';
 
 function makeTpCacheKey(customer, rig) {
     return 'tp_cache::' + (customer || '') + '::' + (rig || '');
@@ -348,16 +355,130 @@ function makeTpCacheKey(customer, rig) {
 
 function saveTpCache(customer, rig, payload) {
     if (!customer || !rig || !payload) return;
-    localStorage.setItem(makeTpCacheKey(customer, rig), JSON.stringify(payload));
+    localStorage.setItem(makeTpCacheKey(customer, rig), JSON.stringify({
+        savedAtUtc: new Date().toISOString(),
+        payload
+    }));
 }
 
 function loadTpCache(customer, rig) {
     if (!customer || !rig) return null;
     try {
-        const raw = localStorage.getItem(makeTpCacheKey(customer, rig));
-        return raw ? JSON.parse(raw) : null;
+        const key = makeTpCacheKey(customer, rig);
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.sections)) {
+            localStorage.removeItem(key);
+            return null;
+        }
+        const savedAtMs = parsed && parsed.savedAtUtc ? Date.parse(parsed.savedAtUtc) : NaN;
+        if (!parsed || !parsed.payload || isNaN(savedAtMs) || (Date.now() - savedAtMs) > TP_CACHE_TTL_MS) {
+            localStorage.removeItem(key);
+            return null;
+        }
+        return parsed.payload;
     } catch {
         return null;
+    }
+}
+
+function clearStaleTpCache() {
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (!k || !k.startsWith('tp_cache::')) continue;
+            try {
+                const raw = localStorage.getItem(k);
+                const parsed = raw ? JSON.parse(raw) : null;
+                const ts = parsed && parsed.savedAtUtc ? Date.parse(parsed.savedAtUtc) : NaN;
+                if (!parsed || !parsed.payload || isNaN(ts) || (Date.now() - ts) > TP_CACHE_TTL_MS) {
+                    localStorage.removeItem(k);
+                }
+            } catch {
+                localStorage.removeItem(k);
+            }
+        }
+    } catch {
+    }
+}
+
+function updateTimeplannerButton(secondsLeft) {
+    btnTimeplanner.innerHTML = '<span class="spinner-inline"></span>Scraping (' + secondsLeft + 's)';
+}
+
+async function getLastScrapeStageFromLog() {
+    try {
+        const r = await fetch('http://localhost:9002/api/log?_=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return '';
+        const txt = await r.text();
+        const lines = txt.split(/\r?\n/);
+
+        // Prefer explicit TimePlanner stages to avoid reporting Sync stages.
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const m = lines[i].match(/TimePlanner Stage:\s*(.+)$/);
+            if (m && m[1]) return m[1].trim();
+        }
+    } catch {
+    }
+    return '';
+}
+
+async function getTimePlannerLogProbe() {
+    try {
+        const r = await fetch('http://localhost:9002/api/log?_=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return { signature: '', op: '', firstLine: '' };
+        const txt = await r.text();
+        const lines = txt.split(/\r?\n/);
+        const firstLine = (lines[0] || '').trim();
+        const secondLine = (lines[1] || '').trim();
+        const thirdLine = (lines[2] || '').trim();
+        const sig = txt.length + '|' + firstLine + '|' + secondLine + '|' + thirdLine;
+        let op = '';
+        const m = firstLine.match(/\|\s*Op=([^|\s]+)\s*\|/i);
+        if (m && m[1]) op = m[1].trim();
+        return { signature: sig, op, firstLine };
+    } catch {
+        return { signature: '', op: '', firstLine: '' };
+    }
+}
+
+function startTimeplannerCountdown() {
+    tpTimedOut = false;
+    const startedAt = Date.now();
+    updateTimeplannerButton(Math.ceil(TP_REQUEST_TIMEOUT_MS / 1000));
+    if (tpCountdownTimer) clearInterval(tpCountdownTimer);
+    tpCountdownTimer = setInterval(async () => {
+        const leftMs = TP_REQUEST_TIMEOUT_MS - (Date.now() - startedAt);
+        const leftSec = Math.max(0, Math.ceil(leftMs / 1000));
+        if (leftSec > 0) {
+            updateTimeplannerButton(leftSec);
+            return;
+        }
+        clearInterval(tpCountdownTimer);
+        tpCountdownTimer = null;
+        if (!tpTimedOut) {
+            tpTimedOut = true;
+            btnTimeplanner.disabled = false;
+            btnTimeplanner.textContent = 'Timeplanner';
+            log('TimePlanner operation timed out after 120s.', true);
+            const probe = await getTimePlannerLogProbe();
+            if (probe.signature && probe.signature === tpLogSignatureAtStart) {
+                log('No new scraper log entries were written for this TimePlanner run. Backend call likely did not start or app instance is stale.', true);
+            } else if (probe.op && probe.op.toLowerCase() !== 'timeplanner') {
+                log('Scraper log still points to Op=' + probe.op + ' (not TimePlanner). Running desktop app is likely outdated.', true);
+            }
+            const stage = await getLastScrapeStageFromLog();
+            if (stage) log('Timeout reached while running: ' + stage, true);
+            else log('No TimePlanner stage found in scraper log for this run.', true);
+        }
+    }, 1000);
+}
+
+function stopTimeplannerCountdown() {
+    if (tpCountdownTimer) {
+        clearInterval(tpCountdownTimer);
+        tpCountdownTimer = null;
     }
 }
 
@@ -437,17 +558,29 @@ function log(msg, isError) {
 }
 
 // ── API helpers ─────────────────────────────────────────────────────
-async function apiPost(path, body) {
-    const res = await fetch(API + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || res.statusText);
+async function apiPost(path, body, timeoutMs) {
+    const controller = new AbortController();
+    const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+        const res = await fetch(API + path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || res.statusText);
+        }
+        return res.json();
+    } catch (err) {
+        if (err && err.name === 'AbortError') {
+            throw new Error('Request timed out after ' + Math.round(timeoutMs / 1000) + 's. Check scraper log for last stage.');
+        }
+        throw err;
+    } finally {
+        if (timer) clearTimeout(timer);
     }
-    return res.json();
 }
 
 function esc(s) {
@@ -521,8 +654,12 @@ btnTimeplanner.addEventListener('click', async () => {
 
     if (!customer || !rig)  return alert('Select customer and rig.');
 
+    const baselineProbe = await getTimePlannerLogProbe();
+    tpLogSignatureAtStart = baselineProbe.signature;
+
     btnTimeplanner.disabled = true;
     btnTimeplanner.innerHTML = '<span class="spinner-inline"></span>Scraping…';
+    startTimeplannerCountdown();
     statusLog.innerHTML = '';
     tpBody.innerHTML = '';
     tpPanel.classList.remove('show');
@@ -532,6 +669,7 @@ btnTimeplanner.addEventListener('click', async () => {
     modemPanel.classList.remove('show');
     btnLoadModems.disabled = true;
     btnCopy.disabled = true;
+    startLiveLog();
 
     try {
         const alive = await checkApiHealth();
@@ -542,7 +680,7 @@ btnTimeplanner.addEventListener('click', async () => {
             operator: customer,
             rig: rig,
             headless: true
-        });
+        }, TP_REQUEST_TIMEOUT_MS);
 
         if (!tp.success) {
             log('TimePlanner error: ' + (tp.error || 'unknown'), true);
@@ -567,8 +705,22 @@ btnTimeplanner.addEventListener('click', async () => {
 
         applyTimePlannerPayload({ sections, recentOperations, lastUpdated }, false);
     } catch (err) {
+        if (err && /timed out/i.test(err.message || '')) {
+            tpTimedOut = true;
+            const probe = await getTimePlannerLogProbe();
+            if (probe.signature && probe.signature === tpLogSignatureAtStart) {
+                log('No new scraper log entries were written for this TimePlanner run. Backend call likely did not start or app instance is stale.', true);
+            } else if (probe.op && probe.op.toLowerCase() !== 'timeplanner') {
+                log('Scraper log still points to Op=' + probe.op + ' (not TimePlanner). Running desktop app is likely outdated.', true);
+            }
+            const stage = await getLastScrapeStageFromLog();
+            if (stage) log('Last scraper stage before timeout: ' + stage, true);
+            else log('No TimePlanner stage found in scraper log for this run.', true);
+        }
         log('Error: ' + err.message, true);
     } finally {
+        stopLiveLog();
+        stopTimeplannerCountdown();
         btnTimeplanner.disabled = false;
         btnTimeplanner.textContent = 'Timeplanner';
     }
@@ -680,6 +832,7 @@ btnLoadModems.addEventListener('click', async () => {
 
     btnLoadModems.disabled = true;
     btnLoadModems.innerHTML = '<span class="spinner-inline"></span>Loading…';
+    startLiveLog();
 
     try {
         const alive = await checkApiHealth();
@@ -699,6 +852,7 @@ btnLoadModems.addEventListener('click', async () => {
     } catch (err) {
         log('Error: ' + err.message, true);
     } finally {
+        stopLiveLog();
         btnLoadModems.disabled = false;
         btnLoadModems.textContent = 'Load Modems';
     }
@@ -824,6 +978,7 @@ btnCopy.addEventListener('click', () => {
 
 // ── Persist selections in sessionStorage ─────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+    clearStaleTpCache();
     const cust = sessionStorage.getItem('mc_cust');
     if (cust) {
         customerSel.value = cust;
@@ -841,19 +996,53 @@ rigSel.addEventListener('change', () => {
 // ── Scraper Log Viewer ───────────────────────────────────────────
 const logPanel      = document.getElementById('logPanel');
 const logContent    = document.getElementById('logContent');
+const logFetchedAt  = document.getElementById('logFetchedAt');
 const btnShowLog    = document.getElementById('btnShowLog');
 const btnRefreshLog = document.getElementById('btnRefreshLog');
+let liveLogTimer = null;
+let liveLogInFlight = false;
 
-async function loadLog() {
-    logContent.textContent = 'Loading…';
+function ensureLogPanelVisible() {
+    if (logPanel.style.display === 'none') {
+        logPanel.style.display = 'block';
+        btnShowLog.textContent = 'Hide Log';
+    }
+}
+
+function startLiveLog() {
+    ensureLogPanelVisible();
+    loadLog(true);
+    if (liveLogTimer) return;
+    liveLogTimer = setInterval(() => {
+        if (!liveLogInFlight) loadLog(false);
+    }, 2000);
+}
+
+function stopLiveLog() {
+    if (liveLogTimer) {
+        clearInterval(liveLogTimer);
+        liveLogTimer = null;
+    }
+    loadLog(false);
+}
+
+async function loadLog(showLoading) {
+    if (showLoading) logContent.textContent = 'Loading…';
+    liveLogInFlight = true;
     try {
-        const r = await fetch('http://localhost:9002/api/log');
+        const r = await fetch('http://localhost:9002/api/log?_=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const txt = await r.text();
+        const wasNearBottom = (logContent.scrollHeight - logContent.scrollTop - logContent.clientHeight) < 24;
         logContent.textContent = txt;
-        logContent.scrollTop = logContent.scrollHeight;
+        if (wasNearBottom || liveLogTimer) logContent.scrollTop = logContent.scrollHeight;
+        const now = new Date();
+        logFetchedAt.textContent = 'fetched ' + now.toLocaleTimeString();
     } catch(e) {
-        logContent.textContent = '[Could not fetch log — is the desktop app running?]\n' + e;
+        logContent.textContent = '[Could not reach localhost:9002 — is Modem Copier 2.0 running?]\n' + e;
+        logFetchedAt.textContent = 'failed ' + new Date().toLocaleTimeString();
+    } finally {
+        liveLogInFlight = false;
     }
 }
 
@@ -861,9 +1050,15 @@ btnShowLog.addEventListener('click', () => {
     const hidden = logPanel.style.display === 'none';
     logPanel.style.display = hidden ? 'block' : 'none';
     btnShowLog.textContent  = hidden ? 'Hide Log' : 'View Scraper Log';
-    if (hidden) loadLog();
+    if (hidden) loadLog(true);
 });
-btnRefreshLog.addEventListener('click', loadLog);
+btnRefreshLog.addEventListener('click', async () => {
+    btnRefreshLog.disabled = true;
+    btnRefreshLog.textContent = '⧗ ...';
+    await loadLog(true);
+    btnRefreshLog.disabled = false;
+    btnRefreshLog.innerHTML = '&#8635; Refresh';
+});
 </script>
 </body>
 </html>
