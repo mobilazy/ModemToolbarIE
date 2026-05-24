@@ -1939,6 +1939,14 @@ namespace ModemMergerWinFormsApp
                     break;
                 }
 
+                // If explicit BHA rack-back/POOH is hidden in collapsed rows, use next
+                // hole/section boundary as a soft section end.
+                if (endIdx2 < 0 && nextHoleIdx < timedTasks.Count)
+                {
+                    endIdx2 = nextHoleIdx;
+                    endValue2 = timedTasks[nextHoleIdx].Item1.StartDateTime;
+                }
+
                 if (endIdx2 < 0 || string.IsNullOrWhiteSpace(endValue2)) continue;
 
                 var startTask2 = timedTasks[startIdx].Item1;
@@ -2090,6 +2098,37 @@ namespace ModemMergerWinFormsApp
                 ScrapeLog.Info($"  >> Section (D-section fallback): '{synD.SectionName}' at {dTt.Item1.StartDateTime}");
             }
 
+            // ── DEDUP OVERLAPPING SECTIONS ────────────────────────────────────────────
+            // Keep the strongest interpretation when two sections likely represent the
+            // same BHA cycle (for example, explicit MU/POOH section + hole fallback).
+            var keep = Enumerable.Repeat(true, sections.Count).ToArray();
+            for (int i = 0; i < sections.Count; i++)
+            {
+                if (!keep[i]) continue;
+                for (int j = i + 1; j < sections.Count; j++)
+                {
+                    if (!keep[j]) continue;
+                    if (!SectionsLikelySameCycle(sections[i], sections[j])) continue;
+
+                    int ci = GetSectionConfidence(sections[i]);
+                    int cj = GetSectionConfidence(sections[j]);
+
+                    if (ci > cj) { keep[j] = false; continue; }
+                    if (cj > ci) { keep[i] = false; break; }
+
+                    bool iHasSize = !string.IsNullOrWhiteSpace(sections[i].SectionSize);
+                    bool jHasSize = !string.IsNullOrWhiteSpace(sections[j].SectionSize);
+                    if (iHasSize && !jHasSize) { keep[j] = false; continue; }
+                    if (jHasSize && !iHasSize) { keep[i] = false; break; }
+
+                    double iDur = sections[i].DurationDays;
+                    double jDur = sections[j].DurationDays;
+                    if (iDur >= jDur) keep[j] = false;
+                    else { keep[i] = false; break; }
+                }
+            }
+            sections = sections.Where((s, idx) => keep[idx]).ToList();
+
             // Re-sort all sections by start time after both extraction passes.
             sections = sections
                 .OrderBy(s =>
@@ -2186,7 +2225,121 @@ namespace ModemMergerWinFormsApp
             if (string.Equals(lk, rk, StringComparison.OrdinalIgnoreCase)) return true;
 
             // Handle cases where one side includes extra context but the same size tokens.
-            return lk.Contains(rk) || rk.Contains(lk);
+            if (lk.Contains(rk) || rk.Contains(lk)) return true;
+
+            // Numeric-tolerant match for values like 15.955 vs 15.995.
+            var lt = ParseSizeTokens(left);
+            var rt = ParseSizeTokens(right);
+            if (lt.Count == 0 || rt.Count == 0) return false;
+
+            int matched = 0;
+            foreach (var a in lt)
+            {
+                foreach (var b in rt)
+                {
+                    if (Math.Abs(a - b) <= 0.06)
+                    {
+                        matched++;
+                        break;
+                    }
+                }
+            }
+
+            return matched >= Math.Min(lt.Count, rt.Count);
+        }
+
+        private static List<double> ParseSizeTokens(string value)
+        {
+            var tokens = new List<double>();
+            if (string.IsNullOrWhiteSpace(value)) return tokens;
+
+            var s = value.ToLowerInvariant();
+            s = Regex.Replace(s, @"inch(?:es)?\b|in\b|\""|''", " ", RegexOptions.IgnoreCase);
+
+            foreach (Match m in Regex.Matches(s, @"\d+(?:\.\d+)?(?:[\s-]*\d+/\d+)?"))
+            {
+                var t = m.Value.Trim();
+                if (string.IsNullOrWhiteSpace(t)) continue;
+
+                double n;
+                if (TryParseSizeNumber(t, out n))
+                    tokens.Add(n);
+            }
+
+            return tokens;
+        }
+
+        private static bool TryParseSizeNumber(string token, out double value)
+        {
+            value = 0;
+            if (string.IsNullOrWhiteSpace(token)) return false;
+
+            var t = Regex.Replace(token.Trim(), @"\s+", " ");
+            t = t.Replace("-", " ");
+
+            var mixed = Regex.Match(t, @"^(\d+(?:\.\d+)?)\s+(\d+)/(\d+)$");
+            if (mixed.Success)
+            {
+                double whole;
+                double num;
+                double den;
+                if (!double.TryParse(mixed.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out whole)) return false;
+                if (!double.TryParse(mixed.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out num)) return false;
+                if (!double.TryParse(mixed.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out den)) return false;
+                if (Math.Abs(den) < 1e-9) return false;
+                value = whole + (num / den);
+                return true;
+            }
+
+            var frac = Regex.Match(t, @"^(\d+)/(\d+)$");
+            if (frac.Success)
+            {
+                double num;
+                double den;
+                if (!double.TryParse(frac.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out num)) return false;
+                if (!double.TryParse(frac.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out den)) return false;
+                if (Math.Abs(den) < 1e-9) return false;
+                value = num / den;
+                return true;
+            }
+
+            return double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static bool SectionsLikelySameCycle(TimePlannerSection a, TimePlannerSection b)
+        {
+            DateTime aStart, bStart;
+            if (!TryParseKabalDate(a.MuBhaDateTime, out aStart) || !TryParseKabalDate(b.MuBhaDateTime, out bStart))
+                return false;
+
+            DateTime aEnd;
+            DateTime bEnd;
+            if (!TryParseKabalDate(a.PoohDateTime, out aEnd)) aEnd = aStart;
+            if (!TryParseKabalDate(b.PoohDateTime, out bEnd)) bEnd = bStart;
+
+            bool overlap = aStart <= bEnd && bStart <= aEnd;
+            if (!overlap) return false;
+
+            return SizesLikelyMatch(a.SectionSize, b.SectionSize)
+                || Math.Abs((aStart - bStart).TotalHours) < 2.0;
+        }
+
+        private static int GetSectionConfidence(TimePlannerSection section)
+        {
+            if (section == null) return 0;
+            int score = 0;
+
+            if (!string.IsNullOrWhiteSpace(section.SectionSize)) score += 2;
+            if (section.DurationDays > 0) score += 1;
+
+            foreach (var t in section.Tasks ?? new List<TimePlannerTask>())
+            {
+                if (t == null || string.IsNullOrWhiteSpace(t.TaskName)) continue;
+                if (IsSectionStartTask(t.TaskName)) score += 3;
+                if (_poohRx.IsMatch(t.TaskName) || _ldBhaRx.IsMatch(t.TaskName)) score += 3;
+            }
+
+            return score;
         }
 
         private static bool IsHoleOrSectionTaskName(string taskName)
